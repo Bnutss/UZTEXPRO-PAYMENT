@@ -8,6 +8,7 @@ import 'login_page.dart';
 class MainPageScreen extends StatefulWidget {
   final String jwtToken;
 
+  ///
   MainPageScreen({required this.jwtToken});
 
   @override
