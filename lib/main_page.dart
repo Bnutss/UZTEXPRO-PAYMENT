@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:uztexpro_payment/main.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'settings_screen.dart'; // Импортируйте экран настроек
+import 'settings_screen.dart';
+import 'login_page.dart'; // Импортируем страницу входа
 
 class MainPageScreen extends StatefulWidget {
   final String jwtToken;
@@ -235,6 +236,16 @@ class _MainPageScreenState extends State<MainPageScreen> {
     await fetchData();
   }
 
+  void _logout() {
+    // Очистка токена и переход на страницу входа
+    storage.delete(key: "jwtToken").then((_) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => LoginPage()),
+        (Route<dynamic> route) => false,
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -258,6 +269,10 @@ class _MainPageScreenState extends State<MainPageScreen> {
                 MaterialPageRoute(builder: (context) => SettingsScreen()),
               );
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            onPressed: _logout,
           ),
         ],
       ),
