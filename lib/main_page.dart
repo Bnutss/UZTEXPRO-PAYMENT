@@ -309,7 +309,9 @@ class _MainPageScreenState extends State<MainPageScreen> {
                       ),
                       leading: const Icon(Icons.business, color: Colors.blue),
                       onTap: () {
-                        showInputDialog(context, item);
+                        if(item['has_change']){
+                          showInputDialog(context, item);
+                        }
                       },
                     ),
                   );
