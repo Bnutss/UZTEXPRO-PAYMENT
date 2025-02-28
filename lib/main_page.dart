@@ -8,7 +8,6 @@ import 'login_page.dart';
 class MainPageScreen extends StatefulWidget {
   final String jwtToken;
 
-  ///
   MainPageScreen({required this.jwtToken});
 
   @override
@@ -238,7 +237,6 @@ class _MainPageScreenState extends State<MainPageScreen> {
   }
 
   void _logout() {
-    // Очистка токена и переход на страницу входа
     storage.delete(key: "jwtToken").then((_) {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => LoginPage()),
