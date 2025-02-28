@@ -3,7 +3,7 @@ import 'package:uztexpro_payment/main.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'settings_screen.dart';
-import 'login_page.dart'; // Импортируем страницу входа
+import 'login_page.dart';
 
 class MainPageScreen extends StatefulWidget {
   final String jwtToken;
