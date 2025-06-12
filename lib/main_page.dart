@@ -24,6 +24,7 @@ class _MainPageScreenState extends State<MainPageScreen>
   List<dynamic> statuses = [];
   Map<String, dynamic>? selectedStatus;
   bool isLoading = true;
+  bool isUpdatingStatus = false;
   TextEditingController notesController = TextEditingController();
   TextEditingController amountController = TextEditingController();
   final NumberFormat currencyFormatter = NumberFormat('#,###', 'ru');
@@ -205,383 +206,404 @@ class _MainPageScreenState extends State<MainPageScreen>
     }
   }
 
-  void showUpdateStatusDialog(
-      BuildContext context, Map<String, dynamic> report) {
-    selectedStatus = statuses.firstWhere(
-      (status) => status["id"] == report['status'],
-      orElse: () => null,
-    );
+  Color _getStatusColor(int statusId) {
+    switch (statusId) {
+      case 2:
+        return const Color(0xFF43A047);
+      case 3:
+        return const Color(0xFFD32F2F);
+      case 5:
+        return const Color(0xFFEF6C00);
+      default:
+        return const Color(0xFF1976D2);
+    }
+  }
 
-    notesController.text = report['notes'] ?? '';
-    amountController.clear();
+  IconData _getStatusIcon(int statusId) {
+    switch (statusId) {
+      case 2:
+        return Icons.check_circle;
+      case 3:
+        return Icons.cancel;
+      case 5:
+        return Icons.account_balance_wallet;
+      default:
+        return Icons.pending;
+    }
+  }
 
-    showDialog(
+  void _showSuccessAnimation() {
+    showGeneralDialog(
       context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            bool showAmountField = selectedStatus?["id"] == 5;
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.5),
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (context, animation1, animation2) {
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          Navigator.of(context).pop();
+        });
 
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              elevation: 10,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.update,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Обновление статуса платежа',
-                            style: TextStyle(
-                              color: Theme.of(context).primaryColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(Icons.close),
-                          padding: EdgeInsets.zero,
-                          splashRadius: 24,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.grey.shade100, Colors.grey.shade200],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.shade300,
-                            blurRadius: 3,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+        return Center(
+          child: TweenAnimationBuilder(
+            tween: Tween<double>(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 500),
+            builder: (context, double value, child) {
+              return Transform.scale(
+                scale: value,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.withOpacity(0.3),
+                        blurRadius: 15,
+                        spreadRadius: 5,
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${report['bussines_name'] ?? "Без названия"}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 8),
-                          _buildDialogInfoRow(Icons.description, 'Договор:',
-                              '${report['contract'] ?? 'Нет данных'}'),
-                          const SizedBox(height: 6),
-                          _buildDialogInfoRow(Icons.subject, 'Предмет:',
-                              '${report['sub_contract'] ?? 'Нет данных'}'),
-                          const SizedBox(height: 6),
-                          _buildDialogInfoRow(Icons.monetization_on, 'Сумма:',
-                              '${formatCurrency(report['contract_price'])} ${report['currency_name'] ?? ''}'),
-                        ],
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        color: Colors.green.shade600,
+                        size: 50,
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Выберите статус платежа:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade800,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade300),
-                        color: Colors.grey.shade50,
-                      ),
-                      child: DropdownButtonFormField<Map<String, dynamic>>(
-                        value: selectedStatus,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                          border: InputBorder.none,
-                          prefixIcon: Icon(Icons.playlist_add_check,
-                              color: Colors.orange.shade700),
-                        ),
-                        hint: const Text("Выберите статус платежа",
-                            style: TextStyle(fontSize: 14)),
-                        icon: Icon(Icons.arrow_drop_down,
-                            color: Colors.orange.shade700),
-                        items: statuses
-                            .map<DropdownMenuItem<Map<String, dynamic>>>(
-                                (status) {
-                          return DropdownMenuItem<Map<String, dynamic>>(
-                            value: status,
-                            child: Text(status["name"],
-                                style: const TextStyle(fontSize: 14)),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setDialogState(() {
-                            selectedStatus = value;
-                            showAmountField = selectedStatus?["id"] == 5;
-                          });
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (showAmountField)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Сумма частичной оплаты:',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey.shade800,
-                              fontSize: 15,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: amountController,
-                            keyboardType: TextInputType.number,
-                            style: const TextStyle(fontSize: 14),
-                            decoration: InputDecoration(
-                              hintText: 'Введите сумму',
-                              hintStyle: TextStyle(
-                                  fontSize: 14, color: Colors.grey.shade500),
-                              filled: true,
-                              fillColor: Colors.grey.shade50,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide:
-                                    BorderSide(color: Colors.grey.shade300),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                    color: Colors.orange.shade700, width: 2),
-                              ),
-                              prefixIcon: Icon(Icons.monetization_on,
-                                  size: 20, color: Colors.orange.shade700),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  vertical: 12, horizontal: 16),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-                      ),
-                    Text(
-                      'Примечание:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade800,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: notesController,
-                      maxLines: 3,
-                      style: const TextStyle(fontSize: 14),
-                      decoration: InputDecoration(
-                        hintText: 'Добавьте комментарий...',
-                        hintStyle: TextStyle(
-                            fontSize: 14, color: Colors.grey.shade500),
-                        filled: true,
-                        fillColor: Colors.grey.shade50,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                              color: Colors.orange.shade700, width: 2),
-                        ),
-                        prefixIcon: Icon(Icons.comment,
-                            size: 20, color: Colors.orange.shade700),
-                        contentPadding: const EdgeInsets.symmetric(
-                            vertical: 12, horizontal: 16),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: Text(
-                            "ОТМЕНА",
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade700,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton(
-                          onPressed: () async {
-                            if (selectedStatus == null) {
-                              showNotification(
-                                  'Пожалуйста, выберите статус', false);
-                              return;
-                            }
-
-                            Navigator.of(context).pop();
-
-                            showDialog(
-                              context: context,
-                              barrierDismissible: false,
-                              builder: (BuildContext context) {
-                                return Dialog(
-                                  backgroundColor: Colors.transparent,
-                                  elevation: 0,
-                                  child: Center(
-                                    child: Container(
-                                      padding: const EdgeInsets.all(20),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(15),
-                                      ),
-                                      child: const Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          CircularProgressIndicator(
-                                            valueColor:
-                                                AlwaysStoppedAnimation<Color>(
-                                                    Color(0xFFFF9800)),
-                                            strokeWidth: 3,
-                                          ),
-                                          SizedBox(height: 16),
-                                          Text(
-                                            'Обновление статуса...',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            );
-
-                            try {
-                              var requestData = {
-                                'notes': notesController.text,
-                                'status': selectedStatus?["id"],
-                              };
-
-                              if (amountController.text.isNotEmpty) {
-                                requestData['partial_price'] =
-                                    amountController.text;
-                              }
-
-                              var response = await http
-                                  .patch(
-                                    Uri.parse(
-                                        "$API/edo/payment-raport/${report['id']}/"),
-                                    headers: {
-                                      "Content-Type": "application/json",
-                                      "Authorization":
-                                          "Bearer ${jsonDecode(widget.jwtToken)["token"]}",
-                                    },
-                                    body: jsonEncode(requestData),
-                                  )
-                                  .timeout(
-                                    const Duration(seconds: 20),
-                                    onTimeout: () => http.Response(
-                                        'Время ожидания истекло', 408),
-                                  );
-                              Navigator.of(context).pop();
-
-                              if (response.statusCode == 200 ||
-                                  response.statusCode == 201) {
-                                showNotification(
-                                    'Статус платежа успешно обновлен', true);
-                                fetchPaymentReports();
-                              } else {
-                                showNotification(
-                                    'Ошибка при обновлении статуса', false);
-                              }
-                            } catch (e) {
-                              Navigator.of(context).pop();
-                              showNotification(
-                                  'Произошла ошибка при обновлении', false);
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFF9800),
-                            foregroundColor: Colors.white,
-                            elevation: 3,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            "СОХРАНИТЬ",
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         );
       },
     );
   }
 
-  Widget _buildDialogInfoRow(IconData icon, String label, String value) {
+  Future<void> updateReportStatus(
+      Map<String, dynamic> report,
+      Map<String, dynamic> selectedStatus,
+      String notes,
+      String? partialPrice) async {
+    bool confirmed = await showModalBottomSheet<bool>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (BuildContext context) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 10,
+                    spreadRadius: 0,
+                    offset: Offset(0, -2),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.sync,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Подтверждение действия',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Изменить статус платежа на:',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _getStatusColor(selectedStatus["id"])
+                                .withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _getStatusColor(selectedStatus["id"])
+                                  .withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _getStatusIcon(selectedStatus["id"]),
+                                color: _getStatusColor(selectedStatus["id"]),
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                selectedStatus["name"],
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: _getStatusColor(selectedStatus["id"]),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (notes.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            'Примечание:',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.amber.shade200),
+                            ),
+                            child: Text(
+                              notes,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade800,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (partialPrice != null &&
+                            partialPrice.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            'Сумма частичной оплаты:',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.green.shade200),
+                            ),
+                            child: Text(
+                              '$partialPrice ${report['currency_name'] ?? ''}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          child: Text(
+                            'ОТМЕНА',
+                            style: TextStyle(
+                              color: Colors.grey.shade700,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.of(context).pop(true),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            backgroundColor: const Color(0xFFFF9800),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'ПОДТВЕРДИТЬ',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        ) ??
+        false;
+    if (!confirmed) return;
+    final loadingOverlayEntry = OverlayEntry(
+      builder: (context) => Material(
+        color: Colors.black.withOpacity(0.3),
+        child: Center(
+          child: Container(
+            width: 180,
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 12,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: CircularProgressIndicator(
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(Colors.orange.shade700),
+                    strokeWidth: 3,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Обновление...',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    Overlay.of(context).insert(loadingOverlayEntry);
+    var requestData = {
+      'status': selectedStatus["id"],
+      'notes': notes,
+    };
+
+    if (partialPrice != null && partialPrice.isNotEmpty) {
+      requestData['partial_price'] = partialPrice;
+    }
+
+    try {
+      var response = await http
+          .patch(
+            Uri.parse("$API/edo/payment-raport/${report['id']}/"),
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer ${jsonDecode(widget.jwtToken)["token"]}",
+            },
+            body: jsonEncode(requestData),
+          )
+          .timeout(
+            const Duration(seconds: 20),
+            onTimeout: () => throw Exception('Время ожидания истекло'),
+          );
+      loadingOverlayEntry.remove();
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        _showSuccessAnimation();
+        showNotification('Статус платежа успешно обновлен', true);
+        await fetchPaymentReports();
+      } else {
+        throw Exception('Ошибка сервера: ${response.statusCode}');
+      }
+    } catch (e) {
+      loadingOverlayEntry.remove();
+      showNotification('Ошибка при обновлении: ${e.toString()}', false);
+    }
+  }
+
+  Widget _buildCompactInfoRow(IconData icon, String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -612,6 +634,387 @@ class _MainPageScreenState extends State<MainPageScreen>
           ),
         ),
       ],
+    );
+  }
+
+  void showUpdateStatusDialog(
+      BuildContext context, Map<String, dynamic> report) {
+    selectedStatus = statuses.firstWhere(
+      (status) => status["id"] == report['status'],
+      orElse: () => null,
+    );
+
+    notesController.text = report['notes'] ?? '';
+    amountController.clear();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            bool showAmountField = selectedStatus?["id"] == 5;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 10,
+                      offset: Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Center(
+                      child: Container(
+                        margin: const EdgeInsets.only(top: 12),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFFFB74D), Color(0xFFFF9800)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.edit_note,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Изменение статуса',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  report['bussines_name'] ?? 'Платеж',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                            icon: Icon(
+                              Icons.close,
+                              size: 20,
+                              color: Colors.grey.shade700,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        children: [
+                          _buildCompactInfoRow(
+                            Icons.description_outlined,
+                            'Договор:',
+                            report['contract'] ?? 'Нет данных',
+                          ),
+                          const SizedBox(height: 8),
+                          _buildCompactInfoRow(
+                            Icons.subject_outlined,
+                            'Предмет:',
+                            report['sub_contract'] ?? 'Нет данных',
+                          ),
+                          const SizedBox(height: 8),
+                          _buildCompactInfoRow(
+                            Icons.monetization_on_outlined,
+                            'Сумма:',
+                            '${formatCurrency(report['contract_price'])} ${report['currency_name'] ?? ''}',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Статус платежа',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey.shade800,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade300),
+                              color: Colors.grey.shade50,
+                            ),
+                            child:
+                                DropdownButtonFormField<Map<String, dynamic>>(
+                              value: selectedStatus,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
+                                border: InputBorder.none,
+                                prefixIcon: Icon(Icons.playlist_add_check,
+                                    color: Colors.orange.shade700),
+                              ),
+                              hint: const Text("Выберите статус платежа",
+                                  style: TextStyle(fontSize: 14)),
+                              icon: Icon(Icons.arrow_drop_down,
+                                  color: Colors.orange.shade700),
+                              items: statuses
+                                  .map<DropdownMenuItem<Map<String, dynamic>>>(
+                                      (status) {
+                                Color statusColor =
+                                    _getStatusColor(status["id"]);
+                                return DropdownMenuItem<Map<String, dynamic>>(
+                                  value: status,
+                                  child: Row(
+                                    children: [
+                                      Icon(_getStatusIcon(status["id"]),
+                                          size: 18, color: statusColor),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        status["name"],
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey.shade800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setModalState(() {
+                                  selectedStatus = value;
+                                  showAmountField = selectedStatus?["id"] == 5;
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (showAmountField)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Сумма частичной оплаты',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey.shade800,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: amountController,
+                              keyboardType: TextInputType.number,
+                              style: const TextStyle(fontSize: 14),
+                              decoration: InputDecoration(
+                                hintText: 'Введите сумму',
+                                hintStyle: TextStyle(
+                                    fontSize: 14, color: Colors.grey.shade500),
+                                filled: true,
+                                fillColor: Colors.grey.shade50,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide:
+                                      BorderSide(color: Colors.grey.shade300),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(
+                                      color: Colors.orange.shade700, width: 2),
+                                ),
+                                prefixIcon: Icon(Icons.monetization_on,
+                                    size: 20, color: Colors.orange.shade700),
+                                suffixText: report['currency_name'] ?? '',
+                                contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 12, horizontal: 16),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Примечание',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey.shade800,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: notesController,
+                            maxLines: 2,
+                            style: const TextStyle(fontSize: 14),
+                            decoration: InputDecoration(
+                              hintText: 'Добавьте комментарий...',
+                              hintStyle: TextStyle(
+                                  fontSize: 14, color: Colors.grey.shade500),
+                              filled: true,
+                              fillColor: Colors.grey.shade50,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide:
+                                    BorderSide(color: Colors.grey.shade300),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                    color: Colors.orange.shade700, width: 2),
+                              ),
+                              prefixIcon: Icon(Icons.comment,
+                                  size: 20, color: Colors.orange.shade700),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 12, horizontal: 16),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () =>
+                                  Navigator.of(dialogContext).pop(),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                side: BorderSide(color: Colors.grey.shade300),
+                              ),
+                              child: Text(
+                                'ОТМЕНА',
+                                style: TextStyle(
+                                  color: Colors.grey.shade700,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                if (selectedStatus == null) {
+                                  showNotification(
+                                      'Пожалуйста, выберите статус', false);
+                                  return;
+                                }
+
+                                Navigator.of(dialogContext).pop();
+
+                                final Map<String, dynamic> statusToUpdate =
+                                    Map<String, dynamic>.from(selectedStatus!);
+                                final String notesText = notesController.text;
+                                final String? partialPrice = showAmountField
+                                    ? amountController.text
+                                    : null;
+
+                                updateReportStatus(report, statusToUpdate,
+                                    notesText, partialPrice);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                backgroundColor: const Color(0xFFFF9800),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'СОХРАНИТЬ',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -1041,13 +1444,13 @@ class _MainPageScreenState extends State<MainPageScreen>
                                           size: 18,
                                         ),
                                       ),
-                                      const SizedBox(width: 12),
+                                      const SizedBox(width: 10),
                                       Expanded(
                                         child: Text(
                                           report['bussines_name'] ??
                                               "Без названия",
                                           style: const TextStyle(
-                                            fontSize: 16,
+                                            fontSize: 14,
                                             fontWeight: FontWeight.bold,
                                             color: Color(0xFF424242),
                                           ),
@@ -1057,7 +1460,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                                       if (report['has_change'])
                                         Container(
                                           padding: const EdgeInsets.symmetric(
-                                              horizontal: 8, vertical: 4),
+                                              horizontal: 6, vertical: 4),
                                           decoration: BoxDecoration(
                                             color: Colors.blue.shade50,
                                             borderRadius:
@@ -1079,7 +1482,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                                               Text(
                                                 'Доступно',
                                                 style: TextStyle(
-                                                  fontSize: 12,
+                                                  fontSize: 11,
                                                   color: Colors.blue.shade700,
                                                   fontWeight: FontWeight.bold,
                                                 ),
@@ -1122,11 +1525,11 @@ class _MainPageScreenState extends State<MainPageScreen>
                                       const SizedBox(height: 12),
                                       _buildInfoRow(
                                         'Заявитель',
-                                        report['update_by'] ?? 'Не указан',
+                                        report['applicant_name'] ?? 'Не указан',
                                         Icons.person,
                                         Colors.blueGrey.shade600,
                                       ),
-                                      const SizedBox(height: 8),
+                                      const SizedBox(height: 6),
                                       if (report['raport_paying_type_name'] !=
                                           null)
                                         _buildInfoRow(
@@ -1136,7 +1539,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                                           payingTypeColor,
                                           isBold: true,
                                         ),
-                                      const SizedBox(height: 8),
+                                      const SizedBox(height: 6),
                                       Container(
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
@@ -1161,7 +1564,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                                                     children: [
                                                       Icon(
                                                         Icons.account_balance,
-                                                        size: 14,
+                                                        size: 12,
                                                         color: Colors
                                                             .orange.shade700,
                                                       ),
@@ -1181,7 +1584,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                                                     formatCurrency(report[
                                                         'contract_price']),
                                                     style: const TextStyle(
-                                                      fontSize: 13,
+                                                      fontSize: 11,
                                                       fontWeight:
                                                           FontWeight.bold,
                                                       color: Color(0xFF424242),
@@ -1206,7 +1609,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                                                     children: [
                                                       Icon(
                                                         Icons.payment,
-                                                        size: 14,
+                                                        size: 12,
                                                         color: Colors
                                                             .green.shade700,
                                                       ),
@@ -1226,7 +1629,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                                                     formatCurrency(
                                                         report['paid']),
                                                     style: const TextStyle(
-                                                      fontSize: 13,
+                                                      fontSize: 11,
                                                       fontWeight:
                                                           FontWeight.bold,
                                                       color: Color(0xFF424242),
@@ -1251,7 +1654,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                                                     children: [
                                                       Icon(
                                                         Icons.currency_exchange,
-                                                        size: 14,
+                                                        size: 12,
                                                         color: Colors
                                                             .indigo.shade700,
                                                       ),
@@ -1271,7 +1674,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                                                     report['currency_name'] ??
                                                         '-',
                                                     style: const TextStyle(
-                                                      fontSize: 13,
+                                                      fontSize: 11,
                                                       fontWeight:
                                                           FontWeight.bold,
                                                       color: Color(0xFF424242),
@@ -1301,14 +1704,14 @@ class _MainPageScreenState extends State<MainPageScreen>
                                             Icon(
                                               statusIcon,
                                               color: statusColor,
-                                              size: 20,
+                                              size: 18,
                                             ),
                                             const SizedBox(width: 8),
                                             Expanded(
                                               child: Text(
                                                 'Статус: ${report['status_name'] ?? 'Не определен'}',
                                                 style: TextStyle(
-                                                  fontSize: 14,
+                                                  fontSize: 12,
                                                   fontWeight: FontWeight.bold,
                                                   color: statusColor,
                                                 ),
@@ -1325,7 +1728,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                                                       Icons.file_present,
                                                       color:
                                                           Colors.blue.shade700,
-                                                      size: 20,
+                                                      size: 18,
                                                     ),
                                                     onPressed: () {
                                                       _launchURL(report[
@@ -1335,8 +1738,8 @@ class _MainPageScreenState extends State<MainPageScreen>
                                                     padding: EdgeInsets.zero,
                                                     constraints:
                                                         const BoxConstraints(
-                                                      minWidth: 32,
-                                                      minHeight: 32,
+                                                      minWidth: 30,
+                                                      minHeight: 30,
                                                     ),
                                                   ),
                                                   IconButton(
@@ -1344,7 +1747,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                                                       Icons.copy,
                                                       color:
                                                           Colors.blue.shade700,
-                                                      size: 20,
+                                                      size: 18,
                                                     ),
                                                     onPressed: () async {
                                                       final fullUrl =
@@ -1361,8 +1764,8 @@ class _MainPageScreenState extends State<MainPageScreen>
                                                     padding: EdgeInsets.zero,
                                                     constraints:
                                                         const BoxConstraints(
-                                                      minWidth: 32,
-                                                      minHeight: 32,
+                                                      minWidth: 30,
+                                                      minHeight: 30,
                                                     ),
                                                   ),
                                                 ],
@@ -1393,14 +1796,14 @@ class _MainPageScreenState extends State<MainPageScreen>
                                                 Icon(
                                                   Icons.note,
                                                   color: Colors.amber.shade800,
-                                                  size: 18,
+                                                  size: 16,
                                                 ),
                                                 const SizedBox(width: 8),
                                                 Expanded(
                                                   child: Text(
                                                     report['notes'],
                                                     style: TextStyle(
-                                                      fontSize: 13,
+                                                      fontSize: 11,
                                                       color:
                                                           Colors.grey.shade800,
                                                       fontStyle:
@@ -1441,7 +1844,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                                           Icon(
                                             Icons.touch_app,
                                             color: Colors.white,
-                                            size: 16,
+                                            size: 14,
                                           ),
                                           SizedBox(width: 6),
                                           Text(
@@ -1449,7 +1852,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                                             style: TextStyle(
                                               color: Colors.white,
                                               fontWeight: FontWeight.bold,
-                                              fontSize: 12,
+                                              fontSize: 11,
                                             ),
                                           ),
                                         ],
@@ -1544,14 +1947,14 @@ class _MainPageScreenState extends State<MainPageScreen>
         children: [
           Icon(
             icon,
-            size: 16,
+            size: 14,
             color: Colors.grey.shade600,
           ),
           const SizedBox(width: 8),
           Text(
             '$label:',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 11,
               color: Colors.grey.shade700,
               fontWeight: FontWeight.w500,
             ),
@@ -1561,7 +1964,7 @@ class _MainPageScreenState extends State<MainPageScreen>
             child: Text(
               value,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 11,
                 fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
                 color: valueColor,
               ),
