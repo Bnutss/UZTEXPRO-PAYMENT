@@ -8,6 +8,8 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'package:shimmer/shimmer.dart';
+import 'app_strings.dart';
+import 'locale_notifier.dart';
 
 class MainPageScreen extends StatefulWidget {
   final String jwtToken;
@@ -53,7 +55,10 @@ class _MainPageScreenState extends State<MainPageScreen>
     });
 
     _initializeData();
+    localeNotifier.addListener(_onLocaleChanged);
   }
+
+  void _onLocaleChanged() => setState(() {});
 
   @override
   void dispose() {
@@ -61,6 +66,7 @@ class _MainPageScreenState extends State<MainPageScreen>
     _scrollController.dispose();
     notesController.dispose();
     amountController.dispose();
+    localeNotifier.removeListener(_onLocaleChanged);
     super.dispose();
   }
 
@@ -89,10 +95,7 @@ class _MainPageScreenState extends State<MainPageScreen>
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 2,
               ),
@@ -112,10 +115,9 @@ class _MainPageScreenState extends State<MainPageScreen>
 
   Future<void> fetchPaymentStatuses() async {
     const String storageKey = "payment_statuses";
-
+    final s = S.of(context);
     try {
       String? storedData = await storage.read(key: storageKey);
-
       if (storedData != null) {
         setState(() {
           statuses = jsonDecode(storedData);
@@ -128,7 +130,7 @@ class _MainPageScreenState extends State<MainPageScreen>
           },
         ).timeout(
           const Duration(seconds: 15),
-          onTimeout: () => throw Exception('Превышено время ожидания'),
+          onTimeout: () => throw Exception('Timeout'),
         );
 
         if (response.statusCode == 200) {
@@ -138,19 +140,17 @@ class _MainPageScreenState extends State<MainPageScreen>
             statuses = jsonResponse;
           });
         } else {
-          throw Exception('Не удалось загрузить статусы');
+          throw Exception('Failed');
         }
       }
     } catch (e) {
-      showNotification('Ошибка при загрузке статусов', false);
+      showNotification(s.loadStatusError, false);
     }
   }
 
   Future<void> fetchPaymentReports() async {
-    setState(() {
-      isLoading = true;
-    });
-
+    setState(() => isLoading = true);
+    final s = S.of(context);
     try {
       final response = await http.get(
         Uri.parse("$API/edo/payment-raport/?for_mobile=1"),
@@ -159,7 +159,7 @@ class _MainPageScreenState extends State<MainPageScreen>
         },
       ).timeout(
         const Duration(seconds: 15),
-        onTimeout: () => throw Exception('Превышено время ожидания'),
+        onTimeout: () => throw Exception('Timeout'),
       );
 
       if (response.statusCode == 200) {
@@ -170,13 +170,11 @@ class _MainPageScreenState extends State<MainPageScreen>
         });
         _animationController.forward();
       } else {
-        throw Exception('Не удалось загрузить платежные рапорты');
+        throw Exception('Failed');
       }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-      showNotification('Ошибка при загрузке данных', false);
+      setState(() => isLoading = false);
+      showNotification(s.loadDataError, false);
     }
   }
 
@@ -187,22 +185,19 @@ class _MainPageScreenState extends State<MainPageScreen>
   }
 
   Future<void> _launchURL(String url) async {
+    final s = S.of(context);
     final fullUrl = 'https://uztex.pro$url';
-
     try {
       final Uri uri = Uri.parse(fullUrl);
-      if (!await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      )) {
-        showNotification('Не удалось открыть файл', false);
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        showNotification(s.fileOpenError, false);
         await Clipboard.setData(ClipboardData(text: fullUrl));
-        showNotification('URL скопирован в буфер обмена', true);
+        showNotification(s.urlCopied, true);
       }
     } catch (e) {
-      showNotification('Ошибка при открытии файла', false);
+      showNotification(s.fileError, false);
       await Clipboard.setData(ClipboardData(text: fullUrl));
-      showNotification('URL скопирован в буфер обмена', true);
+      showNotification(s.urlCopied, true);
     }
   }
 
@@ -242,7 +237,6 @@ class _MainPageScreenState extends State<MainPageScreen>
         Future.delayed(const Duration(milliseconds: 1500), () {
           Navigator.of(context).pop();
         });
-
         return Center(
           child: TweenAnimationBuilder(
             tween: Tween<double>(begin: 0.0, end: 1.0),
@@ -254,7 +248,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
@@ -264,15 +258,12 @@ class _MainPageScreenState extends State<MainPageScreen>
                       ),
                     ],
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.check_circle,
-                        color: Colors.green.shade600,
-                        size: 50,
-                      ),
-                    ],
+                  child: Center(
+                    child: Icon(
+                      Icons.check_circle,
+                      color: Colors.green.shade600,
+                      size: 50,
+                    ),
                   ),
                 ),
               );
@@ -288,19 +279,25 @@ class _MainPageScreenState extends State<MainPageScreen>
       Map<String, dynamic> selectedStatus,
       String notes,
       String? partialPrice) async {
+    final s = S.of(context);
+    final theme = Theme.of(context);
+    final surface = theme.colorScheme.surface;
+    final onSurface = theme.colorScheme.onSurface;
+    final outline = theme.colorScheme.outline;
+
     bool confirmed = await showModalBottomSheet<bool>(
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
           builder: (BuildContext context) {
             return Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
+              decoration: BoxDecoration(
+                color: surface,
+                borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(24),
                   topRight: Radius.circular(24),
                 ),
-                boxShadow: [
+                boxShadow: const [
                   BoxShadow(
                     color: Colors.black26,
                     blurRadius: 10,
@@ -320,7 +317,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
+                        color: outline,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -337,20 +334,13 @@ class _MainPageScreenState extends State<MainPageScreen>
                           ),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(
-                          Icons.sync,
-                          color: Colors.white,
-                          size: 20,
-                        ),
+                        child: const Icon(Icons.sync, color: Colors.white, size: 20),
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Подтверждение действия',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          s.confirmAction,
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: onSurface),
                         ),
                       ),
                     ],
@@ -359,31 +349,25 @@ class _MainPageScreenState extends State<MainPageScreen>
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
+                      color: onSurface.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
+                      border: Border.all(color: outline),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Изменить статус платежа на:',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade700,
-                          ),
+                          s.changePaymentStatusTo,
+                          style: TextStyle(fontSize: 14, color: onSurface.withOpacity(0.7)),
                         ),
                         const SizedBox(height: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
-                            color: _getStatusColor(selectedStatus["id"])
-                                .withOpacity(0.1),
+                            color: _getStatusColor(selectedStatus["id"]).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: _getStatusColor(selectedStatus["id"])
-                                  .withOpacity(0.3),
+                              color: _getStatusColor(selectedStatus["id"]).withOpacity(0.3),
                             ),
                           ),
                           child: Row(
@@ -409,11 +393,8 @@ class _MainPageScreenState extends State<MainPageScreen>
                         if (notes.isNotEmpty) ...[
                           const SizedBox(height: 12),
                           Text(
-                            'Примечание:',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade700,
-                            ),
+                            s.noteColon,
+                            style: TextStyle(fontSize: 14, color: onSurface.withOpacity(0.7)),
                           ),
                           const SizedBox(height: 4),
                           Container(
@@ -426,22 +407,15 @@ class _MainPageScreenState extends State<MainPageScreen>
                             ),
                             child: Text(
                               notes,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey.shade800,
-                              ),
+                              style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.8)),
                             ),
                           ),
                         ],
-                        if (partialPrice != null &&
-                            partialPrice.isNotEmpty) ...[
+                        if (partialPrice != null && partialPrice.isNotEmpty) ...[
                           const SizedBox(height: 12),
                           Text(
-                            'Сумма частичной оплаты:',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade700,
-                            ),
+                            s.partialAmountColon,
+                            style: TextStyle(fontSize: 14, color: onSurface.withOpacity(0.7)),
                           ),
                           const SizedBox(height: 4),
                           Container(
@@ -473,15 +447,13 @@ class _MainPageScreenState extends State<MainPageScreen>
                           onPressed: () => Navigator.of(context).pop(false),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            side: BorderSide(color: Colors.grey.shade300),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            side: BorderSide(color: outline),
                           ),
                           child: Text(
-                            'ОТМЕНА',
+                            s.cancel,
                             style: TextStyle(
-                              color: Colors.grey.shade700,
+                              color: onSurface.withOpacity(0.7),
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
                             ),
@@ -497,16 +469,11 @@ class _MainPageScreenState extends State<MainPageScreen>
                             backgroundColor: const Color(0xFFFF9800),
                             foregroundColor: Colors.white,
                             elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                          child: const Text(
-                            'ПОДТВЕРДИТЬ',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
+                          child: Text(
+                            s.confirm,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                           ),
                         ),
                       ),
@@ -518,7 +485,9 @@ class _MainPageScreenState extends State<MainPageScreen>
           },
         ) ??
         false;
+
     if (!confirmed) return;
+
     final loadingOverlayEntry = OverlayEntry(
       builder: (context) => Material(
         color: Colors.black.withOpacity(0.3),
@@ -527,7 +496,7 @@ class _MainPageScreenState extends State<MainPageScreen>
             width: 180,
             padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
@@ -544,18 +513,18 @@ class _MainPageScreenState extends State<MainPageScreen>
                   width: 40,
                   height: 40,
                   child: CircularProgressIndicator(
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(Colors.orange.shade700),
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.orange.shade700),
                     strokeWidth: 3,
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Обновление...',
+                Text(
+                  s.updating,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontWeight: FontWeight.w500,
                     fontSize: 14,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ],
@@ -564,12 +533,13 @@ class _MainPageScreenState extends State<MainPageScreen>
         ),
       ),
     );
+
     Overlay.of(context).insert(loadingOverlayEntry);
+
     var requestData = {
       'status': selectedStatus["id"],
       'notes': notes,
     };
-
     if (partialPrice != null && partialPrice.isNotEmpty) {
       requestData['partial_price'] = partialPrice;
     }
@@ -584,40 +554,35 @@ class _MainPageScreenState extends State<MainPageScreen>
             },
             body: jsonEncode(requestData),
           )
-          .timeout(
-            const Duration(seconds: 20),
-            onTimeout: () => throw Exception('Время ожидания истекло'),
-          );
+          .timeout(const Duration(seconds: 20));
+
       loadingOverlayEntry.remove();
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         _showSuccessAnimation();
-        showNotification('Статус платежа успешно обновлен', true);
+        showNotification(s.statusUpdated, true);
         await fetchPaymentReports();
       } else {
-        throw Exception('Ошибка сервера: ${response.statusCode}');
+        throw Exception('Error: ${response.statusCode}');
       }
     } catch (e) {
       loadingOverlayEntry.remove();
-      showNotification('Ошибка при обновлении: ${e.toString()}', false);
+      showNotification('${s.updateError}: ${e.toString()}', false);
     }
   }
 
   Widget _buildCompactInfoRow(IconData icon, String label, String value) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon,
-          size: 16,
-          color: Colors.orange.shade700,
-        ),
+        Icon(icon, size: 16, color: Colors.orange.shade700),
         const SizedBox(width: 6),
         Text(
           label,
           style: TextStyle(
             fontSize: 13,
-            color: Colors.grey.shade700,
+            color: onSurface.withOpacity(0.7),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -625,10 +590,7 @@ class _MainPageScreenState extends State<MainPageScreen>
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: onSurface),
             overflow: TextOverflow.ellipsis,
             maxLines: 1,
           ),
@@ -637,8 +599,13 @@ class _MainPageScreenState extends State<MainPageScreen>
     );
   }
 
-  void showUpdateStatusDialog(
-      BuildContext context, Map<String, dynamic> report) {
+  void showUpdateStatusDialog(BuildContext context, Map<String, dynamic> report) {
+    final s = S.of(context);
+    final theme = Theme.of(context);
+    final surface = theme.colorScheme.surface;
+    final onSurface = theme.colorScheme.onSurface;
+    final outline = theme.colorScheme.outline;
+
     selectedStatus = statuses.firstWhere(
       (status) => status["id"] == report['status'],
       orElse: () => null,
@@ -661,18 +628,14 @@ class _MainPageScreenState extends State<MainPageScreen>
                 bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: surface,
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(24),
                     topRight: Radius.circular(24),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 10,
-                      offset: Offset(0, -2),
-                    ),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, -2)),
                   ],
                 ),
                 child: Column(
@@ -684,7 +647,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
+                          color: outline,
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -703,31 +666,25 @@ class _MainPageScreenState extends State<MainPageScreen>
                               ),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Icon(
-                              Icons.edit_note,
-                              color: Colors.white,
-                              size: 24,
-                            ),
+                            child: const Icon(Icons.edit_note, color: Colors.white, size: 24),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Изменение статуса',
+                                Text(
+                                  s.changeStatus,
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
+                                    color: onSurface,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  report['bussines_name'] ?? 'Платеж',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey.shade600,
-                                  ),
+                                  report['bussines_name'] ?? s.unnamed,
+                                  style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.6)),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -736,16 +693,9 @@ class _MainPageScreenState extends State<MainPageScreen>
                           ),
                           IconButton(
                             onPressed: () => Navigator.of(dialogContext).pop(),
-                            icon: Icon(
-                              Icons.close,
-                              size: 20,
-                              color: Colors.grey.shade700,
-                            ),
+                            icon: Icon(Icons.close, size: 20, color: onSurface.withOpacity(0.7)),
                             padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(
-                              minWidth: 32,
-                              minHeight: 32,
-                            ),
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                           ),
                         ],
                       ),
@@ -754,27 +704,27 @@ class _MainPageScreenState extends State<MainPageScreen>
                       margin: const EdgeInsets.symmetric(horizontal: 20),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
+                        color: onSurface.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade200),
+                        border: Border.all(color: outline),
                       ),
                       child: Column(
                         children: [
                           _buildCompactInfoRow(
                             Icons.description_outlined,
-                            'Договор:',
-                            report['contract'] ?? 'Нет данных',
+                            s.contractColon,
+                            report['contract'] ?? s.noData,
                           ),
                           const SizedBox(height: 8),
                           _buildCompactInfoRow(
                             Icons.subject_outlined,
-                            'Предмет:',
-                            report['sub_contract'] ?? 'Нет данных',
+                            s.subjectColon,
+                            report['sub_contract'] ?? s.noData,
                           ),
                           const SizedBox(height: 8),
                           _buildCompactInfoRow(
                             Icons.monetization_on_outlined,
-                            'Сумма:',
+                            s.amountColon,
                             '${formatCurrency(report['contract_price'])} ${report['currency_name'] ?? ''}',
                           ),
                         ],
@@ -787,53 +737,43 @@ class _MainPageScreenState extends State<MainPageScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Статус платежа',
+                            s.paymentStatus,
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
-                              color: Colors.grey.shade800,
+                              color: onSurface,
                             ),
                           ),
                           const SizedBox(height: 8),
                           Container(
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.grey.shade300),
-                              color: Colors.grey.shade50,
+                              border: Border.all(color: outline),
+                              color: onSurface.withOpacity(0.03),
                             ),
-                            child:
-                                DropdownButtonFormField<Map<String, dynamic>>(
+                            child: DropdownButtonFormField<Map<String, dynamic>>(
                               value: selectedStatus,
                               isExpanded: true,
+                              dropdownColor: surface,
                               decoration: InputDecoration(
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 12),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                 border: InputBorder.none,
-                                prefixIcon: Icon(Icons.playlist_add_check,
-                                    color: Colors.orange.shade700),
+                                prefixIcon: Icon(Icons.playlist_add_check, color: Colors.orange.shade700),
+                                fillColor: Colors.transparent,
                               ),
-                              hint: const Text("Выберите статус платежа",
-                                  style: TextStyle(fontSize: 14)),
-                              icon: Icon(Icons.arrow_drop_down,
-                                  color: Colors.orange.shade700),
-                              items: statuses
-                                  .map<DropdownMenuItem<Map<String, dynamic>>>(
-                                      (status) {
-                                Color statusColor =
-                                    _getStatusColor(status["id"]);
+                              hint: Text(s.selectPaymentStatus, style: const TextStyle(fontSize: 14)),
+                              icon: Icon(Icons.arrow_drop_down, color: Colors.orange.shade700),
+                              items: statuses.map<DropdownMenuItem<Map<String, dynamic>>>((status) {
+                                Color statusColor = _getStatusColor(status["id"]);
                                 return DropdownMenuItem<Map<String, dynamic>>(
                                   value: status,
                                   child: Row(
                                     children: [
-                                      Icon(_getStatusIcon(status["id"]),
-                                          size: 18, color: statusColor),
+                                      Icon(_getStatusIcon(status["id"]), size: 18, color: statusColor),
                                       const SizedBox(width: 8),
                                       Text(
                                         status["name"],
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey.shade800,
-                                        ),
+                                        style: TextStyle(fontSize: 14, color: onSurface),
                                       ),
                                     ],
                                   ),
@@ -857,39 +797,28 @@ class _MainPageScreenState extends State<MainPageScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Сумма частичной оплаты',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.grey.shade800,
-                              ),
+                              s.partialAmountLabel,
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: onSurface),
                             ),
                             const SizedBox(height: 8),
                             TextField(
                               controller: amountController,
                               keyboardType: TextInputType.number,
-                              style: const TextStyle(fontSize: 14),
+                              style: TextStyle(fontSize: 14, color: onSurface),
                               decoration: InputDecoration(
-                                hintText: 'Введите сумму',
-                                hintStyle: TextStyle(
-                                    fontSize: 14, color: Colors.grey.shade500),
-                                filled: true,
-                                fillColor: Colors.grey.shade50,
+                                hintText: s.enterAmount,
+                                hintStyle: TextStyle(fontSize: 14, color: onSurface.withOpacity(0.4)),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide:
-                                      BorderSide(color: Colors.grey.shade300),
+                                  borderSide: BorderSide(color: outline),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                      color: Colors.orange.shade700, width: 2),
+                                  borderSide: BorderSide(color: Colors.orange.shade700, width: 2),
                                 ),
-                                prefixIcon: Icon(Icons.monetization_on,
-                                    size: 20, color: Colors.orange.shade700),
+                                prefixIcon: Icon(Icons.monetization_on, size: 20, color: Colors.orange.shade700),
                                 suffixText: report['currency_name'] ?? '',
-                                contentPadding: const EdgeInsets.symmetric(
-                                    vertical: 12, horizontal: 16),
+                                contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                               ),
                             ),
                           ],
@@ -901,38 +830,27 @@ class _MainPageScreenState extends State<MainPageScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Примечание',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.grey.shade800,
-                            ),
+                            s.noteLabel,
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: onSurface),
                           ),
                           const SizedBox(height: 8),
                           TextField(
                             controller: notesController,
                             maxLines: 2,
-                            style: const TextStyle(fontSize: 14),
+                            style: TextStyle(fontSize: 14, color: onSurface),
                             decoration: InputDecoration(
-                              hintText: 'Добавьте комментарий...',
-                              hintStyle: TextStyle(
-                                  fontSize: 14, color: Colors.grey.shade500),
-                              filled: true,
-                              fillColor: Colors.grey.shade50,
+                              hintText: s.addComment,
+                              hintStyle: TextStyle(fontSize: 14, color: onSurface.withOpacity(0.4)),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide:
-                                    BorderSide(color: Colors.grey.shade300),
+                                borderSide: BorderSide(color: outline),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                    color: Colors.orange.shade700, width: 2),
+                                borderSide: BorderSide(color: Colors.orange.shade700, width: 2),
                               ),
-                              prefixIcon: Icon(Icons.comment,
-                                  size: 20, color: Colors.orange.shade700),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  vertical: 12, horizontal: 16),
+                              prefixIcon: Icon(Icons.comment, size: 20, color: Colors.orange.shade700),
+                              contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                             ),
                           ),
                         ],
@@ -944,20 +862,16 @@ class _MainPageScreenState extends State<MainPageScreen>
                         children: [
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: () =>
-                                  Navigator.of(dialogContext).pop(),
+                              onPressed: () => Navigator.of(dialogContext).pop(),
                               style: OutlinedButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                side: BorderSide(color: Colors.grey.shade300),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                side: BorderSide(color: outline),
                               ),
                               child: Text(
-                                'ОТМЕНА',
+                                s.cancel,
                                 style: TextStyle(
-                                  color: Colors.grey.shade700,
+                                  color: onSurface.withOpacity(0.7),
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
                                 ),
@@ -969,39 +883,27 @@ class _MainPageScreenState extends State<MainPageScreen>
                             child: ElevatedButton(
                               onPressed: () {
                                 if (selectedStatus == null) {
-                                  showNotification(
-                                      'Пожалуйста, выберите статус', false);
+                                  showNotification(s.selectStatusFirst, false);
                                   return;
                                 }
-
                                 Navigator.of(dialogContext).pop();
-
                                 final Map<String, dynamic> statusToUpdate =
                                     Map<String, dynamic>.from(selectedStatus!);
                                 final String notesText = notesController.text;
-                                final String? partialPrice = showAmountField
-                                    ? amountController.text
-                                    : null;
-
-                                updateReportStatus(report, statusToUpdate,
-                                    notesText, partialPrice);
+                                final String? partialPrice =
+                                    showAmountField ? amountController.text : null;
+                                updateReportStatus(report, statusToUpdate, notesText, partialPrice);
                               },
                               style: ElevatedButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
                                 backgroundColor: const Color(0xFFFF9800),
                                 foregroundColor: Colors.white,
                                 elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
-                              child: const Text(
-                                'СОХРАНИТЬ',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
+                              child: Text(
+                                s.save,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                               ),
                             ),
                           ),
@@ -1019,13 +921,15 @@ class _MainPageScreenState extends State<MainPageScreen>
   }
 
   void _logout() {
+    final s = S.of(context);
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           elevation: 10,
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -1038,25 +942,18 @@ class _MainPageScreenState extends State<MainPageScreen>
                     color: Colors.red.shade50,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    Icons.logout,
-                    color: Colors.red.shade700,
-                    size: 32,
-                  ),
+                  child: Icon(Icons.logout, color: Colors.red.shade700, size: 32),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  "Выход из системы",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Text(
+                  s.logOut,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: onSurface),
                 ),
                 const SizedBox(height: 12),
-                const Text(
-                  "Вы уверены, что хотите выйти из учетной записи?",
+                Text(
+                  s.logOutConfirm,
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14),
+                  style: TextStyle(fontSize: 14, color: onSurface.withOpacity(0.7)),
                 ),
                 const SizedBox(height: 24),
                 Row(
@@ -1067,15 +964,13 @@ class _MainPageScreenState extends State<MainPageScreen>
                         onPressed: () => Navigator.of(context).pop(),
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         child: Text(
-                          "ОТМЕНА",
+                          s.cancel,
                           style: TextStyle(
                             fontSize: 14,
-                            color: Colors.grey.shade700,
+                            color: onSurface.withOpacity(0.7),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -1085,10 +980,9 @@ class _MainPageScreenState extends State<MainPageScreen>
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
-                          storage.delete(key: "jwtToken").then((_) {
+                          storage.delete(key: "jwt").then((_) {
                             Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(
-                                  builder: (context) => LoginPage()),
+                              MaterialPageRoute(builder: (context) => LoginPage()),
                               (Route<dynamic> route) => false,
                             );
                           });
@@ -1098,16 +992,11 @@ class _MainPageScreenState extends State<MainPageScreen>
                           foregroundColor: Colors.white,
                           elevation: 2,
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: const Text(
-                          "ВЫЙТИ",
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        child: Text(
+                          s.logOutBtn,
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -1122,24 +1011,23 @@ class _MainPageScreenState extends State<MainPageScreen>
   }
 
   Widget _buildShimmerCard() {
+    final theme = Theme.of(context);
     return Shimmer.fromColors(
-      baseColor: Colors.grey.shade300,
-      highlightColor: Colors.grey.shade100,
+      baseColor: theme.colorScheme.outline,
+      highlightColor: theme.colorScheme.surface,
       child: Card(
         margin: const EdgeInsets.only(bottom: 8),
         elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Column(
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               width: double.infinity,
               height: 40,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(12),
                   topRight: Radius.circular(12),
                 ),
@@ -1150,77 +1038,35 @@ class _MainPageScreenState extends State<MainPageScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 14,
-                        height: 14,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 120,
-                        height: 12,
-                        color: Colors.white,
-                      ),
-                    ],
-                  ),
+                  Row(children: [
+                    Container(width: 14, height: 14, color: theme.cardColor),
+                    const SizedBox(width: 8),
+                    Container(width: 120, height: 12, color: theme.cardColor),
+                  ]),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Container(
-                        width: 14,
-                        height: 14,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 160,
-                        height: 12,
-                        color: Colors.white,
-                      ),
-                    ],
-                  ),
+                  Row(children: [
+                    Container(width: 14, height: 14, color: theme.cardColor),
+                    const SizedBox(width: 8),
+                    Container(width: 160, height: 12, color: theme.cardColor),
+                  ]),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Container(
-                        width: 14,
-                        height: 14,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 140,
-                        height: 12,
-                        color: Colors.white,
-                      ),
-                    ],
-                  ),
+                  Row(children: [
+                    Container(width: 14, height: 14, color: theme.cardColor),
+                    const SizedBox(width: 8),
+                    Container(width: 140, height: 12, color: theme.cardColor),
+                  ]),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          height: 12,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Container(
-                          height: 12,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
+                  Row(children: [
+                    Expanded(child: Container(height: 12, color: theme.cardColor)),
+                    const SizedBox(width: 20),
+                    Expanded(child: Container(height: 12, color: theme.cardColor)),
+                  ]),
                   const SizedBox(height: 16),
                   Container(
                     width: 80,
                     height: 20,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: theme.cardColor,
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
@@ -1235,17 +1081,17 @@ class _MainPageScreenState extends State<MainPageScreen>
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    final surface = theme.colorScheme.surface;
+    final outline = theme.colorScheme.outline;
+
     return Scaffold(
-      extendBodyBehindAppBar: false,
-      backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
-        title: const Text(
-          "Платежные договоры",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
+        title: Text(
+          s.paymentAgreements,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
         ),
         centerTitle: true,
         flexibleSpace: Container(
@@ -1259,9 +1105,7 @@ class _MainPageScreenState extends State<MainPageScreen>
         ),
         elevation: 4,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            bottom: Radius.circular(16),
-          ),
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
         ),
         actions: [
           IconButton(
@@ -1272,13 +1116,13 @@ class _MainPageScreenState extends State<MainPageScreen>
                 MaterialPageRoute(builder: (context) => SettingsScreen()),
               );
             },
-            tooltip: 'Настройки',
+            tooltip: s.settingsTooltip,
             splashRadius: 24,
           ),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white, size: 24),
             onPressed: _logout,
-            tooltip: 'Выйти',
+            tooltip: s.exitTooltip,
             splashRadius: 24,
           ),
         ],
@@ -1300,36 +1144,24 @@ class _MainPageScreenState extends State<MainPageScreen>
                           color: Colors.orange.shade50,
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
-                          Icons.business_center,
-                          size: 70,
-                          color: Colors.orange.shade300,
-                        ),
+                        child: Icon(Icons.business_center, size: 70, color: Colors.orange.shade300),
                       ),
                       const SizedBox(height: 24),
                       Text(
-                        "Нет доступных платежных договоров",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey.shade700,
-                        ),
+                        s.noContracts,
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: onSurface.withOpacity(0.7)),
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
                         onPressed: _refreshData,
                         icon: const Icon(Icons.refresh, size: 20),
-                        label: const Text("Обновить",
-                            style: TextStyle(fontSize: 15)),
+                        label: Text(s.refresh, style: const TextStyle(fontSize: 15)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFFF9800),
                           foregroundColor: Colors.white,
                           elevation: 3,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
                     ],
@@ -1380,31 +1212,26 @@ class _MainPageScreenState extends State<MainPageScreen>
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
                           elevation: 2,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           clipBehavior: Clip.antiAlias,
                           child: InkWell(
                             onTap: () {
                               if (report['has_change']) {
                                 showUpdateStatusDialog(context, report);
                               } else {
-                                showNotification(
-                                    'У вас нет прав на изменение статуса',
-                                    false);
+                                showNotification(s.noPermission, false);
                               }
                             },
                             borderRadius: BorderRadius.circular(12),
                             child: Column(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 12),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
-                                        Colors.grey.shade50,
-                                        Colors.grey.shade100
+                                        onSurface.withOpacity(0.04),
+                                        onSurface.withOpacity(0.08),
                                       ],
                                       begin: Alignment.topCenter,
                                       end: Alignment.bottomCenter,
@@ -1420,67 +1247,48 @@ class _MainPageScreenState extends State<MainPageScreen>
                                         padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
                                           gradient: const LinearGradient(
-                                            colors: [
-                                              Color(0xFFFF9800),
-                                              Color(0xFFFF7043)
-                                            ],
+                                            colors: [Color(0xFFFF9800), Color(0xFFFF7043)],
                                             begin: Alignment.topLeft,
                                             end: Alignment.bottomRight,
                                           ),
-                                          borderRadius:
-                                              BorderRadius.circular(10),
+                                          borderRadius: BorderRadius.circular(10),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.orange
-                                                  .withOpacity(0.3),
+                                              color: Colors.orange.withOpacity(0.3),
                                               blurRadius: 4,
                                               offset: const Offset(0, 2),
                                             ),
                                           ],
                                         ),
-                                        child: const Icon(
-                                          Icons.business,
-                                          color: Colors.white,
-                                          size: 18,
-                                        ),
+                                        child: const Icon(Icons.business, color: Colors.white, size: 18),
                                       ),
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Text(
-                                          report['bussines_name'] ??
-                                              "Без названия",
-                                          style: const TextStyle(
+                                          report['bussines_name'] ?? s.unnamed,
+                                          style: TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.bold,
-                                            color: Color(0xFF424242),
+                                            color: onSurface,
                                           ),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                       if (report['has_change'])
                                         Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 6, vertical: 4),
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                                           decoration: BoxDecoration(
                                             color: Colors.blue.shade50,
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                            border: Border.all(
-                                              color: Colors.blue.shade100,
-                                              width: 1,
-                                            ),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: Colors.blue.shade100, width: 1),
                                           ),
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              Icon(
-                                                Icons.edit,
-                                                size: 12,
-                                                color: Colors.blue.shade700,
-                                              ),
+                                              Icon(Icons.edit, size: 12, color: Colors.blue.shade700),
                                               const SizedBox(width: 4),
                                               Text(
-                                                'Доступно',
+                                                s.available,
                                                 style: TextStyle(
                                                   fontSize: 11,
                                                   color: Colors.blue.shade700,
@@ -1502,9 +1310,8 @@ class _MainPageScreenState extends State<MainPageScreen>
                                           Expanded(
                                             child: _buildInfoCard(
                                               Icons.description,
-                                              'Договор',
-                                              report['contract'] ??
-                                                  'Нет данных',
+                                              s.contract,
+                                              report['contract'] ?? s.noData,
                                               Colors.blue.shade50,
                                               Colors.blue.shade700,
                                             ),
@@ -1513,9 +1320,8 @@ class _MainPageScreenState extends State<MainPageScreen>
                                           Expanded(
                                             child: _buildInfoCard(
                                               Icons.subject,
-                                              'Предмет',
-                                              report['sub_contract'] ??
-                                                  'Нет данных',
+                                              s.subject,
+                                              report['sub_contract'] ?? s.noData,
                                               Colors.purple.shade50,
                                               Colors.purple.shade700,
                                             ),
@@ -1524,160 +1330,114 @@ class _MainPageScreenState extends State<MainPageScreen>
                                       ),
                                       const SizedBox(height: 12),
                                       _buildInfoRow(
-                                        'Заявитель',
-                                        report['applicant_name'] ?? 'Не указан',
+                                        s.applicant,
+                                        report['applicant_name'] ?? s.notSpecified,
                                         Icons.person,
                                         Colors.blueGrey.shade600,
+                                        onSurface: onSurface,
+                                        outline: outline,
+                                        surface: surface,
                                       ),
                                       const SizedBox(height: 6),
-                                      if (report['raport_paying_type_name'] !=
-                                          null)
+                                      if (report['raport_paying_type_name'] != null)
                                         _buildInfoRow(
-                                          'Тип оплаты',
+                                          s.paymentType,
                                           report['raport_paying_type_name'],
                                           Icons.credit_card,
                                           payingTypeColor,
                                           isBold: true,
+                                          onSurface: onSurface,
+                                          outline: outline,
+                                          surface: surface,
                                         ),
                                       const SizedBox(height: 6),
                                       Container(
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
-                                          color: Colors.grey.shade50,
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                          border: Border.all(
-                                            color: Colors.grey.shade200,
-                                            width: 1,
-                                          ),
+                                          color: onSurface.withOpacity(0.04),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: outline, width: 1),
                                         ),
                                         child: Row(
                                           children: [
                                             Expanded(
                                               child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.center,
+                                                crossAxisAlignment: CrossAxisAlignment.center,
                                                 children: [
                                                   Row(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
+                                                    mainAxisSize: MainAxisSize.min,
                                                     children: [
-                                                      Icon(
-                                                        Icons.account_balance,
-                                                        size: 12,
-                                                        color: Colors
-                                                            .orange.shade700,
-                                                      ),
+                                                      Icon(Icons.account_balance, size: 12, color: Colors.orange.shade700),
                                                       const SizedBox(width: 4),
                                                       Text(
-                                                        'Сумма договора',
-                                                        style: TextStyle(
-                                                          fontSize: 9,
-                                                          color: Colors
-                                                              .grey.shade600,
-                                                        ),
+                                                        s.contractAmount,
+                                                        style: TextStyle(fontSize: 9, color: onSurface.withOpacity(0.5)),
                                                       ),
                                                     ],
                                                   ),
                                                   const SizedBox(height: 4),
                                                   Text(
-                                                    formatCurrency(report[
-                                                        'contract_price']),
-                                                    style: const TextStyle(
+                                                    formatCurrency(report['contract_price']),
+                                                    style: TextStyle(
                                                       fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color: Color(0xFF424242),
+                                                      fontWeight: FontWeight.bold,
+                                                      color: onSurface,
                                                     ),
                                                   ),
                                                 ],
                                               ),
                                             ),
-                                            Container(
-                                              width: 1,
-                                              height: 40,
-                                              color: Colors.grey.shade300,
-                                            ),
+                                            Container(width: 1, height: 40, color: outline),
                                             Expanded(
                                               child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.center,
+                                                crossAxisAlignment: CrossAxisAlignment.center,
                                                 children: [
                                                   Row(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
+                                                    mainAxisSize: MainAxisSize.min,
                                                     children: [
-                                                      Icon(
-                                                        Icons.payment,
-                                                        size: 12,
-                                                        color: Colors
-                                                            .green.shade700,
-                                                      ),
+                                                      Icon(Icons.payment, size: 12, color: Colors.green.shade700),
                                                       const SizedBox(width: 4),
                                                       Text(
-                                                        'К оплате',
-                                                        style: TextStyle(
-                                                          fontSize: 9,
-                                                          color: Colors
-                                                              .grey.shade600,
-                                                        ),
+                                                        s.toPay,
+                                                        style: TextStyle(fontSize: 9, color: onSurface.withOpacity(0.5)),
                                                       ),
                                                     ],
                                                   ),
                                                   const SizedBox(height: 4),
                                                   Text(
-                                                    formatCurrency(
-                                                        report['paid']),
-                                                    style: const TextStyle(
+                                                    formatCurrency(report['paid']),
+                                                    style: TextStyle(
                                                       fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color: Color(0xFF424242),
+                                                      fontWeight: FontWeight.bold,
+                                                      color: onSurface,
                                                     ),
                                                   ),
                                                 ],
                                               ),
                                             ),
-                                            Container(
-                                              width: 1,
-                                              height: 40,
-                                              color: Colors.grey.shade300,
-                                            ),
+                                            Container(width: 1, height: 40, color: outline),
                                             Expanded(
                                               child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.center,
+                                                crossAxisAlignment: CrossAxisAlignment.center,
                                                 children: [
                                                   Row(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
+                                                    mainAxisSize: MainAxisSize.min,
                                                     children: [
-                                                      Icon(
-                                                        Icons.currency_exchange,
-                                                        size: 12,
-                                                        color: Colors
-                                                            .indigo.shade700,
-                                                      ),
+                                                      Icon(Icons.currency_exchange, size: 12, color: Colors.indigo.shade700),
                                                       const SizedBox(width: 4),
                                                       Text(
-                                                        'Валюта',
-                                                        style: TextStyle(
-                                                          fontSize: 9,
-                                                          color: Colors
-                                                              .grey.shade600,
-                                                        ),
+                                                        s.currency,
+                                                        style: TextStyle(fontSize: 9, color: onSurface.withOpacity(0.5)),
                                                       ),
                                                     ],
                                                   ),
                                                   const SizedBox(height: 4),
                                                   Text(
-                                                    report['currency_name'] ??
-                                                        '-',
-                                                    style: const TextStyle(
+                                                    report['currency_name'] ?? '-',
+                                                    style: TextStyle(
                                                       fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color: Color(0xFF424242),
+                                                      fontWeight: FontWeight.bold,
+                                                      color: onSurface,
                                                     ),
                                                   ),
                                                 ],
@@ -1688,28 +1448,19 @@ class _MainPageScreenState extends State<MainPageScreen>
                                       ),
                                       const SizedBox(height: 16),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 8, horizontal: 12),
+                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                                         decoration: BoxDecoration(
                                           color: statusColor.withOpacity(0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                          border: Border.all(
-                                            color: statusColor.withOpacity(0.3),
-                                            width: 1,
-                                          ),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: statusColor.withOpacity(0.3), width: 1),
                                         ),
                                         child: Row(
                                           children: [
-                                            Icon(
-                                              statusIcon,
-                                              color: statusColor,
-                                              size: 18,
-                                            ),
+                                            Icon(statusIcon, color: statusColor, size: 18),
                                             const SizedBox(width: 8),
                                             Expanded(
                                               child: Text(
-                                                'Статус: ${report['status_name'] ?? 'Не определен'}',
+                                                '${s.statusLabel}: ${report['status_name'] ?? '-'}',
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.bold,
@@ -1717,97 +1468,55 @@ class _MainPageScreenState extends State<MainPageScreen>
                                                 ),
                                               ),
                                             ),
-                                            if (report[
-                                                    'contract_document_url'] !=
-                                                null)
+                                            if (report['contract_document_url'] != null)
                                               Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
                                                   IconButton(
-                                                    icon: Icon(
-                                                      Icons.file_present,
-                                                      color:
-                                                          Colors.blue.shade700,
-                                                      size: 18,
-                                                    ),
-                                                    onPressed: () {
-                                                      _launchURL(report[
-                                                          'contract_document_url']);
-                                                    },
+                                                    icon: Icon(Icons.file_present, color: Colors.blue.shade700, size: 18),
+                                                    onPressed: () => _launchURL(report['contract_document_url']),
                                                     tooltip: 'Просмотр файла',
                                                     padding: EdgeInsets.zero,
-                                                    constraints:
-                                                        const BoxConstraints(
-                                                      minWidth: 30,
-                                                      minHeight: 30,
-                                                    ),
+                                                    constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
                                                   ),
                                                   IconButton(
-                                                    icon: Icon(
-                                                      Icons.copy,
-                                                      color:
-                                                          Colors.blue.shade700,
-                                                      size: 18,
-                                                    ),
+                                                    icon: Icon(Icons.copy, color: Colors.blue.shade700, size: 18),
                                                     onPressed: () async {
-                                                      final fullUrl =
-                                                          'https://uztex.pro${report['contract_document_url']}';
-                                                      Clipboard.setData(
-                                                          ClipboardData(
-                                                              text: fullUrl));
-                                                      showNotification(
-                                                          'URL скопирован',
-                                                          true);
+                                                      final fullUrl = 'https://uztex.pro${report['contract_document_url']}';
+                                                      Clipboard.setData(ClipboardData(text: fullUrl));
+                                                      showNotification(s.urlCopiedShort, true);
                                                     },
-                                                    tooltip:
-                                                        'Копировать ссылку',
+                                                    tooltip: 'Копировать ссылку',
                                                     padding: EdgeInsets.zero,
-                                                    constraints:
-                                                        const BoxConstraints(
-                                                      minWidth: 30,
-                                                      minHeight: 30,
-                                                    ),
+                                                    constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
                                                   ),
                                                 ],
                                               ),
                                           ],
                                         ),
                                       ),
-                                      if (report['notes'] != null &&
-                                          report['notes'].toString().isNotEmpty)
+                                      if (report['notes'] != null && report['notes'].toString().isNotEmpty)
                                         Padding(
-                                          padding:
-                                              const EdgeInsets.only(top: 12),
+                                          padding: const EdgeInsets.only(top: 12),
                                           child: Container(
                                             padding: const EdgeInsets.all(12),
                                             decoration: BoxDecoration(
                                               color: Colors.amber.shade50,
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                              border: Border.all(
-                                                color: Colors.amber.shade200,
-                                                width: 1,
-                                              ),
+                                              borderRadius: BorderRadius.circular(10),
+                                              border: Border.all(color: Colors.amber.shade200, width: 1),
                                             ),
                                             child: Row(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
+                                              crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                Icon(
-                                                  Icons.note,
-                                                  color: Colors.amber.shade800,
-                                                  size: 16,
-                                                ),
+                                                Icon(Icons.note, color: Colors.amber.shade800, size: 16),
                                                 const SizedBox(width: 8),
                                                 Expanded(
                                                   child: Text(
                                                     report['notes'],
                                                     style: TextStyle(
                                                       fontSize: 11,
-                                                      color:
-                                                          Colors.grey.shade800,
-                                                      fontStyle:
-                                                          FontStyle.italic,
+                                                      color: onSurface.withOpacity(0.7),
+                                                      fontStyle: FontStyle.italic,
                                                     ),
                                                   ),
                                                 ),
@@ -1821,35 +1530,27 @@ class _MainPageScreenState extends State<MainPageScreen>
                                 if (report['has_change'])
                                   Container(
                                     width: double.infinity,
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 8),
-                                    decoration: BoxDecoration(
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    decoration: const BoxDecoration(
                                       gradient: LinearGradient(
-                                        colors: [
-                                          const Color(0xFFFF9800),
-                                          const Color(0xFFFF7043)
-                                        ],
+                                        colors: [Color(0xFFFF9800), Color(0xFFFF7043)],
                                         begin: Alignment.centerLeft,
                                         end: Alignment.centerRight,
                                       ),
-                                      borderRadius: const BorderRadius.only(
+                                      borderRadius: BorderRadius.only(
                                         bottomLeft: Radius.circular(12),
                                         bottomRight: Radius.circular(12),
                                       ),
                                     ),
-                                    child: const Center(
+                                    child: Center(
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(
-                                            Icons.touch_app,
-                                            color: Colors.white,
-                                            size: 14,
-                                          ),
-                                          SizedBox(width: 6),
+                                          const Icon(Icons.touch_app, color: Colors.white, size: 14),
+                                          const SizedBox(width: 6),
                                           Text(
-                                            'Нажмите для изменения статуса',
-                                            style: TextStyle(
+                                            s.tapToChangeStatus,
+                                            style: const TextStyle(
                                               color: Colors.white,
                                               fontWeight: FontWeight.bold,
                                               fontSize: 11,
@@ -1877,18 +1578,21 @@ class _MainPageScreenState extends State<MainPageScreen>
                 );
               },
               backgroundColor: const Color(0xFFFF9800),
-              child: const Icon(
-                Icons.arrow_upward,
-                color: Colors.white,
-              ),
+              child: const Icon(Icons.arrow_upward, color: Colors.white),
               mini: true,
             )
           : null,
     );
   }
 
-  Widget _buildInfoCard(IconData icon, String label, String value,
-      Color backgroundColor, Color iconColor) {
+  Widget _buildInfoCard(
+    IconData icon,
+    String label,
+    String value,
+    Color backgroundColor,
+    Color iconColor,
+  ) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -1900,30 +1604,18 @@ class _MainPageScreenState extends State<MainPageScreen>
         children: [
           Row(
             children: [
-              Icon(
-                icon,
-                size: 16,
-                color: iconColor,
-              ),
+              Icon(icon, size: 16, color: iconColor),
               const SizedBox(width: 6),
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: iconColor,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: TextStyle(fontSize: 12, color: iconColor, fontWeight: FontWeight.w500),
               ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF424242),
-            ),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: onSurface),
             overflow: TextOverflow.ellipsis,
             maxLines: 1,
           ),
@@ -1933,29 +1625,32 @@ class _MainPageScreenState extends State<MainPageScreen>
   }
 
   Widget _buildInfoRow(
-      String label, String value, IconData icon, Color valueColor,
-      {bool isBold = false}) {
+    String label,
+    String value,
+    IconData icon,
+    Color valueColor, {
+    bool isBold = false,
+    required Color onSurface,
+    required Color outline,
+    required Color surface,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: onSurface.withOpacity(0.04),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: outline),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(
-            icon,
-            size: 14,
-            color: Colors.grey.shade600,
-          ),
+          Icon(icon, size: 14, color: onSurface.withOpacity(0.5)),
           const SizedBox(width: 8),
           Text(
             '$label:',
             style: TextStyle(
               fontSize: 11,
-              color: Colors.grey.shade700,
+              color: onSurface.withOpacity(0.6),
               fontWeight: FontWeight.w500,
             ),
           ),

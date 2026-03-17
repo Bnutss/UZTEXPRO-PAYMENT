@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'app_strings.dart';
+import 'locale_notifier.dart';
 
 class ConfidentialityPage extends StatefulWidget {
   @override
@@ -19,6 +21,15 @@ class _ConfidentialityPageState extends State<ConfidentialityPage> {
     super.initState();
     _checkBiometrics();
     _loadBiometricPreference();
+    localeNotifier.addListener(_onLocaleChanged);
+  }
+
+  void _onLocaleChanged() => setState(() {});
+
+  @override
+  void dispose() {
+    localeNotifier.removeListener(_onLocaleChanged);
+    super.dispose();
   }
 
   Future<void> _checkBiometrics() async {
@@ -27,11 +38,9 @@ class _ConfidentialityPageState extends State<ConfidentialityPage> {
     try {
       canCheckBiometrics = await auth.canCheckBiometrics;
       availableBiometrics = await auth.getAvailableBiometrics();
-      print("Available biometrics: $availableBiometrics");
     } catch (e) {
       canCheckBiometrics = false;
       availableBiometrics = <BiometricType>[];
-      print("Error checking biometrics: $e");
     }
     if (!mounted) return;
     setState(() {
@@ -50,19 +59,18 @@ class _ConfidentialityPageState extends State<ConfidentialityPage> {
 
   Future<void> _authenticate() async {
     bool authenticated = false;
+    final s = S.of(context);
     try {
       authenticated = await auth.authenticate(
-        localizedReason: 'Authenticate to access confidentiality settings',
+        localizedReason: s.authReason,
         options: const AuthenticationOptions(
           useErrorDialogs: true,
           stickyAuth: true,
           biometricOnly: true,
         ),
       );
-      print("Authentication successful");
     } catch (e) {
       authenticated = false;
-      print("Authentication error: $e");
     }
     if (!mounted) return;
     setState(() {
@@ -80,66 +88,80 @@ class _ConfidentialityPageState extends State<ConfidentialityPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textPrimary = theme.colorScheme.onSurface;
+    final surface = theme.colorScheme.surface;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Конфиденциальность',
-          style: TextStyle(
+          s.privacyTitle,
+          style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
             fontSize: 20,
           ),
         ),
         flexibleSpace: Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.orange, Colors.red],
+              colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
           ),
         ),
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
       ),
       body: AnimatedSwitcher(
-        duration: Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 300),
         child: _isAuthenticated
-            ? _buildAuthenticatedContent()
-            : _buildUnauthenticatedContent(),
+            ? _buildAuthenticatedContent(s, textPrimary, surface)
+            : _buildUnauthenticatedContent(s, textPrimary),
       ),
     );
   }
 
-  Widget _buildAuthenticatedContent() {
+  Widget _buildAuthenticatedContent(S s, Color textPrimary, Color surface) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.security, size: 100, color: Colors.orange),
-          SizedBox(height: 20),
+          const Icon(Icons.security, size: 100, color: Color(0xFFFF9800)),
+          const SizedBox(height: 20),
           Text(
-            'Настройки конфиденциальности',
+            s.privacySettings,
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: textPrimary,
             ),
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: 40),
-          ListTile(
-            leading: Icon(Icons.fingerprint, color: Colors.orange),
-            title: Text(
-              'Использовать биометрическую аутентификацию',
-              style: TextStyle(fontSize: 18, color: Colors.black87),
+          const SizedBox(height: 40),
+          Container(
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outline,
+              ),
             ),
-            trailing: Switch.adaptive(
-              value: _useBiometrics,
-              onChanged:
-                  _canCheckBiometrics ? _toggleBiometricPreference : null,
-              activeColor: Colors.orange,
+            child: ListTile(
+              leading: const Icon(Icons.fingerprint, color: Color(0xFFFF9800)),
+              title: Text(
+                s.useBiometric,
+                style: TextStyle(fontSize: 16, color: textPrimary),
+              ),
+              trailing: Switch.adaptive(
+                value: _useBiometrics,
+                onChanged: _canCheckBiometrics ? _toggleBiometricPreference : null,
+                activeColor: const Color(0xFFFF9800),
+              ),
             ),
           ),
         ],
@@ -147,31 +169,31 @@ class _ConfidentialityPageState extends State<ConfidentialityPage> {
     );
   }
 
-  Widget _buildUnauthenticatedContent() {
+  Widget _buildUnauthenticatedContent(S s, Color textPrimary) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.lock_outline, size: 100, color: Colors.orange),
-          SizedBox(height: 20),
+          const Icon(Icons.lock_outline, size: 100, color: Color(0xFFFF9800)),
+          const SizedBox(height: 20),
           Text(
-            'Пожалуйста, пройдите биометрическую аутентификацию для доступа к настройкам конфиденциальности.',
-            style: TextStyle(fontSize: 18, color: Colors.black87),
+            s.biometricRequired,
+            style: TextStyle(fontSize: 18, color: textPrimary),
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           ElevatedButton.icon(
             onPressed: _authenticate,
-            icon: Icon(Icons.fingerprint),
+            icon: const Icon(Icons.fingerprint),
             label: Text(
-              'Аутентификация',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              s.authenticate,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
+              backgroundColor: const Color(0xFFFF9800),
               foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(30.0),
               ),
