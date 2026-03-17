@@ -979,13 +979,14 @@ class _MainPageScreenState extends State<MainPageScreen>
                     const SizedBox(width: 16),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {
-                          storage.delete(key: "jwt").then((_) {
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(builder: (context) => LoginPage()),
-                              (Route<dynamic> route) => false,
-                            );
-                          });
+                        onPressed: () async {
+                          try {
+                            await storage.delete(key: "jwt");
+                          } catch (_) {}
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(builder: (context) => LoginPage()),
+                            (Route<dynamic> route) => false,
+                          );
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red.shade600,

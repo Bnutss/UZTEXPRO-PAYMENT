@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:uztexpro_payment/main_page.dart';
 import 'dart:convert' show json, base64, ascii;
 import 'package:uztexpro_payment/login_page.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'app_storage.dart';
 import 'theme_notifier.dart';
 import 'locale_notifier.dart';
 
@@ -13,7 +13,7 @@ class PROApp extends StatefulWidget {
 }
 
 class _ProMobile extends State<PROApp> {
-  final storage = FlutterSecureStorage();
+  final storage = AppStorage();
 
   Future<String> get jwtOrEmpty async {
     try {

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:local_auth/local_auth.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'app_storage.dart';
 import 'package:uztexpro_payment/main_page.dart';
 import 'package:uztexpro_payment/main.dart';
 import 'app_strings.dart';
@@ -25,7 +25,7 @@ class _LoginPageState extends State<LoginPage>
   final LocalAuthentication auth = LocalAuthentication();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final FlutterSecureStorage storage = FlutterSecureStorage();
+  final AppStorage storage = AppStorage();
 
   bool isLoading = false;
   bool isPasswordVisible = false;
@@ -83,7 +83,9 @@ class _LoginPageState extends State<LoginPage>
 
   Future<void> checkBiometrics() async {
     try {
-      _canCheckBiometrics = await auth.canCheckBiometrics;
+      final canCheck = await auth.canCheckBiometrics;
+      final isSupported = await auth.isDeviceSupported();
+      _canCheckBiometrics = canCheck || isSupported;
     } catch (e) {
       _canCheckBiometrics = false;
     }
@@ -110,7 +112,7 @@ class _LoginPageState extends State<LoginPage>
         options: const AuthenticationOptions(
           useErrorDialogs: true,
           stickyAuth: true,
-          biometricOnly: true,
+          biometricOnly: false,
         ),
       );
     } catch (e) {
@@ -129,7 +131,7 @@ class _LoginPageState extends State<LoginPage>
       );
       if (res.statusCode == 200) return res.body;
       return null;
-    } on Exception {
+    } catch (e) {
       return null;
     }
   }
