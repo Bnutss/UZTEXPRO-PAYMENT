@@ -32,8 +32,8 @@ class _LoginPageState extends State<LoginPage>
   bool _canCheckBiometrics = false;
   bool _useBiometrics = false;
 
-  final Color primaryColor = const Color(0xFFFF9800);
-  final Color secondaryColor = const Color(0xFFFF5722);
+  final Color primaryColor = const Color(0xFFFF8C00);
+  final Color secondaryColor = const Color(0xFFCC1500);
   final Color accentColor = const Color(0xFF6A1B9A);
 
   @override
@@ -222,11 +222,11 @@ class _LoginPageState extends State<LoginPage>
 
   Widget _buildLoadingView(S s) {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [primaryColor, secondaryColor],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+          colors: [Color(0xFFFF8C00), Color(0xFFCC1500)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
       ),
       child: Center(
@@ -245,7 +245,11 @@ class _LoginPageState extends State<LoginPage>
             const SizedBox(height: 30),
             Text(
               s.enterUztexpro,
-              style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -259,22 +263,74 @@ class _LoginPageState extends State<LoginPage>
   }
 
   Widget _buildLoginView(S s) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [primaryColor, secondaryColor],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return Stack(
+      children: [
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFFF8C00), Color(0xFFCC1500)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
         ),
-      ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            _buildAppBar(s),
-            Expanded(child: _buildLoginForm(s)),
-          ],
+        Positioned(
+          top: -80,
+          right: -50,
+          child: Container(
+            width: 220,
+            height: 220,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withOpacity(0.08),
+            ),
+          ),
         ),
-      ),
+        Positioned(
+          top: 120,
+          right: 30,
+          child: Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withOpacity(0.06),
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: 60,
+          left: -80,
+          child: Container(
+            width: 250,
+            height: 250,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withOpacity(0.07),
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: 180,
+          right: -30,
+          child: Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withOpacity(0.05),
+            ),
+          ),
+        ),
+        SafeArea(
+          child: Column(
+            children: [
+              _buildAppBar(s),
+              Expanded(child: _buildLoginForm(s)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -289,6 +345,7 @@ class _LoginPageState extends State<LoginPage>
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
               shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
             ),
             child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 32),
           ),
@@ -304,12 +361,16 @@ class _LoginPageState extends State<LoginPage>
                   fontWeight: FontWeight.bold,
                   letterSpacing: 2,
                   color: Colors.white,
-                  shadows: [Shadow(color: Colors.black26, offset: Offset(1, 1), blurRadius: 3)],
+                  shadows: [Shadow(color: Colors.black26, offset: Offset(1, 1), blurRadius: 4)],
                 ),
               ),
               Text(
                 s.paymentSystem,
-                style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.9), letterSpacing: 1),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withOpacity(0.9),
+                  letterSpacing: 1,
+                ),
               ),
             ],
           ),
@@ -325,47 +386,40 @@ class _LoginPageState extends State<LoginPage>
         position: _slideAnimation,
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-            child: Card(
-              elevation: 16,
-              shadowColor: Colors.black.withOpacity(0.4),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.0)),
-              child: Padding(
-                padding: const EdgeInsets.all(28.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    _buildLogo(),
-                    const SizedBox(height: 36),
-                    _buildWelcomeText(s),
-                    const SizedBox(height: 32),
-                    _buildTextField(
-                      controller: _usernameController,
-                      icon: Icons.person_outline,
-                      label: s.loginField,
-                      isPassword: false,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildTextField(
-                      controller: _passwordController,
-                      icon: Icons.lock_outline,
-                      label: s.passwordField,
-                      isPassword: true,
-                    ),
-                    const SizedBox(height: 32),
-                    _buildLoginButton(s),
-                    if (_canCheckBiometrics) ...[
-                      const SizedBox(height: 24),
-                      _buildBiometricToggle(s),
-                      if (_useBiometrics) ...[
-                        const SizedBox(height: 20),
-                        _buildBiometricLoginButton(s),
-                      ],
-                    ],
-                  ],
+            padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _buildLogo(),
+                const SizedBox(height: 28),
+                _buildWelcomeText(s),
+                const SizedBox(height: 40),
+                _buildTextField(
+                  controller: _usernameController,
+                  icon: Icons.person_outline,
+                  label: s.loginField,
+                  isPassword: false,
                 ),
-              ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _passwordController,
+                  icon: Icons.lock_outline,
+                  label: s.passwordField,
+                  isPassword: true,
+                ),
+                const SizedBox(height: 32),
+                _buildLoginButton(s),
+                if (_canCheckBiometrics) ...[
+                  const SizedBox(height: 20),
+                  _buildBiometricToggle(s),
+                  if (_useBiometrics) ...[
+                    const SizedBox(height: 16),
+                    _buildBiometricLoginButton(s),
+                  ],
+                ],
+                const SizedBox(height: 24),
+              ],
             ),
           ),
         ),
@@ -375,49 +429,43 @@ class _LoginPageState extends State<LoginPage>
 
   Widget _buildLogo() {
     return Container(
-      width: 90,
-      height: 90,
+      width: 92,
+      height: 92,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [primaryColor, secondaryColor],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white.withOpacity(0.18),
+        border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withOpacity(0.4),
-            blurRadius: 16,
+            color: Colors.black.withOpacity(0.18),
+            blurRadius: 24,
             spreadRadius: 2,
-            offset: const Offset(0, 6),
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white.withOpacity(0.2),
-          ),
-          child: const Icon(Icons.security, size: 42, color: Colors.white),
-        ),
+      child: const Center(
+        child: Icon(Icons.security, size: 46, color: Colors.white),
       ),
     );
   }
 
   Widget _buildWelcomeText(S s) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
     return Column(
       children: [
         Text(
           s.welcome,
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: onSurface),
+          style: const TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            shadows: [Shadow(color: Colors.black26, offset: Offset(0, 1), blurRadius: 4)],
+          ),
         ),
         const SizedBox(height: 8),
         Text(
           s.signInAccount,
-          style: TextStyle(fontSize: 16, color: onSurface.withOpacity(0.6)),
+          style: TextStyle(fontSize: 16, color: Colors.white.withOpacity(0.82)),
         ),
       ],
     );
@@ -432,73 +480,63 @@ class _LoginPageState extends State<LoginPage>
     return TextField(
       controller: controller,
       obscureText: isPassword && !isPasswordVisible,
-      style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurface),
+      style: const TextStyle(fontSize: 16, color: Colors.white),
+      cursorColor: Colors.white,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
-        floatingLabelStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+        labelStyle: TextStyle(color: Colors.white.withOpacity(0.8)),
+        floatingLabelStyle: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Theme.of(context).colorScheme.outline, width: 1),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.4), width: 1.5),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: primaryColor, width: 2),
+          borderSide: const BorderSide(color: Colors.white, width: 2),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Theme.of(context).colorScheme.outline, width: 1),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.4), width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        prefixIcon: Icon(icon, color: primaryColor),
+        prefixIcon: Icon(icon, color: Colors.white.withOpacity(0.9)),
         suffixIcon: isPassword
             ? IconButton(
                 icon: Icon(
                   isPasswordVisible ? Icons.visibility_off : Icons.visibility,
-                  color: accentColor,
+                  color: Colors.white70,
                 ),
                 onPressed: () => setState(() => isPasswordVisible = !isPasswordVisible),
               )
             : null,
         filled: true,
+        fillColor: Colors.white.withOpacity(0.15),
       ),
     );
   }
 
   Widget _buildLoginButton(S s) {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       height: 55,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [primaryColor, secondaryColor],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: primaryColor.withOpacity(0.4),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
       child: ElevatedButton(
         onPressed: _login,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
+          backgroundColor: Colors.white,
+          shadowColor: Colors.black.withOpacity(0.25),
+          elevation: 6,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          padding: const EdgeInsets.symmetric(vertical: 16),
         ),
         child: Text(
           s.signIn,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
             letterSpacing: 1.5,
-            color: Colors.white,
+            color: primaryColor,
           ),
         ),
       ),
@@ -506,12 +544,11 @@ class _LoginPageState extends State<LoginPage>
   }
 
   Widget _buildBiometricToggle(S s) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: Colors.white.withOpacity(0.15),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).colorScheme.outline),
+        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
       ),
       child: Material(
         color: Colors.transparent,
@@ -525,10 +562,10 @@ class _LoginPageState extends State<LoginPage>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: accentColor.withOpacity(0.1),
+                    color: Colors.white.withOpacity(0.2),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.fingerprint, color: accentColor, size: 24),
+                  child: const Icon(Icons.fingerprint, color: Colors.white, size: 24),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -537,12 +574,16 @@ class _LoginPageState extends State<LoginPage>
                     children: [
                       Text(
                         s.biometricAuth,
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: onSurface),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         s.useFingerprint,
-                        style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.6)),
+                        style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.75)),
                       ),
                     ],
                   ),
@@ -550,8 +591,10 @@ class _LoginPageState extends State<LoginPage>
                 Switch(
                   value: _useBiometrics,
                   onChanged: toggleBiometricPreference,
-                  activeColor: accentColor,
-                  activeTrackColor: accentColor.withOpacity(0.4),
+                  activeColor: Colors.white,
+                  activeTrackColor: Colors.white.withOpacity(0.4),
+                  inactiveThumbColor: Colors.white.withOpacity(0.6),
+                  inactiveTrackColor: Colors.white.withOpacity(0.2),
                 ),
               ],
             ),
@@ -562,26 +605,29 @@ class _LoginPageState extends State<LoginPage>
   }
 
   Widget _buildBiometricLoginButton(S s) {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       height: 50,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: accentColor, width: 1.5),
-      ),
       child: ElevatedButton.icon(
         onPressed: () => loginWithBiometrics(context),
-        icon: const Icon(Icons.fingerprint, size: 24),
+        icon: const Icon(Icons.fingerprint, size: 24, color: Colors.white),
         label: Text(
           s.signInBiometric,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1),
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1,
+            color: Colors.white,
+          ),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          foregroundColor: accentColor,
+          backgroundColor: Colors.white.withOpacity(0.2),
           shadowColor: Colors.transparent,
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: Colors.white.withOpacity(0.6), width: 1.5),
+          ),
         ),
       ),
     );
