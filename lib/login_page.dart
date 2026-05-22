@@ -221,10 +221,13 @@ class _LoginPageState extends State<LoginPage>
   }
 
   Widget _buildLoadingView(S s) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFFFF8C00), Color(0xFFCC1500)],
+          colors: isDark
+              ? [const Color(0xFF3D1800), const Color(0xFF1F0000)]
+              : [const Color(0xFFFF8C00), const Color(0xFFCC1500)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -263,12 +266,15 @@ class _LoginPageState extends State<LoginPage>
   }
 
   Widget _buildLoginView(S s) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Stack(
       children: [
         Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFFFF8C00), Color(0xFFCC1500)],
+              colors: isDark
+                  ? [const Color(0xFF3D1800), const Color(0xFF1F0000)]
+                  : [const Color(0xFFFF8C00), const Color(0xFFCC1500)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),

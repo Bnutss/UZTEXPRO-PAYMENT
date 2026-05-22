@@ -20,7 +20,9 @@ class _SettingsScreenState extends State<SettingsScreen>
   final AppStorage _storage = const AppStorage();
   String _username = '';
 
-  // Supported languages
+  static const Color _gradientStart = Color(0xFFFF8C00);
+  static const Color _gradientEnd = Color(0xFFCC1500);
+
   final List<Map<String, String>> _languages = [
     {'code': 'ru', 'name': 'Русский', 'desc': 'Русский язык'},
     {'code': 'en', 'name': 'English', 'desc': 'English language'},
@@ -62,131 +64,185 @@ class _SettingsScreenState extends State<SettingsScreen>
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
-    final theme = Theme.of(context);
-    final surface = theme.colorScheme.surface;
-    final onSurface = theme.colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final List<Color> gradientColors = isDark
+        ? [const Color(0xFF3D1800), const Color(0xFF1F0000)]
+        : [_gradientStart, _gradientEnd];
 
-    return Scaffold(
-      appBar: AppBar(
-        systemOverlayStyle: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-        ),
-        title: Text(
-          s.settingsTitle,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
-          splashRadius: 24,
-        ),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          title: Text(
+            s.settingsTitle,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
             ),
           ),
-        ),
-        elevation: 4,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline, color: Colors.white, size: 24),
-            onPressed: () => _showAboutDialog(s),
-            tooltip: s.aboutApp,
+          centerTitle: true,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+            onPressed: () => Navigator.of(context).pop(),
             splashRadius: 24,
           ),
-        ],
-      ),
-      body: FadeTransition(
-        opacity: _animation,
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: gradientColors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+            ),
+          ),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.info_outline, color: Colors.white, size: 24),
+              onPressed: () => _showAboutDialog(s),
+              tooltip: s.aboutApp,
+              splashRadius: 24,
+            ),
+          ],
+        ),
+        body: Stack(
           children: [
-            _buildProfileCard(onSurface),
-            const SizedBox(height: 24),
-            _buildSectionHeader(s.generalSettings, onSurface),
-            _buildSettingButton(
-              Icons.security,
-              s.security,
-              s.securityDesc,
-              const Color(0xFF43A047),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => ConfidentialityPage()),
-                );
-              },
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: gradientColors,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
             ),
-            _buildSettingButton(
-              Icons.language,
-              s.language,
-              s.languageDesc,
-              const Color(0xFFEF6C00),
-              onTap: () => _showLanguageDialog(s),
+            Positioned(
+              top: -60,
+              right: -40,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.07),
+                ),
+              ),
             ),
-            const SizedBox(height: 16),
-            _buildSectionHeader(s.appearance, onSurface),
-            _buildThemeButton(s, surface, onSurface),
-            const SizedBox(height: 24),
-            _buildVersionInfo(s, onSurface),
+            Positioned(
+              bottom: 60,
+              left: -70,
+              child: Container(
+                width: 220,
+                height: 220,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.06),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 200,
+              right: 20,
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.05),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: FadeTransition(
+                opacity: _animation,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+                  children: [
+                    _buildProfileCard(),
+                    const SizedBox(height: 28),
+                    _buildSectionHeader(s.generalSettings),
+                    _buildSettingButton(
+                      Icons.security,
+                      s.security,
+                      s.securityDesc,
+                      const Color(0xFF43A047),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => ConfidentialityPage()),
+                        );
+                      },
+                    ),
+                    _buildSettingButton(
+                      Icons.language,
+                      s.language,
+                      s.languageDesc,
+                      const Color(0xFFEF6C00),
+                      onTap: () => _showLanguageDialog(s),
+                    ),
+                    const SizedBox(height: 20),
+                    _buildSectionHeader(s.appearance),
+                    _buildThemeButton(s),
+                    const SizedBox(height: 28),
+                    _buildVersionInfo(s),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildProfileCard(Color onSurface) {
+  Widget _buildProfileCard() {
     final initial = _username.isNotEmpty ? _username[0].toUpperCase() : 'U';
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFA726), Color(0xFFFF7043)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.orange.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Row(
           children: [
             Container(
-              width: 60,
-              height: 60,
+              width: 64,
+              height: 64,
               decoration: BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
               child: Center(
                 child: Text(
                   initial,
-                  style: TextStyle(
-                    color: Colors.orange.shade700,
+                  style: const TextStyle(
+                    color: _gradientStart,
                     fontWeight: FontWeight.bold,
                     fontSize: 28,
                   ),
@@ -204,18 +260,27 @@ class _SettingsScreenState extends State<SettingsScreen>
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 20,
+                      shadows: [Shadow(color: Colors.black26, offset: Offset(0, 1), blurRadius: 4)],
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     S.of(context).paymentSystem,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withOpacity(0.85),
                       fontSize: 14,
                     ),
                   ),
                 ],
               ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.person, color: Colors.white, size: 22),
             ),
           ],
         ),
@@ -223,19 +288,133 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildThemeButton(S s, Color surface, Color onSurface) {
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 18,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.8),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              shadows: [Shadow(color: Colors.black26, offset: Offset(0, 1), blurRadius: 3)],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingButton(
+    IconData icon,
+    String title,
+    String subtitle,
+    Color iconColor, {
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    final isDarkBtn = theme.brightness == Brightness.dark;
+    final onSurface = theme.colorScheme.onSurface;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDarkBtn ? theme.colorScheme.surface : Colors.white.withOpacity(0.95),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: iconColor.withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: iconColor, size: 24),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            color: onSurface.withOpacity(0.6),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_ios, color: onSurface.withOpacity(0.35), size: 16),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeButton(S s) {
+    final theme = Theme.of(context);
+    final isDarkBtn = theme.brightness == Brightness.dark;
+    final onSurface = theme.colorScheme.onSurface;
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: themeNotifier,
       builder: (context, themeMode, _) {
         final isDark = themeMode == ThemeMode.dark;
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Card(
-            elevation: 2,
-            shadowColor: Colors.black.withOpacity(0.1),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDarkBtn ? theme.colorScheme.surface : Colors.white.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
             child: Padding(
-              padding: const EdgeInsets.all(12.0),
+              padding: const EdgeInsets.all(16.0),
               child: Row(
                 children: [
                   Container(
@@ -286,111 +465,23 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildSectionHeader(String title, Color onSurface) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 8, bottom: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 16,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF9800),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: TextStyle(
-              color: onSurface,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSettingButton(
-    IconData icon,
-    String title,
-    String subtitle,
-    Color iconColor, {
-    required VoidCallback onTap,
-  }) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Card(
-        elevation: 2,
-        shadowColor: Colors.black.withOpacity(0.1),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: iconColor, size: 24),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          color: onSurface.withOpacity(0.6),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.arrow_forward_ios, color: onSurface.withOpacity(0.4), size: 16),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVersionInfo(S s, Color onSurface) {
+  Widget _buildVersionInfo(S s) {
     return Center(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
         decoration: BoxDecoration(
-          color: onSurface.withOpacity(0.05),
+          color: Colors.white.withOpacity(0.18),
           borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: Colors.white.withOpacity(0.35)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.info_outline, size: 16, color: onSurface.withOpacity(0.5)),
+            Icon(Icons.info_outline, size: 16, color: Colors.white.withOpacity(0.85)),
             const SizedBox(width: 8),
             Text(
               s.appVersionLabel,
-              style: TextStyle(color: onSurface.withOpacity(0.5), fontSize: 12),
+              style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12),
             ),
           ],
         ),
@@ -440,12 +531,12 @@ class _SettingsScreenState extends State<SettingsScreen>
                           margin: const EdgeInsets.only(bottom: 12),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? const Color(0xFFFF9800).withOpacity(0.1)
+                                ? _gradientStart.withOpacity(0.1)
                                 : Theme.of(context).colorScheme.surface,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: isSelected
-                                  ? const Color(0xFFFF9800)
+                                  ? _gradientStart
                                   : Theme.of(context).colorScheme.outline,
                               width: 1.5,
                             ),
@@ -453,14 +544,14 @@ class _SettingsScreenState extends State<SettingsScreen>
                           child: RadioListTile<String>(
                             value: lang['code']!,
                             groupValue: selectedLang,
-                            activeColor: const Color(0xFFFF9800),
+                            activeColor: _gradientStart,
                             onChanged: (v) => setDialogState(() => selectedLang = v!),
                             title: Text(
                               lang['name']!,
                               style: TextStyle(
                                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                 color: isSelected
-                                    ? const Color(0xFFFF9800)
+                                    ? _gradientStart
                                     : Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
@@ -498,7 +589,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                             Navigator.of(ctx).pop();
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFF9800),
+                            backgroundColor: _gradientStart,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -529,19 +620,19 @@ class _SettingsScreenState extends State<SettingsScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 70,
-                  height: 70,
+                  width: 72,
+                  height: 72,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
+                      colors: [_gradientStart, _gradientEnd],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.orange.withOpacity(0.3),
-                        blurRadius: 10,
+                        color: _gradientStart.withOpacity(0.35),
+                        blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
                     ],
@@ -549,7 +640,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                   child: const Center(
                     child: Text(
                       "U",
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 36),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 36,
+                      ),
                     ),
                   ),
                 ),
@@ -592,12 +687,15 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ElevatedButton(
                   onPressed: () => Navigator.of(ctx).pop(),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF9800),
+                    backgroundColor: _gradientStart,
                     foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 45),
+                    minimumSize: const Size(double.infinity, 46),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: Text(s.close, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  child: Text(
+                    s.close,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
                 ),
               ],
             ),

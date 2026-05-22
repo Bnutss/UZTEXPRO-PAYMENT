@@ -36,6 +36,9 @@ class _MainPageScreenState extends State<MainPageScreen>
   final _scrollController = ScrollController();
   bool _showBackToTopButton = false;
 
+  static const Color _gradientStart = Color(0xFFFF8C00);
+  static const Color _gradientEnd = Color(0xFFCC1500);
+
   @override
   void initState() {
     super.initState();
@@ -328,7 +331,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
+                            colors: [_gradientStart, _gradientEnd],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -466,7 +469,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                           onPressed: () => Navigator.of(context).pop(true),
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            backgroundColor: const Color(0xFFFF9800),
+                            backgroundColor: _gradientStart,
                             foregroundColor: Colors.white,
                             elevation: 0,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -660,7 +663,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
-                                colors: [Color(0xFFFFB74D), Color(0xFFFF9800)],
+                                colors: [_gradientStart, _gradientEnd],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
@@ -896,7 +899,7 @@ class _MainPageScreenState extends State<MainPageScreen>
                               },
                               style: ElevatedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(vertical: 12),
-                                backgroundColor: const Color(0xFFFF9800),
+                                backgroundColor: _gradientStart,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1012,25 +1015,40 @@ class _MainPageScreenState extends State<MainPageScreen>
   }
 
   Widget _buildShimmerCard() {
-    final theme = Theme.of(context);
+    final isDarkShimmer = Theme.of(context).brightness == Brightness.dark;
+    final shimmerBase = isDarkShimmer
+        ? Colors.white.withOpacity(0.06)
+        : Colors.white.withOpacity(0.15);
+    final shimmerHighlight = isDarkShimmer
+        ? Colors.white.withOpacity(0.16)
+        : Colors.white.withOpacity(0.35);
+    final shimmerBlock = isDarkShimmer
+        ? Colors.white.withOpacity(0.1)
+        : Colors.white.withOpacity(0.3);
     return Shimmer.fromColors(
-      baseColor: theme.colorScheme.outline,
-      highlightColor: theme.colorScheme.surface,
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 8),
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      baseColor: shimmerBase,
+      highlightColor: shimmerHighlight,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: isDarkShimmer
+              ? Colors.white.withOpacity(0.08)
+              : Colors.white.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: Column(
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               width: double.infinity,
-              height: 40,
+              height: 48,
               decoration: BoxDecoration(
-                color: theme.cardColor,
+                color: isDarkShimmer
+                    ? Colors.white.withOpacity(0.12)
+                    : Colors.white.withOpacity(0.25),
                 borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  topRight: Radius.circular(12),
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
                 ),
               ),
             ),
@@ -1040,34 +1058,34 @@ class _MainPageScreenState extends State<MainPageScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
-                    Container(width: 14, height: 14, color: theme.cardColor),
+                    Container(width: 14, height: 14, color: shimmerBlock),
                     const SizedBox(width: 8),
-                    Container(width: 120, height: 12, color: theme.cardColor),
+                    Container(width: 120, height: 12, color: shimmerBlock),
                   ]),
                   const SizedBox(height: 12),
                   Row(children: [
-                    Container(width: 14, height: 14, color: theme.cardColor),
+                    Container(width: 14, height: 14, color: shimmerBlock),
                     const SizedBox(width: 8),
-                    Container(width: 160, height: 12, color: theme.cardColor),
+                    Container(width: 160, height: 12, color: shimmerBlock),
                   ]),
                   const SizedBox(height: 12),
                   Row(children: [
-                    Container(width: 14, height: 14, color: theme.cardColor),
+                    Container(width: 14, height: 14, color: shimmerBlock),
                     const SizedBox(width: 8),
-                    Container(width: 140, height: 12, color: theme.cardColor),
+                    Container(width: 140, height: 12, color: shimmerBlock),
                   ]),
                   const SizedBox(height: 12),
                   Row(children: [
-                    Expanded(child: Container(height: 12, color: theme.cardColor)),
+                    Expanded(child: Container(height: 12, color: shimmerBlock)),
                     const SizedBox(width: 20),
-                    Expanded(child: Container(height: 12, color: theme.cardColor)),
+                    Expanded(child: Container(height: 12, color: shimmerBlock)),
                   ]),
                   const SizedBox(height: 16),
                   Container(
                     width: 80,
                     height: 20,
                     decoration: BoxDecoration(
-                      color: theme.cardColor,
+                      color: shimmerBlock,
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
@@ -1087,502 +1105,624 @@ class _MainPageScreenState extends State<MainPageScreen>
     final onSurface = theme.colorScheme.onSurface;
     final surface = theme.colorScheme.surface;
     final outline = theme.colorScheme.outline;
+    final isDark = theme.brightness == Brightness.dark;
+    final List<Color> gradientColors = isDark
+        ? [const Color(0xFF3D1800), const Color(0xFF1F0000)]
+        : [_gradientStart, _gradientEnd];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          s.paymentAgreements,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        centerTitle: true,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          title: Text(
+            s.paymentAgreements,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
             ),
           ),
-        ),
-        elevation: 4,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white, size: 24),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => SettingsScreen()),
-              );
-            },
-            tooltip: s.settingsTooltip,
-            splashRadius: 24,
+          centerTitle: true,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: gradientColors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white, size: 24),
-            onPressed: _logout,
-            tooltip: s.exitTooltip,
-            splashRadius: 24,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
           ),
-        ],
-      ),
-      body: isLoading
-          ? ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: 5,
-              itemBuilder: (context, index) => _buildShimmerCard(),
-            )
-          : paymentReports.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(Icons.business_center, size: 70, color: Colors.orange.shade300),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        s.noContracts,
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: onSurface.withOpacity(0.7)),
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: _refreshData,
-                        icon: const Icon(Icons.refresh, size: 20),
-                        label: Text(s.refresh, style: const TextStyle(fontSize: 15)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFF9800),
-                          foregroundColor: Colors.white,
-                          elevation: 3,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _refreshData,
-                  color: const Color(0xFFFF9800),
-                  child: FadeTransition(
-                    opacity: _animation,
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(12),
-                      itemCount: paymentReports.length,
-                      itemBuilder: (context, index) {
-                        final report = paymentReports[index];
-                        Color statusColor;
-                        IconData statusIcon;
-
-                        switch (report['status']) {
-                          case 2:
-                            statusColor = const Color(0xFF43A047);
-                            statusIcon = Icons.check_circle;
-                            break;
-                          case 3:
-                            statusColor = const Color(0xFFD32F2F);
-                            statusIcon = Icons.cancel;
-                            break;
-                          case 5:
-                            statusColor = const Color(0xFFEF6C00);
-                            statusIcon = Icons.account_balance_wallet;
-                            break;
-                          default:
-                            statusColor = const Color(0xFF1976D2);
-                            statusIcon = Icons.pending;
-                        }
-
-                        Color payingTypeColor = const Color(0xFFD32F2F);
-                        if (report['raport_paying_type_name'] != null) {
-                          if (report['raport_paying_type_name']
-                              .toString()
-                              .toLowerCase()
-                              .contains('пост')) {
-                            payingTypeColor = const Color(0xFF43A047);
-                          }
-                        }
-
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            onTap: () {
-                              if (report['has_change']) {
-                                showUpdateStatusDialog(context, report);
-                              } else {
-                                showNotification(s.noPermission, false);
-                              }
-                            },
-                            borderRadius: BorderRadius.circular(12),
-                            child: Column(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        onSurface.withOpacity(0.04),
-                                        onSurface.withOpacity(0.08),
-                                      ],
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                    ),
-                                    borderRadius: const BorderRadius.only(
-                                      topLeft: Radius.circular(12),
-                                      topRight: Radius.circular(12),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          gradient: const LinearGradient(
-                                            colors: [Color(0xFFFF9800), Color(0xFFFF7043)],
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                          ),
-                                          borderRadius: BorderRadius.circular(10),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.orange.withOpacity(0.3),
-                                              blurRadius: 4,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ],
-                                        ),
-                                        child: const Icon(Icons.business, color: Colors.white, size: 18),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          report['bussines_name'] ?? s.unnamed,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                            color: onSurface,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      if (report['has_change'])
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue.shade50,
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: Colors.blue.shade100, width: 1),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.edit, size: 12, color: Colors.blue.shade700),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                s.available,
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: Colors.blue.shade700,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                    ],
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.settings, color: Colors.white, size: 24),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => SettingsScreen()),
+                );
+              },
+              tooltip: s.settingsTooltip,
+              splashRadius: 24,
+            ),
+            IconButton(
+              icon: const Icon(Icons.logout, color: Colors.white, size: 24),
+              onPressed: _logout,
+              tooltip: s.exitTooltip,
+              splashRadius: 24,
+            ),
+          ],
+        ),
+        body: Stack(
+          children: [
+            // Full gradient background
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: gradientColors,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+            ),
+            // Decorative circles
+            Positioned(
+              top: -60,
+              right: -40,
+              child: Container(
+                width: 180,
+                height: 180,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.07),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 120,
+              left: -70,
+              child: Container(
+                width: 220,
+                height: 220,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.06),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 300,
+              right: -30,
+              child: Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.05),
+                ),
+              ),
+            ),
+            // Content
+            SafeArea(
+              child: isLoading
+                  ? ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                      itemCount: 5,
+                      itemBuilder: (context, index) => _buildShimmerCard(),
+                    )
+                  : paymentReports.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(28),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.18),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.4),
+                                    width: 2,
                                   ),
                                 ),
-                                Container(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    children: [
-                                      Row(
+                                child: const Icon(
+                                  Icons.business_center,
+                                  size: 70,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              Text(
+                                s.noContracts,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                onPressed: _refreshData,
+                                icon: const Icon(Icons.refresh, size: 20),
+                                label: Text(
+                                  s.refresh,
+                                  style: const TextStyle(fontSize: 15),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: _gradientStart,
+                                  elevation: 4,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 28,
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _refreshData,
+                          color: _gradientStart,
+                          child: FadeTransition(
+                            opacity: _animation,
+                            child: ListView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
+                              itemCount: paymentReports.length,
+                              itemBuilder: (context, index) {
+                                final report = paymentReports[index];
+                                Color statusColor;
+                                IconData statusIcon;
+
+                                switch (report['status']) {
+                                  case 2:
+                                    statusColor = const Color(0xFF43A047);
+                                    statusIcon = Icons.check_circle;
+                                    break;
+                                  case 3:
+                                    statusColor = const Color(0xFFD32F2F);
+                                    statusIcon = Icons.cancel;
+                                    break;
+                                  case 5:
+                                    statusColor = const Color(0xFFEF6C00);
+                                    statusIcon = Icons.account_balance_wallet;
+                                    break;
+                                  default:
+                                    statusColor = const Color(0xFF1976D2);
+                                    statusIcon = Icons.pending;
+                                }
+
+                                Color payingTypeColor = const Color(0xFFD32F2F);
+                                if (report['raport_paying_type_name'] != null) {
+                                  if (report['raport_paying_type_name']
+                                      .toString()
+                                      .toLowerCase()
+                                      .contains('пост')) {
+                                    payingTypeColor = const Color(0xFF43A047);
+                                  }
+                                }
+
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? surface : Colors.white.withOpacity(0.95),
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(isDark ? 0.3 : 0.12),
+                                        blurRadius: 10,
+                                        spreadRadius: 0,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () {
+                                        if (report['has_change']) {
+                                          showUpdateStatusDialog(context, report);
+                                        } else {
+                                          showNotification(s.noPermission, false);
+                                        }
+                                      },
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: Column(
                                         children: [
-                                          Expanded(
-                                            child: _buildInfoCard(
-                                              Icons.description,
-                                              s.contract,
-                                              report['contract'] ?? s.noData,
-                                              Colors.blue.shade50,
-                                              Colors.blue.shade700,
+                                          // Card header with gradient
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 12,
                                             ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: _buildInfoCard(
-                                              Icons.subject,
-                                              s.subject,
-                                              report['sub_contract'] ?? s.noData,
-                                              Colors.purple.shade50,
-                                              Colors.purple.shade700,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _buildInfoRow(
-                                        s.applicant,
-                                        report['applicant_name'] ?? s.notSpecified,
-                                        Icons.person,
-                                        Colors.blueGrey.shade600,
-                                        onSurface: onSurface,
-                                        outline: outline,
-                                        surface: surface,
-                                      ),
-                                      const SizedBox(height: 6),
-                                      if (report['raport_paying_type_name'] != null)
-                                        _buildInfoRow(
-                                          s.paymentType,
-                                          report['raport_paying_type_name'],
-                                          Icons.credit_card,
-                                          payingTypeColor,
-                                          isBold: true,
-                                          onSurface: onSurface,
-                                          outline: outline,
-                                          surface: surface,
-                                        ),
-                                      const SizedBox(height: 6),
-                                      Container(
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: onSurface.withOpacity(0.04),
-                                          borderRadius: BorderRadius.circular(10),
-                                          border: Border.all(color: outline, width: 1),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.center,
-                                                children: [
-                                                  Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Icon(Icons.account_balance, size: 12, color: Colors.orange.shade700),
-                                                      const SizedBox(width: 4),
-                                                      Text(
-                                                        s.contractAmount,
-                                                        style: TextStyle(fontSize: 9, color: onSurface.withOpacity(0.5)),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    formatCurrency(report['contract_price']),
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: onSurface,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            Container(width: 1, height: 40, color: outline),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.center,
-                                                children: [
-                                                  Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Icon(Icons.payment, size: 12, color: Colors.green.shade700),
-                                                      const SizedBox(width: 4),
-                                                      Text(
-                                                        s.toPay,
-                                                        style: TextStyle(fontSize: 9, color: onSurface.withOpacity(0.5)),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    formatCurrency(report['paid']),
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: onSurface,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            Container(width: 1, height: 40, color: outline),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.center,
-                                                children: [
-                                                  Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Icon(Icons.currency_exchange, size: 12, color: Colors.indigo.shade700),
-                                                      const SizedBox(width: 4),
-                                                      Text(
-                                                        s.currency,
-                                                        style: TextStyle(fontSize: 9, color: onSurface.withOpacity(0.5)),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    report['currency_name'] ?? '-',
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: onSurface,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                        decoration: BoxDecoration(
-                                          color: statusColor.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(10),
-                                          border: Border.all(color: statusColor.withOpacity(0.3), width: 1),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(statusIcon, color: statusColor, size: 18),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                '${s.statusLabel}: ${report['status_name'] ?? '-'}',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: statusColor,
-                                                ),
-                                              ),
-                                            ),
-                                            if (report['contract_document_url'] != null)
-                                              Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  IconButton(
-                                                    icon: Icon(Icons.file_present, color: Colors.blue.shade700, size: 18),
-                                                    onPressed: () => _launchURL(report['contract_document_url']),
-                                                    tooltip: 'Просмотр файла',
-                                                    padding: EdgeInsets.zero,
-                                                    constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                                                  ),
-                                                  IconButton(
-                                                    icon: Icon(Icons.copy, color: Colors.blue.shade700, size: 18),
-                                                    onPressed: () async {
-                                                      final fullUrl = 'https://uztex.pro${report['contract_document_url']}';
-                                                      Clipboard.setData(ClipboardData(text: fullUrl));
-                                                      showNotification(s.urlCopiedShort, true);
-                                                    },
-                                                    tooltip: 'Копировать ссылку',
-                                                    padding: EdgeInsets.zero,
-                                                    constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                                                  ),
-                                                ],
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                      if (report['notes'] != null && report['notes'].toString().isNotEmpty)
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 12),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(12),
                                             decoration: BoxDecoration(
-                                              color: Colors.amber.shade50,
-                                              borderRadius: BorderRadius.circular(10),
-                                              border: Border.all(color: Colors.amber.shade200, width: 1),
+                                              gradient: LinearGradient(
+                                                colors: gradientColors,
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                              ),
                                             ),
                                             child: Row(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                Icon(Icons.note, color: Colors.amber.shade800, size: 16),
-                                                const SizedBox(width: 8),
-                                                Expanded(
-                                                  child: Text(
-                                                    report['notes'],
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      color: onSurface.withOpacity(0.7),
-                                                      fontStyle: FontStyle.italic,
-                                                    ),
+                                                Container(
+                                                  padding: const EdgeInsets.all(6),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white.withOpacity(0.25),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.business,
+                                                    color: Colors.white,
+                                                    size: 16,
                                                   ),
                                                 ),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Text(
+                                                    report['bussines_name'] ?? s.unnamed,
+                                                    style: const TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Colors.white,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                if (report['has_change'])
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white.withOpacity(0.25),
+                                                      borderRadius: BorderRadius.circular(8),
+                                                      border: Border.all(
+                                                        color: Colors.white.withOpacity(0.5),
+                                                        width: 1,
+                                                      ),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        const Icon(
+                                                          Icons.edit,
+                                                          size: 12,
+                                                          color: Colors.white,
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        Text(
+                                                          s.available,
+                                                          style: const TextStyle(
+                                                            fontSize: 11,
+                                                            color: Colors.white,
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
                                               ],
                                             ),
                                           ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                if (report['has_change'])
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
-                                    decoration: const BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [Color(0xFFFF9800), Color(0xFFFF7043)],
-                                        begin: Alignment.centerLeft,
-                                        end: Alignment.centerRight,
-                                      ),
-                                      borderRadius: BorderRadius.only(
-                                        bottomLeft: Radius.circular(12),
-                                        bottomRight: Radius.circular(12),
-                                      ),
-                                    ),
-                                    child: Center(
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.touch_app, color: Colors.white, size: 14),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            s.tapToChangeStatus,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 11,
+                                          // Card body
+                                          Container(
+                                            padding: const EdgeInsets.all(16),
+                                            child: Column(
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: _buildInfoCard(
+                                                        Icons.description,
+                                                        s.contract,
+                                                        report['contract'] ?? s.noData,
+                                                        Colors.blue.shade50,
+                                                        Colors.blue.shade700,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Expanded(
+                                                      child: _buildInfoCard(
+                                                        Icons.subject,
+                                                        s.subject,
+                                                        report['sub_contract'] ?? s.noData,
+                                                        Colors.purple.shade50,
+                                                        Colors.purple.shade700,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 12),
+                                                _buildInfoRow(
+                                                  s.applicant,
+                                                  report['applicant_name'] ?? s.notSpecified,
+                                                  Icons.person,
+                                                  Colors.blueGrey.shade600,
+                                                  onSurface: onSurface,
+                                                  outline: outline,
+                                                  surface: surface,
+                                                ),
+                                                const SizedBox(height: 6),
+                                                if (report['raport_paying_type_name'] != null)
+                                                  _buildInfoRow(
+                                                    s.paymentType,
+                                                    report['raport_paying_type_name'],
+                                                    Icons.credit_card,
+                                                    payingTypeColor,
+                                                    isBold: true,
+                                                    onSurface: onSurface,
+                                                    outline: outline,
+                                                    surface: surface,
+                                                  ),
+                                                const SizedBox(height: 6),
+                                                Container(
+                                                  padding: const EdgeInsets.all(12),
+                                                  decoration: BoxDecoration(
+                                                    color: onSurface.withOpacity(0.04),
+                                                    borderRadius: BorderRadius.circular(10),
+                                                    border: Border.all(color: outline, width: 1),
+                                                  ),
+                                                  child: Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                                          children: [
+                                                            Row(
+                                                              mainAxisSize: MainAxisSize.min,
+                                                              children: [
+                                                                Icon(Icons.account_balance, size: 12, color: Colors.orange.shade700),
+                                                                const SizedBox(width: 4),
+                                                                Text(
+                                                                  s.contractAmount,
+                                                                  style: TextStyle(fontSize: 9, color: onSurface.withOpacity(0.5)),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                            const SizedBox(height: 4),
+                                                            Text(
+                                                              formatCurrency(report['contract_price']),
+                                                              style: TextStyle(
+                                                                fontSize: 11,
+                                                                fontWeight: FontWeight.bold,
+                                                                color: onSurface,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      Container(width: 1, height: 40, color: outline),
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                                          children: [
+                                                            Row(
+                                                              mainAxisSize: MainAxisSize.min,
+                                                              children: [
+                                                                Icon(Icons.payment, size: 12, color: Colors.green.shade700),
+                                                                const SizedBox(width: 4),
+                                                                Text(
+                                                                  s.toPay,
+                                                                  style: TextStyle(fontSize: 9, color: onSurface.withOpacity(0.5)),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                            const SizedBox(height: 4),
+                                                            Text(
+                                                              formatCurrency(report['paid']),
+                                                              style: TextStyle(
+                                                                fontSize: 11,
+                                                                fontWeight: FontWeight.bold,
+                                                                color: onSurface,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      Container(width: 1, height: 40, color: outline),
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                                          children: [
+                                                            Row(
+                                                              mainAxisSize: MainAxisSize.min,
+                                                              children: [
+                                                                Icon(Icons.currency_exchange, size: 12, color: Colors.indigo.shade700),
+                                                                const SizedBox(width: 4),
+                                                                Text(
+                                                                  s.currency,
+                                                                  style: TextStyle(fontSize: 9, color: onSurface.withOpacity(0.5)),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                            const SizedBox(height: 4),
+                                                            Text(
+                                                              report['currency_name'] ?? '-',
+                                                              style: TextStyle(
+                                                                fontSize: 11,
+                                                                fontWeight: FontWeight.bold,
+                                                                color: onSurface,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 12),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                    vertical: 8,
+                                                    horizontal: 12,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: statusColor.withOpacity(0.1),
+                                                    borderRadius: BorderRadius.circular(10),
+                                                    border: Border.all(
+                                                      color: statusColor.withOpacity(0.3),
+                                                      width: 1,
+                                                    ),
+                                                  ),
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(statusIcon, color: statusColor, size: 18),
+                                                      const SizedBox(width: 8),
+                                                      Expanded(
+                                                        child: Text(
+                                                          '${s.statusLabel}: ${report['status_name'] ?? '-'}',
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: statusColor,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      if (report['contract_document_url'] != null)
+                                                        Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            IconButton(
+                                                              icon: Icon(Icons.file_present, color: Colors.blue.shade700, size: 18),
+                                                              onPressed: () => _launchURL(report['contract_document_url']),
+                                                              tooltip: 'Просмотр файла',
+                                                              padding: EdgeInsets.zero,
+                                                              constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                                                            ),
+                                                            IconButton(
+                                                              icon: Icon(Icons.copy, color: Colors.blue.shade700, size: 18),
+                                                              onPressed: () async {
+                                                                final fullUrl = 'https://uztex.pro${report['contract_document_url']}';
+                                                                Clipboard.setData(ClipboardData(text: fullUrl));
+                                                                showNotification(s.urlCopiedShort, true);
+                                                              },
+                                                              tooltip: 'Копировать ссылку',
+                                                              padding: EdgeInsets.zero,
+                                                              constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                if (report['notes'] != null &&
+                                                    report['notes'].toString().isNotEmpty)
+                                                  Padding(
+                                                    padding: const EdgeInsets.only(top: 10),
+                                                    child: Container(
+                                                      padding: const EdgeInsets.all(12),
+                                                      decoration: BoxDecoration(
+                                                        color: isDark
+                                                            ? Colors.amber.withOpacity(0.12)
+                                                            : Colors.amber.shade50,
+                                                        borderRadius: BorderRadius.circular(10),
+                                                        border: Border.all(
+                                                          color: isDark
+                                                              ? Colors.amber.withOpacity(0.3)
+                                                              : Colors.amber.shade200,
+                                                          width: 1,
+                                                        ),
+                                                      ),
+                                                      child: Row(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Icon(Icons.note, color: Colors.amber.shade700, size: 16),
+                                                          const SizedBox(width: 8),
+                                                          Expanded(
+                                                            child: Text(
+                                                              report['notes'],
+                                                              style: TextStyle(
+                                                                fontSize: 11,
+                                                                color: onSurface.withOpacity(0.7),
+                                                                fontStyle: FontStyle.italic,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
                                             ),
                                           ),
+                                          // Bottom tap bar
+                                          if (report['has_change'])
+                                            Container(
+                                              width: double.infinity,
+                                              padding: const EdgeInsets.symmetric(vertical: 8),
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  colors: gradientColors,
+                                                  begin: Alignment.centerLeft,
+                                                  end: Alignment.centerRight,
+                                                ),
+                                              ),
+                                              child: Center(
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.touch_app,
+                                                      color: Colors.white,
+                                                      size: 14,
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Text(
+                                                      s.tapToChangeStatus,
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 11,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
                                         ],
                                       ),
                                     ),
                                   ),
-                              ],
+                                );
+                              },
                             ),
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-      floatingActionButton: _showBackToTopButton
-          ? FloatingActionButton(
-              onPressed: () {
-                _scrollController.animateTo(
-                  0,
-                  duration: const Duration(milliseconds: 500),
-                  curve: Curves.easeInOut,
-                );
-              },
-              backgroundColor: const Color(0xFFFF9800),
-              child: const Icon(Icons.arrow_upward, color: Colors.white),
-              mini: true,
-            )
-          : null,
+                        ),
+            ),
+          ],
+        ),
+        floatingActionButton: _showBackToTopButton
+            ? FloatingActionButton(
+                onPressed: () {
+                  _scrollController.animateTo(
+                    0,
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeInOut,
+                  );
+                },
+                backgroundColor: Colors.white,
+                foregroundColor: _gradientStart,
+                mini: true,
+                elevation: 6,
+                child: const Icon(Icons.arrow_upward),
+              )
+            : null,
+      ),
     );
   }
 
@@ -1593,11 +1733,13 @@ class _MainPageScreenState extends State<MainPageScreen>
     Color backgroundColor,
     Color iconColor,
   ) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final theme = Theme.of(context);
+    final isDarkCard = theme.brightness == Brightness.dark;
+    final onSurface = theme.colorScheme.onSurface;
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: isDarkCard ? iconColor.withOpacity(0.14) : backgroundColor,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
