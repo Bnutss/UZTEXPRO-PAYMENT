@@ -15,6 +15,19 @@ class PROApp extends StatefulWidget {
 class _ProMobile extends State<PROApp> {
   final storage = AppStorage();
 
+  @override
+  void initState() {
+    super.initState();
+    _restoreTheme();
+  }
+
+  Future<void> _restoreTheme() async {
+    final saved = await storage.read(key: 'isDarkTheme');
+    if (saved == 'true') {
+      themeNotifier.value = ThemeMode.dark;
+    }
+  }
+
   Future<String> get jwtOrEmpty async {
     try {
       var jwt = await storage.read(key: "jwt");

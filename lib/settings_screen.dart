@@ -452,8 +452,12 @@ class _SettingsScreenState extends State<SettingsScreen>
                   Switch(
                     value: isDark,
                     activeColor: const Color(0xFF7B1FA2),
-                    onChanged: (value) {
+                    onChanged: (value) async {
                       themeNotifier.value = value ? ThemeMode.dark : ThemeMode.light;
+                      await _storage.write(
+                        key: 'isDarkTheme',
+                        value: value.toString(),
+                      );
                     },
                   ),
                 ],
