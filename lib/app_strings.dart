@@ -48,6 +48,131 @@ class S {
         'uz': 'Ruxsatnomalarni boshqarish'
       });
 
+  String get menuSignRequests => _t({
+        'ru': 'Подпись заявок',
+        'en': 'Sign Requests',
+        'uz': 'Arizalarni imzolash'
+      });
+
+  String get menuSignRequestsDesc => _t({
+        'ru': 'Подпись и согласование заявок',
+        'en': 'Sign and approve requests',
+        'uz': "Arizalarni imzolash va tasdiqlash"
+      });
+
+  // Sign Requests Page
+  String get signRequestsTitle => _t({
+        'ru': 'Подпись заявок',
+        'en': 'Sign Requests',
+        'uz': 'Arizalarni imzolash'
+      });
+
+  String get signRequestsEmpty => _t({
+        'ru': 'Нет заявок для подписи',
+        'en': 'No requests to sign',
+        'uz': 'Imzolash uchun arizalar yo\'q'
+      });
+
+  String get signRequestsEmptyDesc => _t({
+        'ru': 'Все заявки обработаны',
+        'en': 'All requests have been processed',
+        'uz': 'Barcha arizalar ko\'rib chiqildi'
+      });
+
+  String get requestNumber =>
+      _t({'ru': 'Заявка №', 'en': 'Request #', 'uz': 'Ariza №'});
+
+  String get requestDate => _t({'ru': 'Дата', 'en': 'Date', 'uz': 'Sana'});
+
+  String get requestAmount =>
+      _t({'ru': 'Сумма', 'en': 'Amount', 'uz': 'Summa'});
+
+  String get requestApplicant =>
+      _t({'ru': 'Заявитель', 'en': 'Applicant', 'uz': 'Ariza beruvchi'});
+
+  String get requestDepartment =>
+      _t({'ru': 'Отдел', 'en': 'Department', 'uz': "Bo'lim"});
+
+  String get approve =>
+      _t({'ru': 'Подписать', 'en': 'Approve', 'uz': 'Imzolash'});
+
+  String get reject =>
+      _t({'ru': 'Отклонить', 'en': 'Reject', 'uz': 'Rad etish'});
+
+  String get approveConfirmTitle => _t({
+        'ru': 'Подтверждение подписи',
+        'en': 'Confirm Signature',
+        'uz': 'Imzoni tasdiqlash'
+      });
+
+  String get approveConfirmDesc => _t({
+        'ru': 'Вы уверены, что хотите подписать эту заявку?',
+        'en': 'Are you sure you want to approve this request?',
+        'uz': 'Bu arizani imzolashni xohlaysizmi?'
+      });
+
+  String get rejectConfirmTitle => _t({
+        'ru': 'Отклонение заявки',
+        'en': 'Reject Request',
+        'uz': 'Arizani rad etish'
+      });
+
+  String get rejectConfirmDesc => _t({
+        'ru': 'Вы уверены, что хотите отклонить эту заявку?',
+        'en': 'Are you sure you want to reject this request?',
+        'uz': 'Bu arizani rad etishni xohlaysizmi?'
+      });
+
+  String get rejectReason => _t({
+        'ru': 'Причина отклонения',
+        'en': 'Rejection reason',
+        'uz': 'Rad etish sababi'
+      });
+
+  String get enterRejectReason => _t({
+        'ru': 'Введите причину отклонения...',
+        'en': 'Enter rejection reason...',
+        'uz': 'Rad etish sababini kiriting...'
+      });
+
+  String get approved =>
+      _t({'ru': 'Подписано', 'en': 'Approved', 'uz': 'Imzolandi'});
+
+  String get rejected =>
+      _t({'ru': 'Отклонено', 'en': 'Rejected', 'uz': 'Rad etildi'});
+
+  String get pending =>
+      _t({'ru': 'Ожидает', 'en': 'Pending', 'uz': 'Kutilmoqda'});
+
+  String get approveSuccess => _t({
+        'ru': 'Заявка успешно подписана',
+        'en': 'Request successfully approved',
+        'uz': 'Ariza muvaffaqiyatli imzolandi'
+      });
+
+  String get rejectSuccess => _t({
+        'ru': 'Заявка отклонена',
+        'en': 'Request rejected',
+        'uz': 'Ariza rad etildi'
+      });
+
+  String get signError => _t({
+        'ru': 'Ошибка при обработке заявки',
+        'en': 'Error processing request',
+        'uz': 'Arizani qayta ishlashda xato'
+      });
+
+  String get filterAll => _t({'ru': 'Все', 'en': 'All', 'uz': 'Barchasi'});
+
+  String get filterPending =>
+      _t({'ru': 'Ожидают', 'en': 'Pending', 'uz': 'Kutilmoqda'});
+
+  String get filterApproved =>
+      _t({'ru': 'Подписаны', 'en': 'Approved', 'uz': 'Imzolangan'});
+
+  String get filterRejected =>
+      _t({'ru': 'Отклонены', 'en': 'Rejected', 'uz': 'Rad etilgan'});
+
   String get inDevelopment => _t({
         'ru': 'Раздел в разработке',
         'en': 'Under development',
@@ -386,7 +511,7 @@ class S {
   String get appVersionLabel => _t({
         'ru': 'Версия приложения: 1.0.0',
         'en': 'App version: 1.0.0',
-        'uz': 'Ilova versiyasi: 1.2.5'
+        'uz': 'Ilova versiyasi: 1.0.0'
       });
 
   String get selectLanguage =>

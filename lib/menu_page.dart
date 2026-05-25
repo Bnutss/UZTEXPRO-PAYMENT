@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'main_page.dart';
 import 'passes_page.dart';
+import 'sign_requests_page.dart';
 import 'settings_screen.dart';
 import 'login_page.dart';
 import 'app_strings.dart';
@@ -230,6 +231,18 @@ class _MenuPageState extends State<MenuPage> with SingleTickerProviderStateMixin
                                 onTap: () => Navigator.push(
                                   context,
                                   MaterialPageRoute(builder: (_) => const PassesPage()),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              _MenuCard(
+                                icon: Icons.draw_rounded,
+                                label: s.menuSignRequests,
+                                description: s.menuSignRequestsDesc,
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          SignRequestsPage(jwtToken: widget.jwtToken)),
                                 ),
                               ),
                             ],
