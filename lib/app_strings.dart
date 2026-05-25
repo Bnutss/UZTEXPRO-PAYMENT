@@ -60,6 +60,15 @@ class S {
         'uz': "Arizalarni imzolash va tasdiqlash"
       });
 
+  String get menuBonuses =>
+      _t({'ru': 'Премии', 'en': 'Bonuses', 'uz': 'Mukofotlar'});
+
+  String get menuBonusesDesc => _t({
+        'ru': 'Утверждение премий',
+        'en': 'Bonus approval',
+        'uz': 'Mukofotlarni tasdiqlash'
+      });
+
   // Sign Requests Page
   String get signRequestsTitle => _t({
         'ru': 'Подпись заявок',
@@ -577,5 +586,90 @@ class S {
         'ru': 'Используйте биометрию для входа в приложение',
         'en': 'Use biometrics to sign in to the app',
         'uz': 'Ilovaga kirish uchun biometriyadan foydalaning'
+      });
+
+  // Bonuses Page
+  String get bonusesTitle =>
+      _t({'ru': 'Премии', 'en': 'Bonuses', 'uz': 'Mukofotlar'});
+
+  String get bonusesEmpty => _t({
+        'ru': 'Список премий пуст',
+        'en': 'Bonus list is empty',
+        'uz': "Mukofotlar ro'yxati bo'sh"
+      });
+
+  String get bonusNumber =>
+      _t({'ru': 'Премия №', 'en': 'Bonus #', 'uz': 'Mukofot №'});
+
+  String get recordsCount =>
+      _t({'ru': 'Записей', 'en': 'Records', 'uz': 'Yozuvlar'});
+
+  String get factoryLabel =>
+      _t({'ru': 'Фабрика', 'en': 'Factory', 'uz': 'Fabrika'});
+
+  String get monthLabel =>
+      _t({'ru': 'Месяц', 'en': 'Month', 'uz': 'Oy'});
+
+  String get createdByLabel =>
+      _t({'ru': 'Создал', 'en': 'Created by', 'uz': 'Yaratdi'});
+
+  String get dateLabel =>
+      _t({'ru': 'Дата', 'en': 'Date', 'uz': 'Sana'});
+
+  String get totalLabel =>
+      _t({'ru': 'Итого', 'en': 'Total', 'uz': 'Jami'});
+
+  String get approvedByLabel =>
+      _t({'ru': 'Согласовал', 'en': 'Approved by', 'uz': 'Kelishdi'});
+
+  String get confirmedByLabel =>
+      _t({'ru': 'Утвердил', 'en': 'Confirmed by', 'uz': 'Tasdiqladi'});
+
+  String get bonusApproveTitle => _t({
+        'ru': 'Утверждение премии',
+        'en': 'Approve Bonus',
+        'uz': 'Mukofotni tasdiqlash'
+      });
+
+  String get bonusApproveDesc => _t({
+        'ru': 'Вы уверены, что хотите утвердить эту премию?',
+        'en': 'Are you sure you want to approve this bonus?',
+        'uz': 'Bu mukofotni tasdiqlamoqchimisiz?'
+      });
+
+  String get bonusApproveBtn =>
+      _t({'ru': 'Утвердить', 'en': 'Approve', 'uz': 'Tasdiqlash'});
+
+  String get bonusApproveSuccess => _t({
+        'ru': 'Премия успешно утверждена',
+        'en': 'Bonus successfully approved',
+        'uz': 'Mukofot muvaffaqiyatli tasdiqlandi'
+      });
+
+  String get bonusDeleteTitle => _t({
+        'ru': 'Удаление премии',
+        'en': 'Delete Bonus',
+        'uz': "Mukofotni o'chirish"
+      });
+
+  String get bonusDeleteDesc => _t({
+        'ru': 'Вы уверены, что хотите удалить эту запись?',
+        'en': 'Are you sure you want to delete this record?',
+        'uz': "Bu yozuvni o'chirmoqchimisiz?"
+      });
+
+  String get deleteBtn =>
+      _t({'ru': 'Удалить', 'en': 'Delete', 'uz': "O'chirish"});
+
+  String get bonusDeleteSuccess => _t({
+        'ru': 'Запись удалена',
+        'en': 'Record deleted',
+        'uz': "Yozuv o'chirildi"
+      });
+
+  String get timeoutError => _t({
+        'ru': 'Превышено время ожидания. Попробуйте ещё раз.',
+        'en': 'Request timed out. Please try again.',
+        'uz': "Kutish vaqti tugadi. Qayta urinib ko'ring."
       });
 }

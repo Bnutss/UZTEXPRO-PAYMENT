@@ -1,0 +1,80 @@
+{
+  "object" : {
+    "artifacts" : [
+
+    ],
+    "dependencies" : [
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "flutterframework",
+          "kind" : "fileSystem",
+          "location" : "/Users/bnutss/StudioProjects/uztexpro_pay/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework",
+          "name" : "FlutterFramework"
+        },
+        "state" : {
+          "name" : "fileSystem",
+          "path" : "/Users/bnutss/StudioProjects/uztexpro_pay/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework"
+        },
+        "subpath" : "flutterframework"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "local_auth_darwin-1.4.3",
+          "kind" : "fileSystem",
+          "location" : "/Users/bnutss/StudioProjects/uztexpro_pay/ios/Flutter/ephemeral/Packages/.packages/local_auth_darwin-1.4.3",
+          "name" : "local_auth_darwin"
+        },
+        "state" : {
+          "name" : "fileSystem",
+          "path" : "/Users/bnutss/StudioProjects/uztexpro_pay/ios/Flutter/ephemeral/Packages/.packages/local_auth_darwin-1.4.3"
+        },
+        "subpath" : "local_auth_darwin-1.4.3"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "path_provider_foundation-2.4.1",
+          "kind" : "fileSystem",
+          "location" : "/Users/bnutss/StudioProjects/uztexpro_pay/ios/Flutter/ephemeral/Packages/.packages/path_provider_foundation-2.4.1",
+          "name" : "path_provider_foundation"
+        },
+        "state" : {
+          "name" : "fileSystem",
+          "path" : "/Users/bnutss/StudioProjects/uztexpro_pay/ios/Flutter/ephemeral/Packages/.packages/path_provider_foundation-2.4.1"
+        },
+        "subpath" : "path_provider_foundation-2.4.1"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "shared_preferences_foundation-2.5.4",
+          "kind" : "fileSystem",
+          "location" : "/Users/bnutss/StudioProjects/uztexpro_pay/ios/Flutter/ephemeral/Packages/.packages/shared_preferences_foundation-2.5.4",
+          "name" : "shared_preferences_foundation"
+        },
+        "state" : {
+          "name" : "fileSystem",
+          "path" : "/Users/bnutss/StudioProjects/uztexpro_pay/ios/Flutter/ephemeral/Packages/.packages/shared_preferences_foundation-2.5.4"
+        },
+        "subpath" : "shared_preferences_foundation-2.5.4"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "url_launcher_ios-6.3.2",
+          "kind" : "fileSystem",
+          "location" : "/Users/bnutss/StudioProjects/uztexpro_pay/ios/Flutter/ephemeral/Packages/.packages/url_launcher_ios-6.3.2",
+          "name" : "url_launcher_ios"
+        },
+        "state" : {
+          "name" : "fileSystem",
+          "path" : "/Users/bnutss/StudioProjects/uztexpro_pay/ios/Flutter/ephemeral/Packages/.packages/url_launcher_ios-6.3.2"
+        },
+        "subpath" : "url_launcher_ios-6.3.2"
+      }
+    ]
+  },
+  "version" : 6
+}
