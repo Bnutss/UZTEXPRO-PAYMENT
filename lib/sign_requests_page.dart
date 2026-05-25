@@ -8,6 +8,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:uztexpro_payment/main.dart';
 import 'app_strings.dart';
 import 'locale_notifier.dart';
+import 'sign_request_detail_page.dart';
 
 // GET  $API/texmansys/material-purchase-application/?limit=1000
 // GET  $API/texmansys/material-purchase-application/{id}/        → full detail
@@ -27,10 +28,17 @@ class _SignRequestsPageState extends State<SignRequestsPage>
     with SingleTickerProviderStateMixin {
   static const Color _g1 = Color(0xFFFF8C00);
   static const Color _g2 = Color(0xFFCC1500);
+  static const String _kCacheKey = 'sign_requests_v2';
+
+  // In-memory cache — instant reuse within the same app session
+  static List<dynamic>? _memCache;
+  static DateTime? _memCacheTime;
+  static const Duration _kCacheTTL = Duration(minutes: 5);
 
   List<dynamic> _all = [];
   List<dynamic> _shown = [];
   bool _isLoading = true;
+  bool _refreshing = false; // silent background refresh
   String? _error;
 
   final _searchCtrl = TextEditingController();
@@ -75,40 +83,92 @@ class _SignRequestsPageState extends State<SignRequestsPage>
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  Future<void> _load({bool forceRefresh = false}) async {
+    // ── 1. In-memory cache: fastest path ──────────────────────
+    if (!forceRefresh && _memCache != null && _memCacheTime != null) {
+      final age = DateTime.now().difference(_memCacheTime!);
+      if (age < _kCacheTTL) {
+        // Cache is fresh — show instantly, skip network entirely
+        _all = List.from(_memCache!);
+        _filter(_searchCtrl.text);
+        if (mounted) setState(() { _isLoading = false; _refreshing = false; });
+        _animCtrl.forward(from: 0);
+        return;
+      }
+      // Cache is stale — show it while silently refreshing
+      _all = List.from(_memCache!);
+      _filter(_searchCtrl.text);
+      if (mounted) setState(() { _isLoading = false; _refreshing = true; _error = null; });
+      _animCtrl.forward(from: 0);
+      await _fetchFromNetwork(silent: true);
+      return;
+    }
+
+    // ── 2. Storage cache: fast path for new sessions ───────────
+    if (!forceRefresh) {
+      try {
+        final cached = await storage.read(key: _kCacheKey);
+        if (cached != null && mounted) {
+          final body = json.decode(cached);
+          final List raw =
+              body is List ? body : (body['results'] ?? body['data'] ?? []);
+          _all = raw.where((a) => a['status'] == 0 || a['status'] == 1).toList();
+          _filter(_searchCtrl.text);
+          setState(() { _isLoading = false; _refreshing = true; _error = null; });
+          _animCtrl.forward(from: 0);
+          // Refresh in background
+          await _fetchFromNetwork(silent: true);
+          return;
+        }
+      } catch (_) {}
+    }
+
+    // ── 3. No cache — show shimmer and fetch ───────────────────
+    setState(() { _isLoading = true; _error = null; _refreshing = false; });
+    await _fetchFromNetwork(silent: false);
+  }
+
+  Future<void> _fetchFromNetwork({required bool silent}) async {
     try {
-      final uri =
-          Uri.parse('$API/$_kPath/?limit=1000');
       final resp = await http
-          .get(uri, headers: _headers)
+          .get(Uri.parse('$API/$_kPath/?limit=1000'), headers: _headers)
           .timeout(const Duration(seconds: 20));
       if (!mounted) return;
       if (resp.statusCode == 200) {
+        // Write to storage cache — must use bodyBytes to guarantee UTF-8 decoding
+        storage.write(key: _kCacheKey, value: utf8.decode(resp.bodyBytes)); // ignore: unawaited_futures
         final body = json.decode(utf8.decode(resp.bodyBytes));
         final List raw =
             body is List ? body : (body['results'] ?? body['data'] ?? []);
-        // Show only applications that need signing (status 0 or 1)
-        _all = raw.where((a) => a['status'] == 0 || a['status'] == 1).toList();
+        final filtered =
+            raw.where((a) => a['status'] == 0 || a['status'] == 1).toList();
+        // Update in-memory cache
+        _memCache = filtered;
+        _memCacheTime = DateTime.now();
+        _all = filtered;
         _filter(_searchCtrl.text);
-        setState(() => _isLoading = false);
-        _animCtrl.forward(from: 0);
+        setState(() { _isLoading = false; _refreshing = false; });
+        if (!silent) _animCtrl.forward(from: 0);
       } else {
-        setState(() {
-          _error =
-              '${S.of(context).loadDataError} (${resp.statusCode})';
-          _isLoading = false;
-        });
+        if (!silent) {
+          setState(() {
+            _error = '${S.of(context).loadDataError} (${resp.statusCode})';
+            _isLoading = false;
+          });
+        } else {
+          if (mounted) setState(() => _refreshing = false);
+        }
       }
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _error = S.of(context).connectionError;
-        _isLoading = false;
-      });
+      if (!silent) {
+        setState(() {
+          _error = S.of(context).connectionError;
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _refreshing = false);
+      }
     }
   }
 
@@ -195,7 +255,10 @@ class _SignRequestsPageState extends State<SignRequestsPage>
           action == 'reject' ? s.rejectSuccess : s.approveSuccess,
           true,
         );
-        await _load();
+        // Invalidate cache so the updated status is fetched fresh
+        _memCache = null;
+        _memCacheTime = null;
+        await _load(forceRefresh: true);
       } else {
         _snack(s.signError, false);
         setState(() => app['_busy'] = false);
@@ -344,8 +407,19 @@ class _SignRequestsPageState extends State<SignRequestsPage>
           iconTheme: const IconThemeData(color: Colors.white),
           actions: [
             IconButton(
-              icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-              onPressed: _isLoading ? null : _load,
+              icon: _refreshing
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation(Colors.white70)),
+                    )
+                  : const Icon(Icons.refresh_rounded, color: Colors.white),
+              onPressed: (_isLoading || _refreshing)
+                  ? null
+                  : () => _load(forceRefresh: true),
             ),
           ],
           flexibleSpace: Container(
@@ -451,7 +525,7 @@ class _SignRequestsPageState extends State<SignRequestsPage>
                       fontSize: 14)),
               const SizedBox(height: 20),
               ElevatedButton.icon(
-                onPressed: _load,
+                onPressed: () => _load(forceRefresh: true),
                 icon: const Icon(Icons.refresh_rounded),
                 label: Text(s.refresh),
                 style: ElevatedButton.styleFrom(
@@ -510,7 +584,7 @@ class _SignRequestsPageState extends State<SignRequestsPage>
     return FadeTransition(
       opacity: _fadeAnim,
       child: RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: () => _load(forceRefresh: true),
         color: _g1,
         child: ListView.builder(
           padding:
@@ -522,6 +596,15 @@ class _SignRequestsPageState extends State<SignRequestsPage>
             gradientColors: gradientColors,
             onSign: () => _onSign(_shown[i]),
             onReject: () => _onReject(_shown[i]),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SignRequestDetailPage(
+                  appId: _shown[i]['id'] as int,
+                  jwtToken: widget.jwtToken,
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -660,6 +743,7 @@ class _AppCard extends StatelessWidget {
   final List<Color> gradientColors;
   final VoidCallback onSign;
   final VoidCallback onReject;
+  final VoidCallback? onTap;
 
   const _AppCard({
     required this.app,
@@ -667,6 +751,7 @@ class _AppCard extends StatelessWidget {
     required this.gradientColors,
     required this.onSign,
     required this.onReject,
+    this.onTap,
   });
 
   bool get _busy => app['_busy'] == true;
@@ -702,7 +787,9 @@ class _AppCard extends StatelessWidget {
     final notes = app['notes']?.toString() ?? '';
     final statusTitle = app['status_title'] ?? '—';
 
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: cardBg,
@@ -905,10 +992,30 @@ class _AppCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.list_alt_rounded,
+                        size: 11,
+                        color: onSurface.withOpacity(0.3)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Нажмите для просмотра материалов',
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: onSurface.withOpacity(0.35)),
+                    ),
+                    Icon(Icons.chevron_right_rounded,
+                        size: 13,
+                        color: onSurface.withOpacity(0.3)),
+                  ],
+                ),
               ],
             ),
           ),
         ],
+      ),
       ),
     );
   }

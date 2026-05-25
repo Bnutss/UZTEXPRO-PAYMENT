@@ -173,6 +173,15 @@ class S {
   String get filterRejected =>
       _t({'ru': 'Отклонены', 'en': 'Rejected', 'uz': 'Rad etilgan'});
 
+  String get signAll =>
+      _t({'ru': 'Подписать все', 'en': 'Sign all', 'uz': 'Hammasini imzolash'});
+
+  String get rejectAll =>
+      _t({'ru': 'Отклонить все', 'en': 'Reject all', 'uz': 'Hammasini rad etish'});
+
+  String get materials =>
+      _t({'ru': 'Материалы', 'en': 'Materials', 'uz': 'Materiallar'});
+
   String get inDevelopment => _t({
         'ru': 'Раздел в разработке',
         'en': 'Under development',

@@ -72,8 +72,11 @@ class _MainPageScreenState extends State<MainPageScreen>
   }
 
   Future<void> _initializeData() async {
-    await fetchPaymentStatuses();
-    await fetchPaymentReports();
+    // Run both requests in parallel instead of sequentially
+    await Future.wait([
+      fetchPaymentStatuses(),
+      fetchPaymentReports(),
+    ]);
   }
 
   String formatCurrency(dynamic value) {
@@ -150,8 +153,24 @@ class _MainPageScreenState extends State<MainPageScreen>
   }
 
   Future<void> fetchPaymentReports() async {
-    setState(() => isLoading = true);
+    const String cacheKey = "payment_reports_v2";
     final s = S.of(context);
+
+    // Show cached data immediately — no spinner on repeat opens
+    try {
+      final cached = await storage.read(key: cacheKey);
+      if (cached != null && mounted) {
+        final data = json.decode(cached);
+        final List results = data is List ? data : (data['results'] ?? []);
+        setState(() {
+          paymentReports = results;
+          isLoading = false;
+        });
+        _animationController.forward();
+      }
+    } catch (_) {}
+
+    // Fetch fresh data (silently if cache was shown)
     try {
       final response = await http.get(
         Uri.parse("$API/edo/payment-raport/?for_mobile=1"),
@@ -163,10 +182,13 @@ class _MainPageScreenState extends State<MainPageScreen>
         onTimeout: () => throw Exception('Timeout'),
       );
 
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(utf8.decode(response.bodyBytes));
+        // Cache for next open — must use bodyBytes to guarantee UTF-8 decoding
+        storage.write(key: cacheKey, value: utf8.decode(response.bodyBytes)); // ignore: unawaited_futures
         setState(() {
-          paymentReports = jsonResponse['results'];
+          paymentReports = jsonResponse['results'] ?? [];
           isLoading = false;
         });
         _animationController.forward();
@@ -174,8 +196,11 @@ class _MainPageScreenState extends State<MainPageScreen>
         throw Exception('Failed');
       }
     } catch (e) {
-      setState(() => isLoading = false);
-      showNotification(s.loadDataError, false);
+      if (!mounted) return;
+      if (paymentReports.isEmpty) {
+        setState(() => isLoading = false);
+        showNotification(s.loadDataError, false);
+      }
     }
   }
 
