@@ -28,11 +28,12 @@ dev_dependencies:
 flutter_icons:
   android: true
   ios: true
-  image_path: "assets/images/fon.png"
+  image_path: "assets/images/background.png"
   remove_alpha_ios: true
 
 flutter:
   assets:
     - assets/images/logo.png
     - assets/images/fon.png
+    - assets/images/background.png
   uses-material-design: true
