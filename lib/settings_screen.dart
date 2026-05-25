@@ -89,7 +89,8 @@ class _SettingsScreenState extends State<SettingsScreen>
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+            icon: const Icon(Icons.arrow_back_ios_new,
+                color: Colors.white, size: 20),
             onPressed: () => Navigator.of(context).pop(),
             splashRadius: 24,
           ),
@@ -100,7 +101,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+              borderRadius:
+                  const BorderRadius.vertical(bottom: Radius.circular(20)),
             ),
           ),
           shape: const RoundedRectangleBorder(
@@ -108,7 +110,8 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.info_outline, color: Colors.white, size: 24),
+              icon:
+                  const Icon(Icons.info_outline, color: Colors.white, size: 24),
               onPressed: () => _showAboutDialog(s),
               tooltip: s.aboutApp,
               splashRadius: 24,
@@ -179,7 +182,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => ConfidentialityPage()),
+                          MaterialPageRoute(
+                              builder: (context) => ConfidentialityPage()),
                         );
                       },
                     ),
@@ -260,7 +264,12 @@ class _SettingsScreenState extends State<SettingsScreen>
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 20,
-                      shadows: [Shadow(color: Colors.black26, offset: Offset(0, 1), blurRadius: 4)],
+                      shadows: [
+                        Shadow(
+                            color: Colors.black26,
+                            offset: Offset(0, 1),
+                            blurRadius: 4)
+                      ],
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -308,7 +317,10 @@ class _SettingsScreenState extends State<SettingsScreen>
               color: Colors.white,
               fontWeight: FontWeight.bold,
               fontSize: 16,
-              shadows: [Shadow(color: Colors.black26, offset: Offset(0, 1), blurRadius: 3)],
+              shadows: [
+                Shadow(
+                    color: Colors.black26, offset: Offset(0, 1), blurRadius: 3)
+              ],
             ),
           ),
         ],
@@ -330,7 +342,9 @@ class _SettingsScreenState extends State<SettingsScreen>
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Container(
         decoration: BoxDecoration(
-          color: isDarkBtn ? theme.colorScheme.surface : Colors.white.withOpacity(0.95),
+          color: isDarkBtn
+              ? theme.colorScheme.surface
+              : Colors.white.withOpacity(0.95),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
@@ -381,7 +395,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                       ],
                     ),
                   ),
-                  Icon(Icons.arrow_forward_ios, color: onSurface.withOpacity(0.35), size: 16),
+                  Icon(Icons.arrow_forward_ios,
+                      color: onSurface.withOpacity(0.35), size: 16),
                 ],
               ),
             ),
@@ -403,7 +418,9 @@ class _SettingsScreenState extends State<SettingsScreen>
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Container(
             decoration: BoxDecoration(
-              color: isDarkBtn ? theme.colorScheme.surface : Colors.white.withOpacity(0.95),
+              color: isDarkBtn
+                  ? theme.colorScheme.surface
+                  : Colors.white.withOpacity(0.95),
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
@@ -423,7 +440,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                       color: const Color(0xFF7B1FA2).withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.palette, color: Color(0xFF7B1FA2), size: 24),
+                    child: const Icon(Icons.palette,
+                        color: Color(0xFF7B1FA2), size: 24),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -453,7 +471,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                     value: isDark,
                     activeColor: const Color(0xFF7B1FA2),
                     onChanged: (value) async {
-                      themeNotifier.value = value ? ThemeMode.dark : ThemeMode.light;
+                      themeNotifier.value =
+                          value ? ThemeMode.dark : ThemeMode.light;
                       await _storage.write(
                         key: 'isDarkTheme',
                         value: value.toString(),
@@ -481,11 +500,13 @@ class _SettingsScreenState extends State<SettingsScreen>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.info_outline, size: 16, color: Colors.white.withOpacity(0.85)),
+            Icon(Icons.info_outline,
+                size: 16, color: Colors.white.withOpacity(0.85)),
             const SizedBox(width: 8),
             Text(
               s.appVersionLabel,
-              style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12),
+              style: TextStyle(
+                  color: Colors.white.withOpacity(0.85), fontSize: 12),
             ),
           ],
         ),
@@ -503,7 +524,8 @@ class _SettingsScreenState extends State<SettingsScreen>
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
@@ -517,12 +539,14 @@ class _SettingsScreenState extends State<SettingsScreen>
                             color: const Color(0xFFEF6C00).withOpacity(0.1),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.language, color: Color(0xFFEF6C00), size: 24),
+                          child: const Icon(Icons.language,
+                              color: Color(0xFFEF6C00), size: 24),
                         ),
                         const SizedBox(width: 16),
                         Text(
                           s.selectLanguage,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
@@ -530,7 +554,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                     ..._languages.map((lang) {
                       final isSelected = selectedLang == lang['code'];
                       return GestureDetector(
-                        onTap: () => setDialogState(() => selectedLang = lang['code']!),
+                        onTap: () =>
+                            setDialogState(() => selectedLang = lang['code']!),
                         child: Container(
                           margin: const EdgeInsets.only(bottom: 12),
                           decoration: BoxDecoration(
@@ -549,11 +574,14 @@ class _SettingsScreenState extends State<SettingsScreen>
                             value: lang['code']!,
                             groupValue: selectedLang,
                             activeColor: _gradientStart,
-                            onChanged: (v) => setDialogState(() => selectedLang = v!),
+                            onChanged: (v) =>
+                                setDialogState(() => selectedLang = v!),
                             title: Text(
                               lang['name']!,
                               style: TextStyle(
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                                 color: isSelected
                                     ? _gradientStart
                                     : Theme.of(context).colorScheme.onSurface,
@@ -563,11 +591,16 @@ class _SettingsScreenState extends State<SettingsScreen>
                               lang['desc']!,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withOpacity(0.6),
                               ),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 4),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                       );
@@ -581,7 +614,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                           child: Text(
                             s.cancel,
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.7),
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -595,10 +631,14 @@ class _SettingsScreenState extends State<SettingsScreen>
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _gradientStart,
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 10),
                           ),
-                          child: Text(s.save, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          child: Text(s.save,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
@@ -617,7 +657,8 @@ class _SettingsScreenState extends State<SettingsScreen>
       context: context,
       builder: (BuildContext ctx) {
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -654,7 +695,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ),
                 const SizedBox(height: 20),
                 const Text(
-                  "UZTEXPRO PAYMENT",
+                  "UZTEXPRO",
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
@@ -662,26 +703,36 @@ class _SettingsScreenState extends State<SettingsScreen>
                   s.versionLabel,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.6),
                   ),
                 ),
                 const SizedBox(height: 20),
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.05),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
                     children: [
-                      const Text("© 2025 UZTEXPRO MOBILE APP.", style: TextStyle(fontSize: 13)),
+                      const Text("© 2026 UZTEXPRO MOBILE APP.",
+                          style: TextStyle(fontSize: 13)),
                       const SizedBox(height: 8),
                       Text(
                         s.allRightsReserved,
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.6),
                         ),
                       ),
                     ],
@@ -694,11 +745,13 @@ class _SettingsScreenState extends State<SettingsScreen>
                     backgroundColor: _gradientStart,
                     foregroundColor: Colors.white,
                     minimumSize: const Size(double.infinity, 46),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                   child: Text(
                     s.close,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                 ),
               ],

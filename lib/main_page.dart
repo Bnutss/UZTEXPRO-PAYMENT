@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:uztexpro_payment/main.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'settings_screen.dart';
-import 'login_page.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
@@ -923,97 +921,6 @@ class _MainPageScreenState extends State<MainPageScreen>
     );
   }
 
-  void _logout() {
-    final s = S.of(context);
-    final theme = Theme.of(context);
-    final onSurface = theme.colorScheme.onSurface;
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          elevation: 10,
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.logout, color: Colors.red.shade700, size: 32),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  s.logOut,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: onSurface),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  s.logOutConfirm,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: onSurface.withOpacity(0.7)),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: Text(
-                          s.cancel,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: onSurface.withOpacity(0.7),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          try {
-                            await storage.delete(key: "jwt");
-                          } catch (_) {}
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(builder: (context) => LoginPage()),
-                            (Route<dynamic> route) => false,
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red.shade600,
-                          foregroundColor: Colors.white,
-                          elevation: 2,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: Text(
-                          s.logOutBtn,
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildShimmerCard() {
     final isDarkShimmer = Theme.of(context).brightness == Brightness.dark;
     final shimmerBase = isDarkShimmer
@@ -1142,25 +1049,6 @@ class _MainPageScreenState extends State<MainPageScreen>
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.settings, color: Colors.white, size: 24),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => SettingsScreen()),
-                );
-              },
-              tooltip: s.settingsTooltip,
-              splashRadius: 24,
-            ),
-            IconButton(
-              icon: const Icon(Icons.logout, color: Colors.white, size: 24),
-              onPressed: _logout,
-              tooltip: s.exitTooltip,
-              splashRadius: 24,
-            ),
-          ],
         ),
         body: Stack(
           children: [

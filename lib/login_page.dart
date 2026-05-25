@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:local_auth/local_auth.dart';
 import 'app_storage.dart';
-import 'package:uztexpro_payment/main_page.dart';
+import 'package:uztexpro_payment/menu_page.dart';
 import 'package:uztexpro_payment/main.dart';
 import 'app_strings.dart';
 import 'locale_notifier.dart';
@@ -192,7 +192,7 @@ class _LoginPageState extends State<LoginPage>
   void _navigateToMainPage(String jwt) {
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => MainPageScreen(jwtToken: jwt)),
+      MaterialPageRoute(builder: (context) => MenuPage(jwtToken: jwt)),
       (route) => false,
     );
   }
@@ -347,13 +347,12 @@ class _LoginPageState extends State<LoginPage>
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
+            width: 52,
+            height: 52,
+            decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+            child: ClipOval(
+              child: Image.asset('assets/images/fon.png', fit: BoxFit.contain),
             ),
-            child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 32),
           ),
           const SizedBox(width: 16),
           Column(
@@ -435,23 +434,22 @@ class _LoginPageState extends State<LoginPage>
 
   Widget _buildLogo() {
     return Container(
-      width: 92,
-      height: 92,
+      width: 100,
+      height: 100,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.white.withOpacity(0.18),
-        border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+        color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.18),
+            color: Colors.black.withOpacity(0.2),
             blurRadius: 24,
             spreadRadius: 2,
             offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: const Center(
-        child: Icon(Icons.security, size: 46, color: Colors.white),
+      child: ClipOval(
+        child: Image.asset('assets/images/fon.png', fit: BoxFit.contain),
       ),
     );
   }
