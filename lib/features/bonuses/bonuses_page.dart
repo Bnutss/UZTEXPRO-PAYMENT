@@ -24,6 +24,10 @@ class _BonusesPageState extends State<BonusesPage>
   static const Color _g1 = Color(0xFFFF8C00);
   static const Color _g2 = Color(0xFFCC1500);
 
+  static List<dynamic>? _memCache;
+  static DateTime? _memCacheTime;
+  static const Duration _kCacheTTL = Duration(minutes: 5);
+
   List<dynamic> _shown = [];
   bool _isLoading = true;
   bool _refreshing = false;
@@ -64,16 +68,35 @@ class _BonusesPageState extends State<BonusesPage>
     super.dispose();
   }
 
+  List<dynamic> _filterPending(List<dynamic> raw) => raw
+      .where((e) =>
+          e['is_change'] == true && (e['status'] as int? ?? 0) != 4)
+      .toList();
+
   Future<void> _load({bool forceRefresh = false}) async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-      _refreshing = false;
-    });
+    // Show memory cache instantly on repeat opens
+    if (!forceRefresh && _memCache != null) {
+      setState(() {
+        _shown = _memCache!;
+        _isLoading = false;
+        _refreshing = false;
+      });
+      _animCtrl.forward(from: 0);
+      // Background refresh if TTL expired
+      if (_memCacheTime != null &&
+          DateTime.now().difference(_memCacheTime!) < _kCacheTTL) return;
+    } else {
+      setState(() {
+        _isLoading = _memCache == null;
+        _error = null;
+        _refreshing = false;
+      });
+    }
+
     try {
       final resp = await http
           .get(Uri.parse('$API/$_kBonusPath/?limit=500'), headers: _headers)
-          .timeout(const Duration(seconds: 120));
+          .timeout(const Duration(seconds: 30));
       if (!mounted) return;
       if (resp.statusCode == 200) {
         final bodyBytes = resp.bodyBytes;
@@ -81,35 +104,38 @@ class _BonusesPageState extends State<BonusesPage>
           final body = json.decode(utf8.decode(bodyBytes));
           return body is List ? body : (body['results'] ?? body['data'] ?? []);
         });
-        final pending = raw
-            .where((e) =>
-                e['is_change'] == true &&
-                (e['status'] as int? ?? 0) != 4)
-            .toList();
+        final pending = _filterPending(raw);
+        _memCache = pending;
+        _memCacheTime = DateTime.now();
         setState(() {
           _shown = pending;
           _isLoading = false;
         });
         _animCtrl.forward(from: 0);
       } else {
-        setState(() {
-          _error =
-              '${S.of(context).loadDataError} (${resp.statusCode})';
-          _isLoading = false;
-        });
+        if (_shown.isEmpty) {
+          setState(() {
+            _error = '${S.of(context).loadDataError} (${resp.statusCode})';
+            _isLoading = false;
+          });
+        }
       }
     } on TimeoutException {
       if (!mounted) return;
-      setState(() {
-        _error = S.of(context).timeoutError;
-        _isLoading = false;
-      });
+      if (_shown.isEmpty) {
+        setState(() {
+          _error = S.of(context).timeoutError;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = S.of(context).connectionError;
-        _isLoading = false;
-      });
+      if (_shown.isEmpty) {
+        setState(() {
+          _error = S.of(context).connectionError;
+          _isLoading = false;
+        });
+      }
     }
   }
 

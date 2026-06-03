@@ -37,6 +37,13 @@ class _MainPageScreenState extends State<MainPageScreen>
   static const Color _gradientStart = Color(0xFFFF8C00);
   static const Color _gradientEnd = Color(0xFFCC1500);
 
+  // In-memory cache — survives navigation, cleared only on hot restart
+  static List<dynamic>? _memStatuses;
+  static List<dynamic>? _memReports;
+  static DateTime? _memStatusesTime;
+  static DateTime? _memReportsTime;
+  static const _kMemTTL = Duration(minutes: 5);
+
   @override
   void initState() {
     super.initState();
@@ -120,12 +127,23 @@ class _MainPageScreenState extends State<MainPageScreen>
   Future<void> fetchPaymentStatuses() async {
     const String storageKey = "payment_statuses";
     final s = S.of(context);
+
+    // Memory cache: instant display on repeat opens
+    final now = DateTime.now();
+    if (_memStatuses != null &&
+        _memStatusesTime != null &&
+        now.difference(_memStatusesTime!) < _kMemTTL) {
+      if (mounted) setState(() => statuses = _memStatuses!);
+      return;
+    }
+
     try {
       String? storedData = await storage.read(key: storageKey);
       if (storedData != null) {
-        setState(() {
-          statuses = jsonDecode(storedData);
-        });
+        final decoded = jsonDecode(storedData) as List;
+        _memStatuses = decoded;
+        _memStatusesTime = now;
+        if (mounted) setState(() => statuses = decoded);
       } else {
         final response = await http.get(
           Uri.parse("$API/edo/payment-raport-status/"),
@@ -139,38 +157,54 @@ class _MainPageScreenState extends State<MainPageScreen>
 
         if (response.statusCode == 200) {
           final jsonResponse = json.decode(utf8.decode(response.bodyBytes));
-          await storage.write(key: storageKey, value: jsonEncode(jsonResponse));
-          setState(() {
-            statuses = jsonResponse;
-          });
+          _memStatuses = jsonResponse as List;
+          _memStatusesTime = DateTime.now();
+          storage.write(key: storageKey, value: jsonEncode(jsonResponse));
+          if (mounted) setState(() => statuses = jsonResponse);
         } else {
           throw Exception('Failed');
         }
       }
     } catch (e) {
-      showNotification(s.loadStatusError, false);
+      if (mounted) showNotification(s.loadStatusError, false);
     }
   }
 
   Future<void> fetchPaymentReports() async {
     const String cacheKey = "payment_reports_v2";
     final s = S.of(context);
+    final now = DateTime.now();
 
-    // Show cached data immediately — no spinner on repeat opens
-    try {
-      final cached = await storage.read(key: cacheKey);
-      if (cached != null && mounted) {
-        final data = json.decode(cached);
-        final List results = data is List ? data : (data['results'] ?? []);
+    // Memory cache: show instantly on repeat opens, no disk I/O
+    if (_memReports != null) {
+      if (mounted) {
         setState(() {
-          paymentReports = results;
+          paymentReports = _memReports!;
           isLoading = false;
         });
         _animationController.forward();
       }
-    } catch (_) {}
+      // Skip network refresh if still fresh
+      if (_memReportsTime != null &&
+          now.difference(_memReportsTime!) < _kMemTTL) return;
+    } else {
+      // First open: try disk cache for fast display before network
+      try {
+        final cached = await storage.read(key: cacheKey);
+        if (cached != null && mounted) {
+          final data = json.decode(cached);
+          final List results = data is List ? data : (data['results'] ?? []);
+          _memReports = results;
+          setState(() {
+            paymentReports = results;
+            isLoading = false;
+          });
+          _animationController.forward();
+        }
+      } catch (_) {}
+    }
 
-    // Fetch fresh data (silently if cache was shown)
+    // Fetch fresh data in background (silently if something was shown)
     try {
       final response = await http.get(
         Uri.parse("$API/edo/payment-raport/?for_mobile=1"),
@@ -185,10 +219,12 @@ class _MainPageScreenState extends State<MainPageScreen>
       if (!mounted) return;
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(utf8.decode(response.bodyBytes));
-        // Cache for next open — must use bodyBytes to guarantee UTF-8 decoding
-        storage.write(key: cacheKey, value: utf8.decode(response.bodyBytes)); // ignore: unawaited_futures
+        final List fresh = jsonResponse['results'] ?? [];
+        _memReports = fresh;
+        _memReportsTime = DateTime.now();
+        storage.write(key: cacheKey, value: utf8.decode(response.bodyBytes));
         setState(() {
-          paymentReports = jsonResponse['results'] ?? [];
+          paymentReports = fresh;
           isLoading = false;
         });
         _animationController.forward();
