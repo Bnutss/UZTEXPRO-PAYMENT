@@ -386,12 +386,14 @@ class _SignRequestsPageState extends State<SignRequestsPage>
             if (_refreshing)
               const Padding(
                 padding: EdgeInsets.only(right: 16),
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(Colors.white70)),
+                child: Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(Colors.white70)),
+                  ),
                 ),
               )
             else
@@ -414,57 +416,75 @@ class _SignRequestsPageState extends State<SignRequestsPage>
             borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
           ),
         ),
-        body: Stack(
+        body: Column(
           children: [
+            // ── Gradient header (count badge) ──────────────────
             Container(
-              height: 180,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                     colors: gradientColors,
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight),
               ),
-            ),
-            Positioned.fill(
-              top: 140,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? Theme.of(context).colorScheme.surface
-                      : const Color(0xFFF2F3F7),
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(24)),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
+                  child: Row(
+                    children: [
+                      const Spacer(),
+                      if (!_isLoading && _error == null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white.withOpacity(0.35)),
+                          ),
+                          child: Text('${_shown.length}',
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white)),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
-            SafeArea(
-              child: Column(
-                children: [
-                  const SizedBox(height: 10),
-                  // Search bar
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _SearchBar(
-                      controller: _searchCtrl,
-                      isDark: isDark,
-                      hint: s.requestNumber,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  // Filter chips
-                  if (!_isLoading && _error == null)
-                    _FilterBar(
-                      selected: _statusFilter,
-                      allCount: _all.length,
-                      pendingCount: _pendingCount,
-                      signingCount: _signingCount,
-                      shownCount: _shown.length,
-                      isDark: isDark,
-                      onSelect: _setFilter,
-                    ),
-                  const SizedBox(height: 4),
-                  Expanded(child: _buildBody(s, isDark, gradientColors)),
-                ],
+            // ── Search bar on white background ─────────────────
+            Container(
+              color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+              child: _SearchBar(
+                controller: _searchCtrl,
+                isDark: isDark,
+                hint: s.requestNumber,
+              ),
+            ),
+            // ── Filter chips on light background ───────────────
+            if (!_isLoading && _error == null)
+              Container(
+                color: isDark
+                    ? Theme.of(context).colorScheme.surface
+                    : const Color(0xFFF4F4F4),
+                padding: const EdgeInsets.only(top: 6, bottom: 8),
+              child: _FilterBar(
+                  selected: _statusFilter,
+                  allCount: _all.length,
+                  pendingCount: _pendingCount,
+                  signingCount: _signingCount,
+                  isDark: isDark,
+                  onSelect: _setFilter,
+                ),
+              ),
+            // ── List ───────────────────────────────────────────
+            Expanded(
+              child: Container(
+                color: isDark
+                    ? Theme.of(context).colorScheme.surface
+                    : const Color(0xFFF4F4F4),
+                child: _buildBody(s, isDark, gradientColors),
               ),
             ),
           ],
@@ -604,47 +624,40 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return Container(
-      height: 48,
+      height: 46,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        color: isDark ? Colors.white.withOpacity(0.07) : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: isDark ? Colors.white12 : Colors.grey.shade200),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2))
+              ],
       ),
       child: TextField(
         controller: controller,
-        style: TextStyle(
-          color: isDark ? Colors.white : Colors.grey.shade800,
-          fontSize: 14,
-        ),
+        style: TextStyle(color: onSurface, fontSize: 14),
         decoration: InputDecoration(
           hintText: 'Поиск по заявке, заявителю, отделу...',
-          hintStyle: TextStyle(
-            color: isDark ? Colors.white38 : Colors.grey.shade400,
-            fontSize: 13,
-          ),
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            color: isDark ? Colors.white38 : Colors.grey.shade400,
-            size: 20,
-          ),
+          hintStyle:
+              TextStyle(color: onSurface.withOpacity(0.38), fontSize: 14),
+          prefixIcon: Icon(Icons.search_rounded,
+              color: onSurface.withOpacity(0.38), size: 20),
           suffixIcon: ValueListenableBuilder<TextEditingValue>(
             valueListenable: controller,
             builder: (_, v, __) => v.text.isEmpty
                 ? const SizedBox.shrink()
-                : GestureDetector(
-                    onTap: controller.clear,
-                    child: Icon(
-                      Icons.close_rounded,
-                      size: 18,
-                      color: isDark ? Colors.white38 : Colors.grey.shade400,
-                    ),
+                : IconButton(
+                    icon: Icon(Icons.clear_rounded,
+                        size: 18, color: onSurface.withOpacity(0.4)),
+                    onPressed: controller.clear,
                   ),
           ),
           border: InputBorder.none,
@@ -661,7 +674,6 @@ class _FilterBar extends StatelessWidget {
   final int allCount;
   final int pendingCount;
   final int signingCount;
-  final int shownCount;
   final bool isDark;
   final void Function(String) onSelect;
 
@@ -670,41 +682,23 @@ class _FilterBar extends StatelessWidget {
     required this.allCount,
     required this.pendingCount,
     required this.signingCount,
-    required this.shownCount,
     required this.isDark,
     required this.onSelect,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
+    return SizedBox(
+      height: 34,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         children: [
           _chip(context, 'all', 'Все', allCount),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           _chip(context, 'pending', 'Ожидает', pendingCount),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           _chip(context, 'signing', 'На подписи', signingCount),
-          const Spacer(),
-          if (shownCount > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white10 : Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: isDark ? Colors.white24 : Colors.orange.shade200),
-              ),
-              child: Text(
-                '$shownCount',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white70 : Colors.orange.shade800,
-                ),
-              ),
-            ),
         ],
       ),
     );
