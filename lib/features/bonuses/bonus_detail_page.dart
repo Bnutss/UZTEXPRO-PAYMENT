@@ -259,7 +259,6 @@ class _InfoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Gradient header
           Container(
             padding: const EdgeInsets.symmetric(
                 horizontal: 16, vertical: 14),
@@ -320,7 +319,6 @@ class _InfoCard extends StatelessWidget {
               ],
             ),
           ),
-          // Info body
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(

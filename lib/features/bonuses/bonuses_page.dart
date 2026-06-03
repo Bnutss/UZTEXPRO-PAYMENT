@@ -5,8 +5,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shimmer/shimmer.dart';
 import 'package:uztexpro_payment/main.dart';
-import 'app_strings.dart';
-import 'locale_notifier.dart';
+import '../../core/localization/app_strings.dart';
+import '../../core/localization/locale_notifier.dart';
 import 'bonus_detail_page.dart';
 
 const _kBonusPath = 'edo/bonus-employee';
@@ -610,8 +610,6 @@ class _BonusCard extends StatelessWidget {
     final approveBy = item['approve_by']?.toString() ?? '';
     final confirmBy = item['confirm_by']?.toString() ?? '';
     final notes = item['notes']?.toString() ?? '';
-    // is_change от бэкенда — "пользователь в группе утверждения",
-    // но не учитывает текущий статус. Статус 4 (Оплата) — финальный, кнопка не нужна.
     final isChange = item['is_change'] == true && status != 4;
     final isDelete = item['is_delete'] == true;
     final statusColor = _statusColor(status);

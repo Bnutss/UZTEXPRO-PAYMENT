@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'main_page.dart';
-import 'passes_page.dart';
-import 'sign_requests_page.dart';
-import 'bonuses_page.dart';
-import 'settings_screen.dart';
-import 'login_page.dart';
-import 'app_strings.dart';
-import 'locale_notifier.dart';
+import '../passes/passes_page.dart';
+import '../sign_requests/sign_requests_page.dart';
+import '../bonuses/bonuses_page.dart';
+import '../settings/settings_screen.dart';
+import '../auth/login_page.dart';
+import '../../core/localization/app_strings.dart';
+import '../../core/localization/locale_notifier.dart';
 import 'package:uztexpro_payment/main.dart';
 
 class MenuPage extends StatefulWidget {
@@ -231,7 +231,9 @@ class _MenuPageState extends State<MenuPage> with SingleTickerProviderStateMixin
                                 description: s.menuPassesDesc,
                                 onTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const PassesPage()),
+                                  MaterialPageRoute(
+                      builder: (_) =>
+                          PassesPage(jwtToken: widget.jwtToken)),
                                 ),
                               ),
                               const SizedBox(height: 12),

@@ -672,4 +672,29 @@ class S {
         'en': 'Request timed out. Please try again.',
         'uz': "Kutish vaqti tugadi. Qayta urinib ko'ring."
       });
+
+  // Passes Page
+  String get passSearchHint => _t({
+        'ru': 'Номер или клиент',
+        'en': 'Number or client',
+        'uz': 'Raqam yoki mijoz'
+      });
+
+  String get passViewMy =>
+      _t({'ru': 'Мои', 'en': 'Mine', 'uz': 'Mening'});
+
+  String get passViewAll =>
+      _t({'ru': 'Все', 'en': 'All', 'uz': 'Barchasi'});
+
+  String get passesEmpty => _t({
+        'ru': 'Нет пропусков',
+        'en': 'No passes',
+        'uz': "Ruxsatnomalar yo'q"
+      });
+
+  String get passesEmptyDesc => _t({
+        'ru': 'Список пропусков пуст',
+        'en': 'The passes list is empty',
+        'uz': "Ruxsatnomalar ro'yxati bo'sh"
+      });
 }

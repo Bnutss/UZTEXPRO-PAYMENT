@@ -6,8 +6,8 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'package:shimmer/shimmer.dart';
-import 'app_strings.dart';
-import 'locale_notifier.dart';
+import '../../core/localization/app_strings.dart';
+import '../../core/localization/locale_notifier.dart';
 
 class MainPageScreen extends StatefulWidget {
   final String jwtToken;

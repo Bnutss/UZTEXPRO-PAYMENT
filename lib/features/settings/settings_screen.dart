@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'app_storage.dart';
+import '../../core/storage/app_storage.dart';
 import 'confidentiality_page.dart';
-import 'theme_notifier.dart';
-import 'locale_notifier.dart';
-import 'app_strings.dart';
+import '../../notifiers/theme_notifier.dart';
+import '../../core/localization/locale_notifier.dart';
+import '../../core/localization/app_strings.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);

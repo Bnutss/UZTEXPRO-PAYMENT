@@ -5,8 +5,8 @@ import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:uztexpro_payment/main.dart';
-import 'app_strings.dart';
-import 'locale_notifier.dart';
+import '../../core/localization/app_strings.dart';
+import '../../core/localization/locale_notifier.dart';
 
 const _kDetailPath = 'texmansys/material-purchase-application';
 

@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:uztexpro_payment/main_page.dart';
+import 'package:uztexpro_payment/features/home/main_page.dart';
 import 'dart:convert' show json, base64, ascii;
-import 'package:uztexpro_payment/login_page.dart';
-import 'app_storage.dart';
-import 'theme_notifier.dart';
-import 'locale_notifier.dart';
+import 'package:uztexpro_payment/features/auth/login_page.dart';
+import '../core/storage/app_storage.dart';
+import '../notifiers/theme_notifier.dart';
+import '../core/localization/locale_notifier.dart';
 
 class PROApp extends StatefulWidget {
   @override

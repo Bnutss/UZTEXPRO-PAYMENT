@@ -6,8 +6,8 @@ import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:uztexpro_payment/main.dart';
-import 'app_strings.dart';
-import 'locale_notifier.dart';
+import '../../core/localization/app_strings.dart';
+import '../../core/localization/locale_notifier.dart';
 import 'sign_request_detail_page.dart';
 
 // GET  $API/texmansys/material-purchase-application/?limit=1000

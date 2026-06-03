@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:local_auth/local_auth.dart';
-import 'app_storage.dart';
-import 'package:uztexpro_payment/menu_page.dart';
+import '../../core/storage/app_storage.dart';
+import 'package:uztexpro_payment/features/home/menu_page.dart';
 import 'package:uztexpro_payment/main.dart';
-import 'app_strings.dart';
-import 'locale_notifier.dart';
+import '../../core/localization/app_strings.dart';
+import '../../core/localization/locale_notifier.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
