@@ -594,7 +594,7 @@ class _SignRequestsPageState extends State<SignRequestsPage>
 }
 
 // ─── Search bar ───────────────────────────────────────────────────────────────
-class _SearchBar extends StatefulWidget {
+class _SearchBar extends StatelessWidget {
   final TextEditingController controller;
   final bool isDark;
   final String hint;
@@ -603,151 +603,54 @@ class _SearchBar extends StatefulWidget {
       {required this.controller, required this.isDark, required this.hint});
 
   @override
-  State<_SearchBar> createState() => _SearchBarState();
-}
-
-class _SearchBarState extends State<_SearchBar>
-    with SingleTickerProviderStateMixin {
-  static const Color _orange = Color(0xFFFF8C00);
-
-  late final FocusNode _focus;
-  late final AnimationController _glowCtrl;
-  late final Animation<double> _glow;
-
-  @override
-  void initState() {
-    super.initState();
-    _focus = FocusNode();
-    _glowCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 250));
-    _glow = CurvedAnimation(parent: _glowCtrl, curve: Curves.easeOut);
-    _focus.addListener(() {
-      if (_focus.hasFocus) {
-        _glowCtrl.forward();
-      } else {
-        _glowCtrl.reverse();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _focus.dispose();
-    _glowCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final isDark = widget.isDark;
-
-    return AnimatedBuilder(
-      animation: _glow,
-      builder: (_, __) {
-        final focused = _glow.value;
-        return Container(
-          height: 52,
-          decoration: BoxDecoration(
-            color: isDark
-                ? Color.lerp(
-                    Colors.white.withOpacity(0.10),
-                    Colors.white.withOpacity(0.16),
-                    focused)
-                : Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: isDark
-                  ? Color.lerp(Colors.white.withOpacity(0.12),
-                      _orange.withOpacity(0.7), focused)!
-                  : Color.lerp(Colors.transparent,
-                      _orange.withOpacity(0.6), focused)!,
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.35 : 0.12),
-                blurRadius: 14,
-                offset: const Offset(0, 5),
-              ),
-              if (focused > 0)
-                BoxShadow(
-                  color: _orange.withOpacity(0.22 * focused),
-                  blurRadius: 18,
-                  spreadRadius: 1,
-                  offset: const Offset(0, 3),
-                ),
-            ],
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
-          child: TextField(
-            controller: widget.controller,
-            focusNode: _focus,
-            style: TextStyle(
-              color: isDark ? Colors.white : Colors.grey.shade800,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-            decoration: InputDecoration(
-              hintText: 'Поиск по заявке, заявителю, отделу...',
-              hintStyle: TextStyle(
-                color: isDark
-                    ? Colors.white.withOpacity(0.35)
-                    : Colors.grey.shade400,
-                fontSize: 13,
-                fontWeight: FontWeight.normal,
-              ),
-              prefixIcon: Padding(
-                padding: const EdgeInsets.all(13),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 26,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    color: focused > 0.5
-                        ? _orange.withOpacity(0.15)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.search_rounded,
-                    color: isDark
-                        ? Color.lerp(Colors.white54, _orange, focused)
-                        : Color.lerp(
-                            Colors.grey.shade400, _orange, focused),
-                    size: 20,
-                  ),
-                ),
-              ),
-              suffixIcon: ValueListenableBuilder<TextEditingValue>(
-                valueListenable: widget.controller,
-                builder: (_, v, __) => v.text.isEmpty
-                    ? const SizedBox.shrink()
-                    : GestureDetector(
-                        onTap: widget.controller.clear,
-                        child: Container(
-                          margin: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? Colors.white.withOpacity(0.12)
-                                : Colors.grey.shade100,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.close_rounded,
-                            size: 16,
-                            color: isDark
-                                ? Colors.white60
-                                : Colors.grey.shade500,
-                          ),
-                        ),
-                      ),
-              ),
-              border: InputBorder.none,
-              contentPadding:
-                  const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
-            ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        style: TextStyle(
+          color: isDark ? Colors.white : Colors.grey.shade800,
+          fontSize: 14,
+        ),
+        decoration: InputDecoration(
+          hintText: 'Поиск по заявке, заявителю, отделу...',
+          hintStyle: TextStyle(
+            color: isDark ? Colors.white38 : Colors.grey.shade400,
+            fontSize: 13,
           ),
-        );
-      },
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            color: isDark ? Colors.white38 : Colors.grey.shade400,
+            size: 20,
+          ),
+          suffixIcon: ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (_, v, __) => v.text.isEmpty
+                ? const SizedBox.shrink()
+                : GestureDetector(
+                    onTap: controller.clear,
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: isDark ? Colors.white38 : Colors.grey.shade400,
+                    ),
+                  ),
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+        ),
+      ),
     );
   }
 }
