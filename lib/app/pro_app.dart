@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:uztexpro_payment/features/home/main_page.dart';
-import 'dart:convert' show json, base64, ascii;
+import 'dart:convert' show json, base64, ascii, jsonDecode;
 import 'package:uztexpro_payment/features/auth/login_page.dart';
+import 'package:uztexpro_payment/features/home/menu_page.dart';
 import '../core/storage/app_storage.dart';
 import '../notifiers/theme_notifier.dart';
 import '../core/localization/locale_notifier.dart';
@@ -65,21 +65,23 @@ class _ProMobile extends State<PROApp> {
                     );
                   }
                   if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                    final jwt = snapshot.data!;
-                    final parts = jwt.split(".");
-                    if (parts.length != 3) return LoginPage();
+                    final stored = snapshot.data!;
                     try {
+                      // stored value is the full JSON response body
+                      final body = jsonDecode(stored) as Map<String, dynamic>;
+                      final rawToken = body['token'] as String?;
+                      if (rawToken == null) return LoginPage();
+                      final parts = rawToken.split('.');
+                      if (parts.length != 3) return LoginPage();
                       final payload = json.decode(
                         ascii.decode(base64.decode(base64.normalize(parts[1]))),
                       );
-                      final expirationTime = DateTime.fromMillisecondsSinceEpoch(
-                          payload["exp"] * 1000);
-                      if (expirationTime.isAfter(DateTime.now())) {
-                        return MainPageScreen(jwtToken: jwt);
+                      final exp = DateTime.fromMillisecondsSinceEpoch(
+                          payload['exp'] * 1000);
+                      if (exp.isAfter(DateTime.now())) {
+                        return MenuPage(jwtToken: stored);
                       }
-                    } catch (e) {
-                      return LoginPage();
-                    }
+                    } catch (_) {}
                   }
                   return LoginPage();
                 },
