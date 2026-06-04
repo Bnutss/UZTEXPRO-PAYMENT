@@ -67,11 +67,6 @@ class _ConfidentialityPageState extends State<ConfidentialityPage> {
     try {
       authenticated = await auth.authenticate(
         localizedReason: s.authReason,
-        options: const AuthenticationOptions(
-          useErrorDialogs: true,
-          stickyAuth: true,
-          biometricOnly: true,
-        ),
       );
     } catch (e) {
       authenticated = false;

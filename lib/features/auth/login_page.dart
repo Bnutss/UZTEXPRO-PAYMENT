@@ -109,11 +109,6 @@ class _LoginPageState extends State<LoginPage>
     try {
       return await auth.authenticate(
         localizedReason: S.of(context).authLoginReason,
-        options: const AuthenticationOptions(
-          useErrorDialogs: true,
-          stickyAuth: true,
-          biometricOnly: false,
-        ),
       );
     } catch (e) {
       return false;
