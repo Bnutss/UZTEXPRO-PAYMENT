@@ -230,7 +230,9 @@ class _PassesPageState extends State<PassesPage>
     final q = _searchCtrl.text.trim().toLowerCase();
     setState(() {
       _shown = _all.where((p) {
-        final matchStatus = _statusFilter == null || p['status'] == _statusFilter;
+        final status = p['status'] as int? ?? 0;
+        if (_viewMode == _kStage && !_signerStatuses.contains(status)) return false;
+        final matchStatus = _statusFilter == null || status == _statusFilter;
         final matchSearch = q.isEmpty ||
             (p['number']?.toString().toLowerCase().contains(q) ?? false) ||
             (p['client']?.toString().toLowerCase().contains(q) ?? false);
