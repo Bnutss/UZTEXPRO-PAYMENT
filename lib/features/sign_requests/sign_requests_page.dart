@@ -36,7 +36,6 @@ class _SignRequestsPageState extends State<SignRequestsPage>
   bool _refreshing = false;
   String? _error;
 
-  // 'all' | 'pending' (0) | 'signing' (1)
   String _statusFilter = 'all';
 
   final _searchCtrl = TextEditingController();
@@ -418,7 +417,7 @@ class _SignRequestsPageState extends State<SignRequestsPage>
         ),
         body: Column(
           children: [
-            // ── Gradient header (count badge) ──────────────────
+            // Gradient header — count badge
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -435,11 +434,13 @@ class _SignRequestsPageState extends State<SignRequestsPage>
                       const Spacer(),
                       if (!_isLoading && _error == null)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white.withOpacity(0.35)),
+                            border: Border.all(
+                                color: Colors.white.withOpacity(0.35)),
                           ),
                           child: Text('${_shown.length}',
                               style: const TextStyle(
@@ -452,24 +453,23 @@ class _SignRequestsPageState extends State<SignRequestsPage>
                 ),
               ),
             ),
-            // ── Search bar on white background ─────────────────
+            // Search bar
             Container(
               color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
               child: _SearchBar(
                 controller: _searchCtrl,
                 isDark: isDark,
-                hint: s.requestNumber,
               ),
             ),
-            // ── Filter chips on light background ───────────────
+            // Filter chips
             if (!_isLoading && _error == null)
               Container(
                 color: isDark
                     ? Theme.of(context).colorScheme.surface
                     : const Color(0xFFF4F4F4),
                 padding: const EdgeInsets.only(top: 6, bottom: 8),
-              child: _FilterBar(
+                child: _FilterBar(
                   selected: _statusFilter,
                   allCount: _all.length,
                   pendingCount: _pendingCount,
@@ -478,13 +478,13 @@ class _SignRequestsPageState extends State<SignRequestsPage>
                   onSelect: _setFilter,
                 ),
               ),
-            // ── List ───────────────────────────────────────────
+            // List
             Expanded(
               child: Container(
                 color: isDark
                     ? Theme.of(context).colorScheme.surface
                     : const Color(0xFFF4F4F4),
-                child: _buildBody(s, isDark, gradientColors),
+                child: _buildBody(s, isDark),
               ),
             ),
           ],
@@ -493,7 +493,7 @@ class _SignRequestsPageState extends State<SignRequestsPage>
     );
   }
 
-  Widget _buildBody(S s, bool isDark, List<Color> gradientColors) {
+  Widget _buildBody(S s, bool isDark) {
     if (_isLoading) return _shimmer(isDark);
 
     if (_error != null) {
@@ -568,12 +568,11 @@ class _SignRequestsPageState extends State<SignRequestsPage>
         onRefresh: () => _load(forceRefresh: true),
         color: _g1,
         child: ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           itemCount: _shown.length,
           itemBuilder: (_, i) => _AppCard(
             app: _shown[i],
             isDark: isDark,
-            gradientColors: gradientColors,
             onSign: () => _onSign(_shown[i]),
             onReject: () => _onReject(_shown[i]),
             onTap: () => Navigator.push(
@@ -595,17 +594,17 @@ class _SignRequestsPageState extends State<SignRequestsPage>
     final base = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
     final highlight = isDark ? Colors.grey.shade700 : Colors.grey.shade100;
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
       itemCount: 5,
       itemBuilder: (_, __) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.only(bottom: 10),
         child: Shimmer.fromColors(
           baseColor: base,
           highlightColor: highlight,
           child: Container(
-            height: 195,
-            decoration:
-                BoxDecoration(color: base, borderRadius: BorderRadius.circular(16)),
+            height: 150,
+            decoration: BoxDecoration(
+                color: base, borderRadius: BorderRadius.circular(14)),
           ),
         ),
       ),
@@ -617,10 +616,8 @@ class _SignRequestsPageState extends State<SignRequestsPage>
 class _SearchBar extends StatelessWidget {
   final TextEditingController controller;
   final bool isDark;
-  final String hint;
 
-  const _SearchBar(
-      {required this.controller, required this.isDark, required this.hint});
+  const _SearchBar({required this.controller, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -696,46 +693,36 @@ class _FilterBar extends StatelessWidget {
         children: [
           _chip(context, 'all', 'Все', allCount),
           const SizedBox(width: 6),
-          _chip(context, 'pending', 'Ожидает', pendingCount),
+          _chip(context, 'pending', 'Ожидает', pendingCount,
+              color: const Color(0xFFF59E0B)),
           const SizedBox(width: 6),
-          _chip(context, 'signing', 'На подписи', signingCount),
+          _chip(context, 'signing', 'На подписи', signingCount,
+              color: const Color(0xFF3B82F6)),
         ],
       ),
     );
   }
 
-  Widget _chip(BuildContext context, String value, String label, int count) {
+  Widget _chip(BuildContext context, String value, String label, int count,
+      {Color? color}) {
     final isSelected = selected == value;
+    final chipColor = color ?? const Color(0xFFFF8C00);
     return GestureDetector(
       onTap: () => onSelect(value),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          gradient: isSelected
-              ? const LinearGradient(
-                  colors: [Color(0xFFFF8C00), Color(0xFFCC1500)],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                )
-              : null,
           color: isSelected
-              ? null
-              : (isDark ? Colors.white12 : Colors.white),
+              ? chipColor.withOpacity(isDark ? 0.25 : 0.12)
+              : (isDark ? Colors.white.withOpacity(0.07) : Colors.white),
           borderRadius: BorderRadius.circular(10),
-          border: isSelected
-              ? null
-              : Border.all(
-                  color: isDark ? Colors.white24 : Colors.grey.shade300),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFFFF8C00).withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  )
-                ]
-              : null,
+          border: Border.all(
+            color: isSelected
+                ? chipColor.withOpacity(isDark ? 0.6 : 0.5)
+                : (isDark ? Colors.white24 : Colors.grey.shade300),
+            width: isSelected ? 1.5 : 1,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -744,22 +731,22 @@ class _FilterBar extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontWeight:
+                    isSelected ? FontWeight.w700 : FontWeight.w500,
                 color: isSelected
-                    ? Colors.white
+                    ? chipColor
                     : (isDark ? Colors.white60 : Colors.grey.shade600),
               ),
             ),
             if (count > 0) ...[
               const SizedBox(width: 5),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? Colors.white.withOpacity(0.25)
-                      : (isDark
-                          ? Colors.white12
-                          : Colors.grey.shade100),
+                      ? chipColor.withOpacity(isDark ? 0.3 : 0.15)
+                      : (isDark ? Colors.white12 : Colors.grey.shade100),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -768,8 +755,10 @@ class _FilterBar extends StatelessWidget {
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
                     color: isSelected
-                        ? Colors.white
-                        : (isDark ? Colors.white54 : Colors.grey.shade500),
+                        ? chipColor
+                        : (isDark
+                            ? Colors.white54
+                            : Colors.grey.shade500),
                   ),
                 ),
               ),
@@ -781,11 +770,66 @@ class _FilterBar extends StatelessWidget {
   }
 }
 
-// ─── App Card ─────────────────────────────────────────────────────────────────
+// ─── Info row (label + value) ─────────────────────────────────────────────────
+class _Row2 extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String value;
+  final Color onSurface;
+
+  const _Row2({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.value,
+    required this.onSurface,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: Icon(icon, size: 14, color: iconColor),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: onSurface.withOpacity(0.45),
+                      letterSpacing: 0.2)),
+              Text(value,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: onSurface),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── App card ─────────────────────────────────────────────────────────────────
 class _AppCard extends StatelessWidget {
+  static const Color _g1 = Color(0xFFFF8C00);
+
   final Map<String, dynamic> app;
   final bool isDark;
-  final List<Color> gradientColors;
   final VoidCallback onSign;
   final VoidCallback onReject;
   final VoidCallback? onTap;
@@ -793,7 +837,6 @@ class _AppCard extends StatelessWidget {
   const _AppCard({
     required this.app,
     required this.isDark,
-    required this.gradientColors,
     required this.onSign,
     required this.onReject,
     this.onTap,
@@ -814,8 +857,9 @@ class _AppCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
-    final cardBg = isDark ? theme.colorScheme.surface : Colors.white;
-    final outline = theme.colorScheme.outline;
+    final cardBg = isDark
+        ? theme.colorScheme.surfaceContainerHighest
+        : Colors.white;
 
     final id = app['id']?.toString() ?? '—';
     final applicant = app['applicant_name'] ?? '—';
@@ -826,313 +870,227 @@ class _AppCard extends StatelessWidget {
     final statusTitle = app['status_title'] ?? '—';
     final status = app['status'] as int? ?? 0;
 
-    final statusColor = status == 1 ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B);
-    final statusIcon = status == 1 ? Icons.pending_rounded : Icons.hourglass_empty_rounded;
+    final statusColor =
+        status == 1 ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B);
+    final statusIcon = status == 1
+        ? Icons.pending_rounded
+        : Icons.hourglass_empty_rounded;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.22 : 0.07),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Gradient header ──
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                    colors: gradientColors,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border(left: BorderSide(color: statusColor, width: 4)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.22 : 0.07),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: const Icon(Icons.assignment_rounded,
-                        color: Colors.white, size: 15),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Заявка №$id',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.25),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withOpacity(0.35)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(statusIcon, color: Colors.white, size: 11),
-                        const SizedBox(width: 4),
-                        Text(statusTitle,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // ── Body ──
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Заявитель + Отдел
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _InfoTile(
-                          icon: Icons.person_outline_rounded,
-                          iconColor: const Color(0xFF6366F1),
-                          label: 'Заявитель',
-                          value: applicant,
-                          isDark: isDark,
-                          onSurface: onSurface,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _InfoTile(
-                          icon: Icons.domain_rounded,
-                          iconColor: const Color(0xFF0EA5E9),
-                          label: 'Отдел',
-                          value: dept,
-                          isDark: isDark,
-                          onSurface: onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // Фабрика + Дата
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _InfoTile(
-                          icon: Icons.factory_outlined,
-                          iconColor: const Color(0xFFF59E0B),
-                          label: 'Фабрика',
-                          value: factory,
-                          isDark: isDark,
-                          onSurface: onSurface,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _InfoTile(
-                          icon: Icons.event_rounded,
-                          iconColor: const Color(0xFF10B981),
-                          label: 'Дата',
-                          value: arriving,
-                          isDark: isDark,
-                          onSurface: onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (notes.isNotEmpty) ...[
-                    const SizedBox(height: 8),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header: icon + id + status badge
+                Row(
+                  children: [
                     Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 7),
+                      padding: const EdgeInsets.all(7),
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? Colors.amber.withOpacity(0.1)
-                            : Colors.amber.shade50,
-                        borderRadius: BorderRadius.circular(8),
+                        color: _g1.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: const Icon(Icons.assignment_rounded,
+                          color: _g1, size: 15),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Заявка №$id',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: onSurface,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                            color: isDark
-                                ? Colors.amber.withOpacity(0.25)
-                                : Colors.amber.shade200),
+                            color: statusColor.withOpacity(0.4)),
                       ),
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.notes_rounded,
-                              size: 13, color: Colors.amber.shade700),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              notes,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                          Icon(statusIcon, size: 10, color: statusColor),
+                          const SizedBox(width: 3),
+                          Text(statusTitle,
                               style: TextStyle(
-                                fontSize: 12,
-                                fontStyle: FontStyle.italic,
-                                color: isDark
-                                    ? Colors.amber.shade200
-                                    : Colors.amber.shade900,
-                              ),
-                            ),
-                          ),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: statusColor)),
                         ],
                       ),
                     ),
                   ],
-                  const SizedBox(height: 12),
-                  Divider(height: 1, color: outline.withOpacity(0.5)),
-                  const SizedBox(height: 10),
-                  // ── Action buttons ──
-                  if (_busy)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 4),
-                        child: SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              valueColor:
-                                  AlwaysStoppedAnimation(Color(0xFFFF8C00))),
-                        ),
-                      ),
-                    )
-                  else
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _ActionBtn(
-                            label: 'Отклонить',
-                            icon: Icons.close_rounded,
-                            color: const Color(0xFFEF4444),
-                            bgColor: const Color(0xFFFEF2F2),
-                            isDark: isDark,
-                            onTap: onReject,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _ActionBtn(
-                            label: 'Подписать',
-                            icon: Icons.draw_rounded,
-                            color: const Color(0xFF22C55E),
-                            bgColor: const Color(0xFFF0FDF4),
-                            isDark: isDark,
-                            onTap: onSign,
-                          ),
-                        ),
-                      ],
-                    ),
+                ),
+                const SizedBox(height: 10),
+                _Row2(
+                  icon: Icons.person_outline_rounded,
+                  iconColor: const Color(0xFF6366F1),
+                  label: 'Заявитель',
+                  value: applicant,
+                  onSurface: onSurface,
+                ),
+                const SizedBox(height: 6),
+                _Row2(
+                  icon: Icons.domain_rounded,
+                  iconColor: const Color(0xFF0EA5E9),
+                  label: 'Отдел',
+                  value: dept,
+                  onSurface: onSurface,
+                ),
+                const SizedBox(height: 6),
+                _Row2(
+                  icon: Icons.factory_outlined,
+                  iconColor: const Color(0xFFF59E0B),
+                  label: 'Фабрика',
+                  value: factory,
+                  onSurface: onSurface,
+                ),
+                const SizedBox(height: 6),
+                _Row2(
+                  icon: Icons.event_rounded,
+                  iconColor: const Color(0xFF10B981),
+                  label: 'Дата прихода',
+                  value: arriving,
+                  onSurface: onSurface,
+                ),
+                if (notes.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  Center(
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.amber.withOpacity(0.1)
+                          : Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: isDark
+                              ? Colors.amber.withOpacity(0.25)
+                              : Colors.amber.shade200),
+                    ),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.list_alt_rounded,
-                            size: 11,
-                            color: onSurface.withOpacity(0.28)),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Нажмите для просмотра материалов',
-                          style: TextStyle(
-                              fontSize: 10,
-                              color: onSurface.withOpacity(0.32)),
+                        Icon(Icons.notes_rounded,
+                            size: 13, color: Colors.amber.shade700),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            notes,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color: isDark
+                                  ? Colors.amber.shade200
+                                  : Colors.amber.shade900,
+                            ),
+                          ),
                         ),
-                        const SizedBox(width: 2),
-                        Icon(Icons.chevron_right_rounded,
-                            size: 13,
-                            color: onSurface.withOpacity(0.28)),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 4),
                 ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Info tile ────────────────────────────────────────────────────────────────
-class _InfoTile extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String label;
-  final String value;
-  final bool isDark;
-  final Color onSurface;
-
-  const _InfoTile({
-    required this.icon,
-    required this.iconColor,
-    required this.label,
-    required this.value,
-    required this.isDark,
-    required this.onSurface,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: isDark
-            ? iconColor.withOpacity(0.08)
-            : iconColor.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-            color: iconColor.withOpacity(isDark ? 0.2 : 0.15)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 13, color: iconColor),
-          const SizedBox(width: 5),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: TextStyle(
-                        fontSize: 10,
-                        color: onSurface.withOpacity(0.45))),
-                const SizedBox(height: 1),
-                Text(value,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: onSurface),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 10),
+                Divider(
+                    height: 1,
+                    color: theme.colorScheme.outline.withOpacity(0.4)),
+                const SizedBox(height: 8),
+                if (_busy)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 4),
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation(
+                                Color(0xFFFF8C00))),
+                      ),
+                    ),
+                  )
+                else
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ActionBtn(
+                          label: 'Отклонить',
+                          icon: Icons.close_rounded,
+                          color: const Color(0xFFEF4444),
+                          bgColor: const Color(0xFFFEF2F2),
+                          isDark: isDark,
+                          onTap: onReject,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _ActionBtn(
+                          label: 'Подписать',
+                          icon: Icons.draw_rounded,
+                          color: const Color(0xFF22C55E),
+                          bgColor: const Color(0xFFF0FDF4),
+                          isDark: isDark,
+                          onTap: onSign,
+                        ),
+                      ),
+                    ],
+                  ),
+                const SizedBox(height: 6),
+                Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.list_alt_rounded,
+                          size: 11,
+                          color: onSurface.withOpacity(0.28)),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Нажмите для просмотра материалов',
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: onSurface.withOpacity(0.32)),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(Icons.chevron_right_rounded,
+                          size: 13,
+                          color: onSurface.withOpacity(0.28)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 2),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1168,8 +1126,8 @@ class _ActionBtn extends StatelessWidget {
           decoration: BoxDecoration(
             color: isDark ? color.withOpacity(0.15) : bgColor,
             borderRadius: BorderRadius.circular(10),
-            border:
-                Border.all(color: color.withOpacity(isDark ? 0.4 : 0.3)),
+            border: Border.all(
+                color: color.withOpacity(isDark ? 0.4 : 0.3)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
