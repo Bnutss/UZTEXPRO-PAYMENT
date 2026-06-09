@@ -11,8 +11,69 @@ import 'bonus_detail_page.dart';
 
 const _kBonusPath = 'edo/bonus-employee';
 
+// ─── Status config ────────────────────────────────────────────────────────────
+
+class BonusStatusCfg {
+  final String label;
+  final String short;
+  final Color color;
+  final IconData icon;
+
+  const BonusStatusCfg(this.label, this.short, this.color, this.icon);
+}
+
+BonusStatusCfg bonusStatusConfig(int code) {
+  switch (code) {
+    case 1:
+      return const BonusStatusCfg(
+        'Новый',
+        'Новый',
+        Color(0xFF1E88E5),
+        Icons.fiber_new_rounded,
+      );
+    case 5:
+      return const BonusStatusCfg(
+        'На проверке',
+        'Проверка',
+        Color(0xFF00ACC1),
+        Icons.rate_review_outlined,
+      );
+    case 2:
+      return const BonusStatusCfg(
+        'Одобрен',
+        'Одобрен',
+        Color(0xFFFF8C00),
+        Icons.thumb_up_outlined,
+      );
+    case 3:
+      return const BonusStatusCfg(
+        'Утверждён',
+        'Утверждён',
+        Color(0xFF43A047),
+        Icons.verified_outlined,
+      );
+    case 4:
+      return const BonusStatusCfg(
+        'Оплачен',
+        'Оплачен',
+        Color(0xFF7B1FA2),
+        Icons.paid_outlined,
+      );
+    default:
+      return BonusStatusCfg(
+        'Статус $code',
+        '$code',
+        Colors.grey,
+        Icons.help_outline,
+      );
+  }
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 class BonusesPage extends StatefulWidget {
   final String jwtToken;
+
   const BonusesPage({Key? key, required this.jwtToken}) : super(key: key);
 
   @override
@@ -24,14 +85,24 @@ class _BonusesPageState extends State<BonusesPage>
   static const Color _g1 = Color(0xFFFF8C00);
   static const Color _g2 = Color(0xFFCC1500);
 
+  static const String _kStage = 'stage';
+  static const String _kCacheKey = 'bonuses_v2';
+
   static List<dynamic>? _memCache;
   static DateTime? _memCacheTime;
   static const Duration _kCacheTTL = Duration(minutes: 5);
 
+  List<dynamic> _all = [];
   List<dynamic> _shown = [];
   bool _isLoading = true;
   bool _refreshing = false;
   String? _error;
+
+  String _viewMode = _kStage;
+  int? _statusFilter;
+
+  final _searchCtrl = TextEditingController();
+  Timer? _debounce;
 
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
@@ -45,16 +116,22 @@ class _BonusesPageState extends State<BonusesPage>
   }
 
   Map<String, String> get _headers => {
-        'Authorization': 'Bearer $_token',
-        'Content-Type': 'application/json',
-      };
+    'Authorization': 'Bearer $_token',
+    'Content-Type': 'application/json',
+  };
 
   @override
   void initState() {
     super.initState();
     _animCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 400));
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
+    _searchCtrl.addListener(() {
+      _debounce?.cancel();
+      _debounce = Timer(const Duration(milliseconds: 250), _filter);
+    });
     _load();
     localeNotifier.addListener(_onLocale);
   }
@@ -64,90 +141,165 @@ class _BonusesPageState extends State<BonusesPage>
   @override
   void dispose() {
     _animCtrl.dispose();
+    _searchCtrl.dispose();
+    _debounce?.cancel();
     localeNotifier.removeListener(_onLocale);
     super.dispose();
   }
 
-  List<dynamic> _filterPending(List<dynamic> raw) => raw
-      .where((e) =>
-          e['is_change'] == true && (e['status'] as int? ?? 0) != 4)
-      .toList();
+  // ── Data ─────────────────────────────────────────────────────────────────────
 
   Future<void> _load({bool forceRefresh = false}) async {
-    // Show memory cache instantly on repeat opens
-    if (!forceRefresh && _memCache != null) {
-      setState(() {
-        _shown = _memCache!;
-        _isLoading = false;
-        _refreshing = false;
-      });
+    if (!forceRefresh && _memCache != null && _memCacheTime != null) {
+      final age = DateTime.now().difference(_memCacheTime!);
+      if (age < _kCacheTTL) {
+        _all = List.from(_memCache!);
+        _filter();
+        if (mounted)
+          setState(() {
+            _isLoading = false;
+            _refreshing = false;
+          });
+        _animCtrl.forward(from: 0);
+        return;
+      }
+      _all = List.from(_memCache!);
+      _filter();
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+          _refreshing = true;
+          _error = null;
+        });
       _animCtrl.forward(from: 0);
-      // Background refresh if TTL expired
-      if (_memCacheTime != null &&
-          DateTime.now().difference(_memCacheTime!) < _kCacheTTL) return;
-    } else {
-      setState(() {
-        _isLoading = _memCache == null;
-        _error = null;
-        _refreshing = false;
-      });
+      await _fetchFromNetwork(silent: true);
+      return;
     }
 
+    if (!forceRefresh) {
+      try {
+        final raw = await storage.read(key: _kCacheKey);
+        if (raw != null && mounted) {
+          final body = json.decode(raw);
+          final List items = body is List
+              ? body
+              : (body['results'] ?? body['data'] ?? []);
+          _all = items;
+          _filter();
+          setState(() {
+            _isLoading = false;
+            _refreshing = true;
+            _error = null;
+          });
+          _animCtrl.forward(from: 0);
+          await _fetchFromNetwork(silent: true);
+          return;
+        }
+      } catch (_) {}
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _refreshing = false;
+    });
+    await _fetchFromNetwork(silent: false);
+  }
+
+  Future<void> _fetchFromNetwork({required bool silent}) async {
     try {
       final resp = await http
           .get(Uri.parse('$API/$_kBonusPath/?limit=500'), headers: _headers)
           .timeout(const Duration(seconds: 30));
       if (!mounted) return;
       if (resp.statusCode == 200) {
-        final bodyBytes = resp.bodyBytes;
-        final List raw = await Future(() {
-          final body = json.decode(utf8.decode(bodyBytes));
-          return body is List ? body : (body['results'] ?? body['data'] ?? []);
-        });
-        final pending = _filterPending(raw);
-        _memCache = pending;
+        final decoded = utf8.decode(resp.bodyBytes);
+        storage.write(key: _kCacheKey, value: decoded);
+        final body = json.decode(decoded);
+        final List items = body is List
+            ? body
+            : (body['results'] ?? body['data'] ?? []);
+        _memCache = items;
         _memCacheTime = DateTime.now();
+        _all = items;
+        _filter();
         setState(() {
-          _shown = pending;
           _isLoading = false;
+          _refreshing = false;
         });
-        _animCtrl.forward(from: 0);
+        if (!silent) _animCtrl.forward(from: 0);
       } else {
-        if (_shown.isEmpty) {
+        if (!silent) {
           setState(() {
             _error = '${S.of(context).loadDataError} (${resp.statusCode})';
             _isLoading = false;
           });
+        } else {
+          if (mounted) setState(() => _refreshing = false);
         }
-      }
-    } on TimeoutException {
-      if (!mounted) return;
-      if (_shown.isEmpty) {
-        setState(() {
-          _error = S.of(context).timeoutError;
-          _isLoading = false;
-        });
       }
     } catch (e) {
       if (!mounted) return;
-      if (_shown.isEmpty) {
+      if (!silent) {
         setState(() {
-          _error = S.of(context).connectionError;
+          _error = '${S.of(context).connectionError}\n$e';
           _isLoading = false;
         });
+      } else {
+        setState(() => _refreshing = false);
       }
     }
   }
 
+  void _filter() {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    setState(() {
+      _shown = _all.where((item) {
+        final status = item['status'] as int? ?? 0;
+        if (_viewMode == _kStage) {
+          if (item['is_change'] != true) return false;
+          if (status == 4) return false;
+        }
+        final matchStatus = _statusFilter == null || status == _statusFilter;
+        final matchSearch =
+            q.isEmpty ||
+            (item['factory_name']?.toString().toLowerCase().contains(q) ??
+                false) ||
+            (item['month_text']?.toString().toLowerCase().contains(q) ??
+                false) ||
+            (item['create_by_name']?.toString().toLowerCase().contains(q) ??
+                false) ||
+            (item['id']?.toString().contains(q) ?? false);
+        return matchStatus && matchSearch;
+      }).toList();
+    });
+  }
+
+  void _switchView(String mode) {
+    if (_viewMode == mode) return;
+    setState(() {
+      _viewMode = mode;
+      _statusFilter = null;
+    });
+    _filter();
+  }
+
+  void _invalidateAndLoad() {
+    _memCache = null;
+    _memCacheTime = null;
+    _load(forceRefresh: true);
+  }
+
+  // ── Actions ──────────────────────────────────────────────────────────────────
+
   Future<void> _onApprove(Map<String, dynamic> item) async {
-    final s = S.of(context);
     final ok = await _confirmDialog(
-      icon: Icons.check_circle_rounded,
-      iconColor: Colors.green.shade600,
-      title: s.bonusApproveTitle,
-      message: s.bonusApproveDesc,
-      confirmLabel: s.bonusApproveBtn,
-      confirmColor: Colors.green.shade600,
+      icon: Icons.check_circle_outline_rounded,
+      iconColor: const Color(0xFF43A047),
+      title: S.of(context).bonusApproveTitle,
+      message: S.of(context).bonusApproveDesc,
+      confirmLabel: S.of(context).bonusApproveBtn,
+      confirmColor: const Color(0xFF43A047),
     );
     if (!ok) return;
     setState(() => item['_busy'] = true);
@@ -159,7 +311,7 @@ class _BonusesPageState extends State<BonusesPage>
       if (!mounted) return;
       if (resp.statusCode == 200) {
         _snack(S.of(context).bonusApproveSuccess, true);
-        await _load(forceRefresh: true);
+        _invalidateAndLoad();
       } else {
         _snack(S.of(context).signError, false);
         setState(() => item['_busy'] = false);
@@ -172,13 +324,12 @@ class _BonusesPageState extends State<BonusesPage>
   }
 
   Future<void> _onDelete(Map<String, dynamic> item) async {
-    final s = S.of(context);
     final ok = await _confirmDialog(
-      icon: Icons.delete_rounded,
+      icon: Icons.delete_outline_rounded,
       iconColor: Colors.red.shade600,
-      title: s.bonusDeleteTitle,
-      message: s.bonusDeleteDesc,
-      confirmLabel: s.deleteBtn,
+      title: S.of(context).bonusDeleteTitle,
+      message: S.of(context).bonusDeleteDesc,
+      confirmLabel: S.of(context).deleteBtn,
       confirmColor: Colors.red.shade600,
     );
     if (!ok) return;
@@ -191,7 +342,7 @@ class _BonusesPageState extends State<BonusesPage>
       if (!mounted) return;
       if (resp.statusCode == 200 || resp.statusCode == 204) {
         _snack(S.of(context).bonusDeleteSuccess, true);
-        await _load(forceRefresh: true);
+        _invalidateAndLoad();
       } else {
         _snack(S.of(context).updateError, false);
         setState(() => item['_busy'] = false);
@@ -203,6 +354,8 @@ class _BonusesPageState extends State<BonusesPage>
     }
   }
 
+  // ── Dialogs ──────────────────────────────────────────────────────────────────
+
   Future<bool> _confirmDialog({
     required IconData icon,
     required Color iconColor,
@@ -211,15 +364,13 @@ class _BonusesPageState extends State<BonusesPage>
     required String confirmLabel,
     required Color confirmColor,
   }) async {
-    final s = S.of(context);
     final surface = Theme.of(context).colorScheme.surface;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => Dialog(
         backgroundColor: surface,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -228,22 +379,30 @@ class _BonusesPageState extends State<BonusesPage>
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.1),
-                    shape: BoxShape.circle),
-                child: Icon(icon, color: iconColor, size: 30),
+                  color: iconColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: iconColor, size: 28),
               ),
-              const SizedBox(height: 16),
-              Text(title,
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: onSurface)),
+              const SizedBox(height: 14),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: onSurface,
+                ),
+              ),
               const SizedBox(height: 8),
-              Text(message,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 13, color: onSurface.withOpacity(0.6))),
-              const SizedBox(height: 24),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: onSurface.withOpacity(0.6),
+                ),
+              ),
+              const SizedBox(height: 22),
               Row(
                 children: [
                   Expanded(
@@ -252,17 +411,20 @@ class _BonusesPageState extends State<BonusesPage>
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        side: BorderSide(
-                            color: onSurface.withOpacity(0.2)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(color: onSurface.withOpacity(0.2)),
                       ),
-                      child: Text(s.cancel,
-                          style: TextStyle(
-                              color: onSurface.withOpacity(0.7),
-                              fontWeight: FontWeight.w600)),
+                      child: Text(
+                        S.of(context).cancel,
+                        style: TextStyle(
+                          color: onSurface.withOpacity(0.7),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () => Navigator.of(ctx).pop(true),
@@ -272,11 +434,13 @@ class _BonusesPageState extends State<BonusesPage>
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                      child: Text(confirmLabel,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold)),
+                      child: Text(
+                        confirmLabel,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ],
@@ -290,31 +454,39 @@ class _BonusesPageState extends State<BonusesPage>
   }
 
   void _snack(String msg, bool ok) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(
-        children: [
-          Icon(ok ? Icons.check_circle : Icons.error,
-              color: Colors.white, size: 16),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Text(msg,
-                  style:
-                      const TextStyle(fontWeight: FontWeight.w500))),
-        ],
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              ok ? Icons.check_circle : Icons.error,
+              color: Colors.white,
+              size: 16,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                msg,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: ok ? const Color(0xFF43A047) : const Color(0xFFD32F2F),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       ),
-      backgroundColor:
-          ok ? const Color(0xFF43A047) : const Color(0xFFD32F2F),
-      behavior: SnackBarBehavior.floating,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    ));
+    );
   }
+
+  // ── Build ─────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gradientColors = isDark
+    final gradColors = isDark
         ? [const Color(0xFF3D1800), const Color(0xFF1F0000)]
         : [_g1, _g2];
 
@@ -326,88 +498,110 @@ class _BonusesPageState extends State<BonusesPage>
       child: Scaffold(
         extendBodyBehindAppBar: true,
         appBar: AppBar(
-          title: Text(S.of(context).bonusesTitle,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18)),
+          title: Text(
+            s.bonusesTitle,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
           centerTitle: true,
           backgroundColor: Colors.transparent,
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.white),
           actions: [
-            IconButton(
-              icon: _refreshing
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation(Colors.white70)),
-                    )
-                  : const Icon(Icons.refresh_rounded, color: Colors.white),
-              onPressed: (_isLoading || _refreshing)
-                  ? null
-                  : () => _load(forceRefresh: true),
-            ),
+            if (_refreshing)
+              const Padding(
+                padding: EdgeInsets.only(right: 16),
+                child: Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(Colors.white70),
+                    ),
+                  ),
+                ),
+              )
+            else
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+                onPressed: _isLoading ? null : _invalidateAndLoad,
+              ),
           ],
           flexibleSpace: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                  colors: gradientColors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight),
-              borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(20)),
-            ),
-          ),
-          shape: const RoundedRectangleBorder(
-            borderRadius:
-                BorderRadius.vertical(bottom: Radius.circular(20)),
-          ),
-        ),
-        body: Stack(
-          children: [
-            Container(
-              height: 160,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                    colors: gradientColors,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight),
+                colors: gradColors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
             ),
-            Positioned.fill(
-              top: 120,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? Theme.of(context).colorScheme.surface
-                      : const Color(0xFFF5F5F5),
-                  borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(24)),
+          ),
+        ),
+        body: Column(
+          children: [
+            // ── Gradient header: toggle + count ──────────────────────────────
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: gradColors,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+                  child: Row(
+                    children: [
+                      _ViewToggle(selected: _viewMode, onChanged: _switchView),
+                      const Spacer(),
+                      if (!_isLoading && _error == null)
+                        _CountBadge(count: _shown.length),
+                    ],
+                  ),
                 ),
               ),
             ),
-            SafeArea(
-              child: Column(
-                children: [
-                  const SizedBox(height: 8),
-                  if (!_isLoading && _error == null)
-                    Padding(
-                      padding:
-                          const EdgeInsets.only(left: 16, bottom: 8),
-                      child: Row(
-                        children: [
-                          _CountChip(
-                              count: _shown.length, isDark: isDark),
-                        ],
-                      ),
-                    ),
-                  Expanded(
-                      child: _buildBody(isDark, gradientColors)),
-                ],
+            // ── Search ───────────────────────────────────────────────────────
+            Container(
+              color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+              child: _SearchBar(
+                controller: _searchCtrl,
+                hintText: 'Фабрика, месяц, создатель',
+                isDark: isDark,
+              ),
+            ),
+            // ── Status filter chips ──────────────────────────────────────────
+            Container(
+              color: isDark
+                  ? Theme.of(context).colorScheme.surface
+                  : const Color(0xFFF4F4F4),
+              padding: const EdgeInsets.only(top: 6, bottom: 8),
+              child: _StatusFilterRow(
+                selected: _statusFilter,
+                isDark: isDark,
+                allLabel: s.filterAll,
+                onSelect: (code) {
+                  setState(
+                    () => _statusFilter = _statusFilter == code ? null : code,
+                  );
+                  _filter();
+                },
+              ),
+            ),
+            // ── List ─────────────────────────────────────────────────────────
+            Expanded(
+              child: Container(
+                color: isDark
+                    ? Theme.of(context).colorScheme.surface
+                    : const Color(0xFFF4F4F4),
+                child: _buildBody(isDark),
               ),
             ),
           ],
@@ -416,9 +610,8 @@ class _BonusesPageState extends State<BonusesPage>
     );
   }
 
-  Widget _buildBody(bool isDark, List<Color> gradientColors) {
+  Widget _buildBody(bool isDark) {
     final s = S.of(context);
-
     if (_isLoading) return _shimmer(isDark);
 
     if (_error != null) {
@@ -428,28 +621,39 @@ class _BonusesPageState extends State<BonusesPage>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.wifi_off_rounded,
-                  size: 56,
-                  color:
-                      isDark ? Colors.white54 : Colors.grey.shade400),
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white10 : Colors.red.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.wifi_off_rounded,
+                  size: 36,
+                  color: isDark ? Colors.white38 : Colors.red.shade300,
+                ),
+              ),
               const SizedBox(height: 16),
-              Text(_error!,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: isDark
-                          ? Colors.white70
-                          : Colors.grey.shade600,
-                      fontSize: 14)),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isDark ? Colors.white60 : Colors.grey.shade600,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
               const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: () => _load(forceRefresh: true),
-                icon: const Icon(Icons.refresh_rounded),
+              FilledButton.icon(
+                onPressed: _invalidateAndLoad,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
                 label: Text(s.refresh),
-                style: ElevatedButton.styleFrom(
+                style: FilledButton.styleFrom(
                   backgroundColor: _g1,
-                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ],
@@ -467,32 +671,42 @@ class _BonusesPageState extends State<BonusesPage>
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white12
-                    : Colors.grey.shade100,
+                color: isDark ? Colors.white10 : Colors.white,
                 shape: BoxShape.circle,
+                boxShadow: isDark
+                    ? []
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 12,
+                        ),
+                      ],
               ),
-              child: Icon(Icons.card_giftcard_rounded,
-                  size: 40,
-                  color: isDark
-                      ? Colors.white54
-                      : Colors.grey.shade400),
+              child: Icon(
+                Icons.card_giftcard_rounded,
+                size: 38,
+                color: isDark ? Colors.white38 : Colors.grey.shade400,
+              ),
             ),
             const SizedBox(height: 16),
-            Text(s.noData,
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isDark
-                        ? Colors.white
-                        : Colors.grey.shade700)),
-            const SizedBox(height: 6),
-            Text(s.bonusesEmpty,
-                style: TextStyle(
-                    fontSize: 13,
-                    color: isDark
-                        ? Colors.white54
-                        : Colors.grey.shade500)),
+            Text(
+              s.bonusesEmpty,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white70 : Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _viewMode == _kStage
+                  ? 'Нет записей, требующих подписи'
+                  : 'Список премий пуст',
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.white38 : Colors.grey.shade500,
+              ),
+            ),
           ],
         ),
       );
@@ -501,48 +715,60 @@ class _BonusesPageState extends State<BonusesPage>
     return FadeTransition(
       opacity: _fadeAnim,
       child: RefreshIndicator(
-        onRefresh: () => _load(forceRefresh: true),
+        onRefresh: () async => _invalidateAndLoad(),
         color: _g1,
         child: ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 32),
           itemCount: _shown.length,
-          itemBuilder: (_, i) => _BonusCard(
-            item: _shown[i],
-            isDark: isDark,
-            gradientColors: gradientColors,
-            onApprove: () => _onApprove(_shown[i]),
-            onDelete: () => _onDelete(_shown[i]),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => BonusDetailPage(
-                    item: _shown[i] as Map<String, dynamic>),
+          itemBuilder: (_, i) {
+            final item = _shown[i] as Map<String, dynamic>;
+            final status = item['status'] as int? ?? 0;
+            final isChange = item['is_change'] == true && status != 4;
+            final isDelete = item['is_delete'] == true;
+
+            return _BonusCard(
+              item: item,
+              isDark: isDark,
+              showApprove: isChange,
+              showDelete: isDelete,
+              onApprove: () => _onApprove(item),
+              onDelete: () => _onDelete(item),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => BonusDetailPage(
+                    item: item,
+                    jwtToken: widget.jwtToken,
+                    canSign: isChange,
+                    canDelete: isDelete,
+                    onActionDone: _invalidateAndLoad,
+                  ),
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
   }
 
   Widget _shimmer(bool isDark) {
-    final base =
-        isDark ? Colors.grey.shade800 : Colors.grey.shade200;
-    final highlight =
-        isDark ? Colors.grey.shade700 : Colors.grey.shade100;
+    final base = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
+    final hi = isDark ? Colors.grey.shade700 : Colors.grey.shade100;
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 32),
       itemCount: 5,
       itemBuilder: (_, __) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.only(bottom: 8),
         child: Shimmer.fromColors(
           baseColor: base,
-          highlightColor: highlight,
+          highlightColor: hi,
           child: Container(
-            height: 210,
+            height: 148,
             decoration: BoxDecoration(
-                color: base,
-                borderRadius: BorderRadius.circular(16)),
+              color: base,
+              borderRadius: BorderRadius.circular(16),
+            ),
           ),
         ),
       ),
@@ -550,41 +776,13 @@ class _BonusesPageState extends State<BonusesPage>
   }
 }
 
-class _CountChip extends StatelessWidget {
-  final int count;
-  final bool isDark;
-  const _CountChip({required this.count, required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white12 : Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: isDark
-                ? Colors.white24
-                : Colors.orange.shade200),
-      ),
-      child: Text(
-        '${S.of(context).recordsCount}: $count',
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color:
-              isDark ? Colors.white70 : Colors.orange.shade800,
-        ),
-      ),
-    );
-  }
-}
+// ─── Bonus Card ───────────────────────────────────────────────────────────────
 
 class _BonusCard extends StatelessWidget {
   final Map<String, dynamic> item;
   final bool isDark;
-  final List<Color> gradientColors;
+  final bool showApprove;
+  final bool showDelete;
   final VoidCallback onApprove;
   final VoidCallback onDelete;
   final VoidCallback onTap;
@@ -592,289 +790,177 @@ class _BonusCard extends StatelessWidget {
   const _BonusCard({
     required this.item,
     required this.isDark,
-    required this.gradientColors,
+    required this.showApprove,
+    required this.showDelete,
     required this.onApprove,
     required this.onDelete,
     required this.onTap,
   });
 
-  bool get _busy => item['_busy'] == true;
-
-  Color _statusColor(int status) {
-    switch (status) {
-      case 1:
-        return Colors.blue;
-      case 2:
-        return Colors.orange;
-      case 3:
-        return Colors.green;
-      case 4:
-        return Colors.purple;
-      case 5:
-        return Colors.teal;
-      default:
-        return Colors.grey;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
-    final cardBg =
-        isDark ? theme.colorScheme.surface : Colors.white;
-    final outline = theme.colorScheme.outline;
+    final cardBg = isDark
+        ? theme.colorScheme.surfaceContainerHighest
+        : Colors.white;
 
     final id = item['id']?.toString() ?? '—';
-    final factory = item['factory_name'] ?? '—';
-    final month = item['month_text'] ?? '—';
+    final factory = item['factory_name']?.toString() ?? '—';
+    final month = item['month_text']?.toString() ?? '—';
     final status = item['status'] as int? ?? 0;
-    final statusText = item['status_text'] ?? '—';
-    final creator = item['create_by_name'] ?? '—';
+    final statusDisp = item['status_text']?.toString();
+    final creator = item['create_by_name']?.toString() ?? '—';
     final totalBonus = item['total_bonus']?.toString() ?? '—';
-    final createdAt = item['created_at'] ?? '—';
-    final approveBy = item['approve_by']?.toString() ?? '';
-    final confirmBy = item['confirm_by']?.toString() ?? '';
+    final createdAt = item['created_at']?.toString() ?? '—';
     final notes = item['notes']?.toString() ?? '';
-    final isChange = item['is_change'] == true && status != 4;
-    final isDelete = item['is_delete'] == true;
-    final statusColor = _statusColor(status);
+    final busy = item['_busy'] == true;
+    final hasActions = showApprove || showDelete;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black
-                .withOpacity(isDark ? 0.25 : 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+    final cfg = bonusStatusConfig(status);
+    final statusLabel = statusDisp ?? cfg.label;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border(left: BorderSide(color: cfg.color, width: 4)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.18 : 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Gradient header
-          Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 11),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                  colors: gradientColors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                      Icons.card_giftcard_rounded,
-                      color: Colors.white,
-                      size: 15),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    '${S.of(context).bonusNumber}$id',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 9, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                        color: Colors.white.withOpacity(0.4)),
-                  ),
-                  child: Text(statusText,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600)),
-                ),
-              ],
-            ),
-          ),
-          // Body
-          Padding(
-            padding:
-                const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ── Header ────────────────────────────────────────────────────
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: _InfoRow(
-                          icon: Icons.factory_outlined,
-                          label: S.of(context).factoryLabel,
-                          value: factory,
-                          isDark: isDark,
-                          onSurface: onSurface),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${S.of(context).bonusNumber}$id',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              _MonthPill(month),
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.calendar_today_rounded,
+                                size: 11,
+                                color: onSurface.withOpacity(0.4),
+                              ),
+                              const SizedBox(width: 3),
+                              Flexible(
+                                child: Text(
+                                  createdAt,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: onSurface.withOpacity(0.5),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: _InfoRow(
-                          icon: Icons.calendar_month_rounded,
-                          label: S.of(context).monthLabel,
-                          value: month,
-                          isDark: isDark,
-                          onSurface: onSurface),
-                    ),
+                    _BonusStatusBadge(cfg: cfg, label: statusLabel),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _InfoRow(
-                          icon: Icons.person_outline_rounded,
-                          label: S.of(context).createdByLabel,
-                          value: creator,
-                          isDark: isDark,
-                          onSurface: onSurface),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _InfoRow(
-                          icon: Icons.access_time_rounded,
-                          label: S.of(context).dateLabel,
-                          value: createdAt,
-                          isDark: isDark,
-                          onSurface: onSurface),
-                    ),
-                  ],
+                const SizedBox(height: 10),
+                _CardDivider(isDark: isDark),
+                const SizedBox(height: 8),
+                // ── Info ──────────────────────────────────────────────────────
+                _InfoLine(
+                  icon: Icons.factory_outlined,
+                  label: S.of(context).factoryLabel,
+                  text: factory,
+                  onSurface: onSurface,
                 ),
-                const SizedBox(height: 6),
-                _InfoRow(
+                const SizedBox(height: 5),
+                _InfoLine(
+                  icon: Icons.person_outline_rounded,
+                  label: S.of(context).createdByLabel,
+                  text: creator,
+                  onSurface: onSurface,
+                ),
+                const SizedBox(height: 5),
+                _InfoLine(
                   icon: Icons.payments_outlined,
                   label: S.of(context).totalLabel,
-                  value: '$totalBonus UZS',
-                  isDark: isDark,
+                  text: '$totalBonus UZS',
                   onSurface: onSurface,
                   highlight: true,
                 ),
-                if (approveBy.isNotEmpty &&
-                    approveBy != ' ') ...[
-                  const SizedBox(height: 6),
-                  _InfoRow(
-                      icon: Icons.approval_rounded,
-                      label: S.of(context).approvedByLabel,
-                      value: approveBy,
-                      isDark: isDark,
-                      onSurface: onSurface),
-                ],
-                if (confirmBy.isNotEmpty &&
-                    confirmBy != ' ') ...[
-                  const SizedBox(height: 6),
-                  _InfoRow(
-                      icon: Icons.verified_rounded,
-                      label: S.of(context).confirmedByLabel,
-                      value: confirmBy,
-                      isDark: isDark,
-                      onSurface: onSurface),
-                ],
                 if (notes.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? Colors.amber.withOpacity(0.1)
-                          : Colors.amber.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                          color: isDark
-                              ? Colors.amber.withOpacity(0.25)
-                              : Colors.amber.shade200),
-                    ),
-                    child: Row(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.notes_rounded,
-                            size: 14,
-                            color: Colors.amber.shade700),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            notes,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
-                              color: isDark
-                                  ? Colors.amber.shade200
-                                  : Colors.amber.shade900,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  const SizedBox(height: 7),
+                  _NoteRow(text: notes, isDark: isDark),
                 ],
-                if (isChange || isDelete) ...[
-                  const SizedBox(height: 12),
-                  Divider(height: 1, color: outline),
+                const SizedBox(height: 10),
+                _CardDivider(isDark: isDark),
+                const SizedBox(height: 8),
+                _BonusStatusProgress(status: status, isDark: isDark),
+                // ── Actions ───────────────────────────────────────────────────
+                if (hasActions) ...[
                   const SizedBox(height: 10),
-                  if (_busy)
+                  _CardDivider(isDark: isDark),
+                  const SizedBox(height: 10),
+                  if (busy)
                     const Center(
                       child: SizedBox(
                         width: 24,
                         height: 24,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            valueColor: AlwaysStoppedAnimation(
-                                Color(0xFFFF8C00))),
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation(Color(0xFFFF8C00)),
+                        ),
                       ),
                     )
                   else
                     Row(
                       children: [
-                        if (isDelete) ...[
+                        if (showDelete) ...[
                           Expanded(
                             child: _ActionBtn(
                               label: S.of(context).deleteBtn,
-                              icon: Icons
-                                  .delete_outline_rounded,
-                              color: const Color(0xFFEF4444),
-                              bgColor:
-                                  const Color(0xFFFEF2F2),
+                              icon: Icons.delete_outline_rounded,
+                              color: const Color(0xFFE53935),
+                              bgColor: const Color(0xFFFFEBEE),
                               isDark: isDark,
                               onTap: onDelete,
                             ),
                           ),
-                          if (isChange)
-                            const SizedBox(width: 10),
+                          if (showApprove) const SizedBox(width: 8),
                         ],
-                        if (isChange)
+                        if (showApprove)
                           Expanded(
                             child: _ActionBtn(
                               label: S.of(context).bonusApproveBtn,
-                              icon: Icons
-                                  .check_circle_outline_rounded,
-                              color: const Color(0xFF22C55E),
-                              bgColor:
-                                  const Color(0xFFF0FDF4),
+                              icon: Icons.check_rounded,
+                              color: const Color(0xFF43A047),
+                              bgColor: const Color(0xFFE8F5E9),
                               isDark: isDark,
                               onTap: onApprove,
                             ),
@@ -885,26 +971,511 @@ class _BonusCard extends StatelessWidget {
               ],
             ),
           ),
-        ],
+        ),
       ),
-    ),  // GestureDetector
     );
   }
 }
 
-class _InfoRow extends StatelessWidget {
+// ─── Status badge ─────────────────────────────────────────────────────────────
+
+class _BonusStatusBadge extends StatelessWidget {
+  final BonusStatusCfg cfg;
+  final String label;
+
+  const _BonusStatusBadge({required this.cfg, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: cfg.color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: cfg.color.withOpacity(0.35), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(cfg.icon, size: 12, color: cfg.color),
+          const SizedBox(width: 5),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 90),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: cfg.color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Status progress bar ──────────────────────────────────────────────────────
+
+class _BonusStatusProgress extends StatelessWidget {
+  final int status;
+  final bool isDark;
+
+  const _BonusStatusProgress({required this.status, required this.isDark});
+
+  // Ordered workflow: 1 → 5 → 2 → 3 → 4
+  static const _steps = [
+    (1, 'Новый', Color(0xFF1E88E5)),
+    (5, 'Проверка', Color(0xFF00ACC1)),
+    (2, 'Одобрен', Color(0xFFFF8C00)),
+    (3, 'Утверждён', Color(0xFF43A047)),
+    (4, 'Оплачен', Color(0xFF7B1FA2)),
+  ];
+
+  int get _idx {
+    for (int i = 0; i < _steps.length; i++) {
+      if (_steps[i].$1 == status) return i;
+    }
+    return -1;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final idx = _idx;
+    final inactiveDot = isDark ? Colors.white12 : Colors.grey.shade200;
+    final inactiveLine = isDark ? Colors.white10 : Colors.grey.shade200;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            for (int i = 0; i < _steps.length; i++) ...[
+              _Dot(
+                done: idx >= 0 && i < idx,
+                current: i == idx,
+                color: _steps[i].$3,
+                inactiveColor: inactiveDot,
+              ),
+              if (i < _steps.length - 1)
+                Expanded(
+                  child: Container(
+                    height: 2,
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    decoration: BoxDecoration(
+                      color: (idx >= 0 && i < idx)
+                          ? _steps[i].$3
+                          : inactiveLine,
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            for (int i = 0; i < _steps.length; i++) ...[
+              Text(
+                _steps[i].$2,
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: i == idx ? FontWeight.w700 : FontWeight.w400,
+                  color: (idx >= 0 && i <= idx)
+                      ? _steps[i].$3
+                      : onSurface.withOpacity(0.28),
+                ),
+              ),
+              if (i < _steps.length - 1) const Spacer(),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _Dot extends StatelessWidget {
+  final bool done;
+  final bool current;
+  final Color color;
+  final Color inactiveColor;
+
+  const _Dot({
+    required this.done,
+    required this.current,
+    required this.color,
+    required this.inactiveColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final size = current ? 18.0 : 14.0;
+    final active = done || current;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: active ? color : inactiveColor,
+        border: Border.all(
+          color: active ? color : Colors.grey.shade300,
+          width: current ? 2.5 : 1.5,
+        ),
+        boxShadow: current
+            ? [
+                BoxShadow(
+                  color: color.withOpacity(0.4),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+              ]
+            : null,
+      ),
+      child: active
+          ? Icon(Icons.check_rounded, size: size * 0.58, color: Colors.white)
+          : null,
+    );
+  }
+}
+
+// ─── View toggle ──────────────────────────────────────────────────────────────
+
+class _ViewToggle extends StatelessWidget {
+  final String selected;
+  final ValueChanged<String> onChanged;
+
+  const _ViewToggle({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 34,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _VTab(
+            label: 'На подпись',
+            active: selected == 'stage',
+            onTap: () => onChanged('stage'),
+          ),
+          _VTab(
+            label: 'Все',
+            active: selected == 'all',
+            onTap: () => onChanged('all'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VTab extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _VTab({required this.label, required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: active
+                ? const Color(0xFFCC1500)
+                : Colors.white.withOpacity(0.8),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Status filter chips ──────────────────────────────────────────────────────
+
+class _StatusFilterRow extends StatelessWidget {
+  final int? selected;
+  final bool isDark;
+  final String allLabel;
+  final ValueChanged<int?> onSelect;
+
+  const _StatusFilterRow({
+    required this.selected,
+    required this.isDark,
+    required this.allLabel,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 34,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        children: [
+          _SChip(
+            label: allLabel,
+            selected: selected == null,
+            color: isDark ? Colors.white70 : Colors.grey.shade600,
+            isDark: isDark,
+            onTap: () => onSelect(null),
+          ),
+          for (final code in [1, 5, 2, 3, 4]) ...[
+            const SizedBox(width: 6),
+            _SChip(
+              label: bonusStatusConfig(code).short,
+              selected: selected == code,
+              color: bonusStatusConfig(code).color,
+              isDark: isDark,
+              onTap: () => onSelect(code),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final Color color;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _SChip({
+    required this.label,
+    required this.selected,
+    required this.color,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected
+              ? color
+              : (isDark ? Colors.white.withOpacity(0.07) : Colors.white),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected
+                ? color
+                : (isDark ? Colors.white12 : Colors.grey.shade200),
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: color.withOpacity(0.28),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [
+                  if (!isDark)
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!selected)
+              Container(
+                width: 7,
+                height: 7,
+                margin: const EdgeInsets.only(right: 6),
+                decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+              ),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: selected
+                    ? Colors.white
+                    : (isDark ? Colors.white70 : Colors.grey.shade700),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Search bar ───────────────────────────────────────────────────────────────
+
+class _SearchBar extends StatelessWidget {
+  final TextEditingController controller;
+  final String hintText;
+  final bool isDark;
+
+  const _SearchBar({
+    required this.controller,
+    required this.hintText,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return Container(
+      height: 46,
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withOpacity(0.07) : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? Colors.white12 : Colors.grey.shade200,
+        ),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+      ),
+      child: TextField(
+        controller: controller,
+        style: TextStyle(color: onSurface, fontSize: 14),
+        decoration: InputDecoration(
+          hintText: '$hintText...',
+          hintStyle: TextStyle(
+            color: onSurface.withOpacity(0.38),
+            fontSize: 14,
+          ),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            color: onSurface.withOpacity(0.38),
+            size: 20,
+          ),
+          suffixIcon: ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (_, v, __) => v.text.isEmpty
+                ? const SizedBox.shrink()
+                : IconButton(
+                    icon: Icon(
+                      Icons.clear_rounded,
+                      size: 18,
+                      color: onSurface.withOpacity(0.4),
+                    ),
+                    onPressed: controller.clear,
+                  ),
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Count badge ──────────────────────────────────────────────────────────────
+
+class _CountBadge extends StatelessWidget {
+  final int count;
+
+  const _CountBadge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.35), width: 1),
+      ),
+      child: Text(
+        '$count',
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Month pill ───────────────────────────────────────────────────────────────
+
+class _MonthPill extends StatelessWidget {
+  final String label;
+
+  const _MonthPill(this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white10 : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isDark ? Colors.white12 : Colors.grey.shade300,
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: isDark ? Colors.white60 : Colors.grey.shade600,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Info line ────────────────────────────────────────────────────────────────
+
+class _InfoLine extends StatelessWidget {
   final IconData icon;
   final String label;
-  final String value;
-  final bool isDark;
+  final String text;
   final Color onSurface;
   final bool highlight;
 
-  const _InfoRow({
+  const _InfoLine({
     required this.icon,
     required this.label,
-    required this.value,
-    required this.isDark,
+    required this.text,
     required this.onSurface,
     this.highlight = false,
   });
@@ -914,44 +1485,91 @@ class _InfoRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon,
-            size: 14,
-            color: highlight
-                ? const Color(0xFFFF8C00)
-                : onSurface.withOpacity(0.4)),
+        Icon(
+          icon,
+          size: 13,
+          color: highlight
+              ? const Color(0xFFFF8C00)
+              : onSurface.withOpacity(0.35),
+        ),
         const SizedBox(width: 6),
+        Text(
+          '$label: ',
+          style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.45)),
+        ),
         Expanded(
-          child: RichText(
-            text: TextSpan(
-              children: [
-                TextSpan(
-                  text: '$label: ',
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: onSurface.withOpacity(0.5)),
-                ),
-                TextSpan(
-                  text: value,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: highlight
-                        ? FontWeight.bold
-                        : FontWeight.w600,
-                    color: highlight
-                        ? const Color(0xFFFF8C00)
-                        : onSurface,
-                  ),
-                ),
-              ],
-            ),
-            maxLines: 2,
+          child: Text(
+            text,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: highlight
+                  ? const Color(0xFFFF8C00)
+                  : onSurface.withOpacity(0.85),
+            ),
           ),
         ),
       ],
     );
   }
 }
+
+// ─── Note row ─────────────────────────────────────────────────────────────────
+
+class _NoteRow extends StatelessWidget {
+  final String text;
+  final bool isDark;
+
+  const _NoteRow({required this.text, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          Icons.notes_rounded,
+          size: 13,
+          color: isDark ? Colors.amber.shade300 : Colors.amber.shade700,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+              color: isDark ? Colors.amber.shade300 : Colors.amber.shade800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Card divider ─────────────────────────────────────────────────────────────
+
+class _CardDivider extends StatelessWidget {
+  final bool isDark;
+
+  const _CardDivider({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      color: isDark ? Colors.white10 : Colors.grey.shade100,
+    );
+  }
+}
+
+// ─── Action button ────────────────────────────────────────────────────────────
 
 class _ActionBtn extends StatelessWidget {
   final String label;
@@ -978,24 +1596,26 @@ class _ActionBtn extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           decoration: BoxDecoration(
             color: isDark ? color.withOpacity(0.15) : bgColor,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-                color:
-                    color.withOpacity(isDark ? 0.4 : 0.3)),
+            border: Border.all(color: color.withOpacity(isDark ? 0.35 : 0.3)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 16),
+              Icon(icon, color: color, size: 15),
               const SizedBox(width: 6),
-              Text(label,
-                  style: TextStyle(
-                      color: color,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold)),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
         ),
