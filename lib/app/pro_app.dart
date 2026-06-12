@@ -53,11 +53,10 @@ class _ProMobile extends State<PROApp> {
               theme: _lightTheme(),
               darkTheme: _darkTheme(),
               home: UpgradeAlert(
-                upgrader: Upgrader(
-                  showIgnore: false,
-                  showLater: true,
-                  dialogStyle: UpgradeDialogStyle.cupertino,
-                ),
+                upgrader: Upgrader(),
+                showIgnore: false,
+                showLater: true,
+                dialogStyle: UpgradeDialogStyle.cupertino,
                 child: FutureBuilder<String>(
                   future: jwtOrEmpty,
                   builder: (context, snapshot) {
