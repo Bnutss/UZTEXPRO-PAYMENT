@@ -275,7 +275,7 @@ class _MenuPageState extends State<MenuPage>
                           child: Builder(builder: (_) {
                             final cards = _buildMenuCards(s);
                             return cards.isEmpty
-                                ? const _NoAccessCard()
+                                ? _NoAccessCard()
                                 : Column(children: cards);
                           }),
                         ),
@@ -518,7 +518,7 @@ class _ActionButton extends StatelessWidget {
 }
 
 class _NoAccessCard extends StatelessWidget {
-  const _NoAccessCard();
+  _NoAccessCard();
 
   @override
   Widget build(BuildContext context) {
@@ -543,9 +543,9 @@ class _NoAccessCard extends StatelessWidget {
                 color: Colors.white, size: 30),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Доступ ограничен',
-            style: TextStyle(
+          Text(
+            S.of(context).accessRestricted,
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 17,
               fontWeight: FontWeight.bold,
@@ -553,7 +553,7 @@ class _NoAccessCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'У вас нет доступа ни к одному разделу.\nОбратитесь к администратору.',
+            S.of(context).noAccessMessage,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white.withOpacity(0.65),

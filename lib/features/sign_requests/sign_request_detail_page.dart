@@ -466,42 +466,42 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
         _SectionCard(
           icon: Icons.assignment_rounded,
           iconColor: _g1,
-          title: 'Информация о заявке',
+          title: S.of(context).requestInfo,
           isDark: isDark,
           child: Column(
             children: [
               _InfoRow(
                   icon: Icons.person_rounded,
                   iconColor: const Color(0xFF6366F1),
-                  label: 'Заявитель',
+                  label: S.of(context).requestApplicant,
                   value: applicant,
                   onSurface: onSurface),
               _divider(onSurface),
               _InfoRow(
                   icon: Icons.account_tree_rounded,
                   iconColor: const Color(0xFF0EA5E9),
-                  label: 'Отдел',
+                  label: S.of(context).requestDepartment,
                   value: dept,
                   onSurface: onSurface),
               _divider(onSurface),
               _InfoRow(
                   icon: Icons.factory_rounded,
                   iconColor: const Color(0xFFF59E0B),
-                  label: 'Фабрика',
+                  label: S.of(context).factoryLabel2,
                   value: factory,
                   onSurface: onSurface),
               _divider(onSurface),
               _InfoRow(
                   icon: Icons.warehouse_rounded,
                   iconColor: const Color(0xFF10B981),
-                  label: 'Склад',
+                  label: S.of(context).warehouseLabel,
                   value: warehouse,
                   onSurface: onSurface),
               _divider(onSurface),
               _InfoRow(
                   icon: Icons.event_rounded,
                   iconColor: const Color(0xFFEC4899),
-                  label: 'Дата прихода',
+                  label: S.of(context).arrivalDate,
                   value: arriving,
                   onSurface: onSurface),
               if (notes.isNotEmpty) ...[
@@ -571,14 +571,14 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
             const SizedBox(width: 8),
             _CountBadge(
                 count: details.length,
-                label: 'позиций',
+                label: S.of(context).positions,
                 color: _g1,
                 isDark: isDark),
             if (pendingCount > 0) ...[
               const SizedBox(width: 6),
               _CountBadge(
                   count: pendingCount,
-                  label: 'ожидают',
+                  label: S.of(context).awaitingLabel,
                   color: Colors.amber.shade700,
                   isDark: isDark),
             ],
@@ -1025,7 +1025,7 @@ class _DetailItemCard extends StatelessWidget {
                     child: _DataCell(
                       icon: Icons.scale_outlined,
                       iconColor: const Color(0xFF0EA5E9),
-                      label: 'Количество',
+                      label: S.of(context).quantity,
                       value: amount != null
                           ? '${_fmtNum(amount, allowZero: true)} $unit'
                               .trim()
@@ -1046,7 +1046,7 @@ class _DetailItemCard extends StatelessWidget {
                     child: _DataCell(
                       icon: Icons.payments_outlined,
                       iconColor: const Color(0xFF10B981),
-                      label: 'Стоимость',
+                      label: S.of(context).costLabel,
                       value: _fmtNum(plannedCost),
                       onSurface: onSurface,
                     ),

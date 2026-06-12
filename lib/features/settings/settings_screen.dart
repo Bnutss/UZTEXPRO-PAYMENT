@@ -1,8 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/storage/app_storage.dart';
-import 'confidentiality_page.dart';
 import '../../notifiers/theme_notifier.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/localization/app_strings.dart';
@@ -19,7 +19,10 @@ class _SettingsScreenState extends State<SettingsScreen>
   late AnimationController _animationController;
   late Animation<double> _animation;
   final AppStorage _storage = const AppStorage();
-  String _username = '';
+
+  String _displayName = '';
+  String _email = '';
+  String _login = '';
   String _version = '';
 
   static const Color _gradientStart = Color(0xFFFF8C00);
@@ -36,32 +39,49 @@ class _SettingsScreenState extends State<SettingsScreen>
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 400),
     );
     _animation = CurvedAnimation(
       parent: _animationController,
-      curve: Curves.easeInOut,
+      curve: Curves.easeOutCubic,
     );
     _animationController.forward();
-    _loadUsername();
+    _loadUserData();
     _loadVersion();
     localeNotifier.addListener(_onLocaleChanged);
   }
 
   void _onLocaleChanged() => setState(() {});
 
-  Future<void> _loadUsername() async {
-    final username = await _storage.read(key: 'username') ?? '';
+  Future<void> _loadUserData() async {
+    final jwtRaw = await _storage.read(key: 'jwt');
+    if (jwtRaw != null) {
+      try {
+        final body = jsonDecode(jwtRaw) as Map<String, dynamic>;
+        final user = body['user'] as Map<String, dynamic>?;
+        if (user != null) {
+          final firstName = (user['first_name'] as String?) ?? '';
+          final lastName = (user['last_name'] as String?) ?? '';
+          final fullName = '$firstName $lastName'.trim();
+          setState(() {
+            _displayName = fullName.isNotEmpty ? fullName : (user['username'] as String? ?? '');
+            _email = (user['email'] as String?) ?? '';
+            _login = (user['username'] as String?) ?? '';
+          });
+          return;
+        }
+      } catch (_) {}
+    }
+    final login = await _storage.read(key: 'username') ?? '';
     setState(() {
-      _username = username;
+      _displayName = login;
+      _login = login;
     });
   }
 
   Future<void> _loadVersion() async {
     final info = await PackageInfo.fromPlatform();
-    setState(() {
-      _version = info.version;
-    });
+    setState(() => _version = info.version);
   }
 
   @override
@@ -99,10 +119,8 @@ class _SettingsScreenState extends State<SettingsScreen>
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new,
-                color: Colors.white, size: 20),
+            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
             onPressed: () => Navigator.of(context).pop(),
-            splashRadius: 24,
           ),
           flexibleSpace: Container(
             decoration: BoxDecoration(
@@ -111,8 +129,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius:
-                  const BorderRadius.vertical(bottom: Radius.circular(20)),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
             ),
           ),
           shape: const RoundedRectangleBorder(
@@ -120,11 +137,9 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
           actions: [
             IconButton(
-              icon:
-                  const Icon(Icons.info_outline, color: Colors.white, size: 24),
+              icon: const Icon(Icons.info_outline, color: Colors.white, size: 24),
               onPressed: () => _showAboutDialog(s),
               tooltip: s.aboutApp,
-              splashRadius: 24,
             ),
           ],
         ),
@@ -140,40 +155,16 @@ class _SettingsScreenState extends State<SettingsScreen>
               ),
             ),
             Positioned(
-              top: -60,
-              right: -40,
-              child: Container(
-                width: 200,
-                height: 200,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.07),
-                ),
-              ),
+              top: -60, right: -40,
+              child: _circle(200, 0.07),
             ),
             Positioned(
-              bottom: 60,
-              left: -70,
-              child: Container(
-                width: 220,
-                height: 220,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.06),
-                ),
-              ),
+              bottom: 60, left: -70,
+              child: _circle(220, 0.06),
             ),
             Positioned(
-              top: 200,
-              right: 20,
-              child: Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.05),
-                ),
-              ),
+              top: 200, right: 20,
+              child: _circle(60, 0.05),
             ),
             SafeArea(
               child: FadeTransition(
@@ -181,33 +172,20 @@ class _SettingsScreenState extends State<SettingsScreen>
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
                   children: [
-                    _buildProfileCard(),
-                    const SizedBox(height: 28),
+                    _buildProfileCard(s),
+                    const SizedBox(height: 24),
                     _buildSectionHeader(s.generalSettings),
                     _buildSettingButton(
-                      Icons.security,
-                      s.security,
-                      s.securityDesc,
-                      const Color(0xFF43A047),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => ConfidentialityPage()),
-                        );
-                      },
-                    ),
-                    _buildSettingButton(
-                      Icons.language,
+                      Icons.language_rounded,
                       s.language,
                       s.languageDesc,
                       const Color(0xFFEF6C00),
                       onTap: () => _showLanguageDialog(s),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     _buildSectionHeader(s.appearance),
                     _buildThemeButton(s),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 32),
                     _buildVersionInfo(s),
                   ],
                 ),
@@ -219,87 +197,148 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildProfileCard() {
-    final initial = _username.isNotEmpty ? _username[0].toUpperCase() : 'U';
+  Widget _circle(double size, double opacity) => Container(
+    width: size, height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: Colors.white.withOpacity(opacity),
+    ),
+  );
+
+  Widget _buildProfileCard(S s) {
+    final initials = _displayName.isNotEmpty
+        ? _displayName.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
+        : 'U';
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.18),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
+        gradient: LinearGradient(
+          colors: [
+            Colors.white.withOpacity(0.22),
+            Colors.white.withOpacity(0.08),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Row(
+        padding: const EdgeInsets.all(24),
+        child: Column(
           children: [
             Container(
-              width: 64,
-              height: 64,
+              width: 80,
+              height: 80,
               decoration: BoxDecoration(
-                color: Colors.white,
                 shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [Colors.white, Color(0xFFF5F5F5)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.12),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
               child: Center(
                 child: Text(
-                  initial,
+                  initials,
                   style: const TextStyle(
                     color: _gradientStart,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w900,
                     fontSize: 28,
+                    letterSpacing: 1,
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(height: 16),
+            Text(
+              _displayName.isNotEmpty ? _displayName : 'UZTEXPRO',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 22,
+                letterSpacing: 0.3,
+                shadows: [
+                  Shadow(color: Colors.black26, offset: Offset(0, 1), blurRadius: 4),
+                ],
+              ),
+            ),
+            if (_email.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    _username.isNotEmpty ? _username : 'UZTEXPRO',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                      shadows: [
-                        Shadow(
-                            color: Colors.black26,
-                            offset: Offset(0, 1),
-                            blurRadius: 4)
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    S.of(context).paymentSystem,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.85),
-                      fontSize: 14,
+                  Icon(Icons.email_outlined, color: Colors.white.withOpacity(0.7), size: 14),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      _email,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 13,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                shape: BoxShape.circle,
+            ],
+            if (_login.isNotEmpty && _login != _displayName) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.person_outline, color: Colors.white.withOpacity(0.6), size: 13),
+                  const SizedBox(width: 6),
+                  Text(
+                    _login,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
-              child: const Icon(Icons.person, color: Colors.white, size: 22),
+            ],
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withOpacity(0.2)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.business_center_outlined, color: Colors.white.withOpacity(0.8), size: 14),
+                  const SizedBox(width: 8),
+                  Text(
+                    s.paymentSystem,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -313,8 +352,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       child: Row(
         children: [
           Container(
-            width: 4,
-            height: 18,
+            width: 4, height: 18,
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.8),
               borderRadius: BorderRadius.circular(2),
@@ -328,8 +366,7 @@ class _SettingsScreenState extends State<SettingsScreen>
               fontWeight: FontWeight.bold,
               fontSize: 16,
               shadows: [
-                Shadow(
-                    color: Colors.black26, offset: Offset(0, 1), blurRadius: 3)
+                Shadow(color: Colors.black26, offset: Offset(0, 1), blurRadius: 3),
               ],
             ),
           ),
@@ -352,15 +389,13 @@ class _SettingsScreenState extends State<SettingsScreen>
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Container(
         decoration: BoxDecoration(
-          color: isDarkBtn
-              ? theme.colorScheme.surface
-              : Colors.white.withOpacity(0.95),
+          color: isDarkBtn ? theme.colorScheme.surface : Colors.white.withOpacity(0.95),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -370,7 +405,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             onTap: onTap,
             borderRadius: BorderRadius.circular(16),
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
                   Container(
@@ -394,19 +429,22 @@ class _SettingsScreenState extends State<SettingsScreen>
                             color: onSurface,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         Text(
                           subtitle,
                           style: TextStyle(
-                            color: onSurface.withOpacity(0.6),
+                            color: onSurface.withOpacity(0.55),
                             fontSize: 13,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  Icon(Icons.arrow_forward_ios,
-                      color: onSurface.withOpacity(0.35), size: 16),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: onSurface.withOpacity(0.3),
+                    size: 16,
+                  ),
                 ],
               ),
             ),
@@ -428,20 +466,18 @@ class _SettingsScreenState extends State<SettingsScreen>
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Container(
             decoration: BoxDecoration(
-              color: isDarkBtn
-                  ? theme.colorScheme.surface
-                  : Colors.white.withOpacity(0.95),
+              color: isDarkBtn ? theme.colorScheme.surface : Colors.white.withOpacity(0.95),
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
                   Container(
@@ -450,8 +486,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                       color: const Color(0xFF7B1FA2).withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.palette,
-                        color: Color(0xFF7B1FA2), size: 24),
+                    child: const Icon(Icons.palette, color: Color(0xFF7B1FA2), size: 24),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -466,11 +501,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                             color: onSurface,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         Text(
                           isDark ? s.darkTheme : s.lightTheme,
                           style: TextStyle(
-                            color: onSurface.withOpacity(0.6),
+                            color: onSurface.withOpacity(0.55),
                             fontSize: 13,
                           ),
                         ),
@@ -481,12 +516,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                     value: isDark,
                     activeColor: const Color(0xFF7B1FA2),
                     onChanged: (value) async {
-                      themeNotifier.value =
-                          value ? ThemeMode.dark : ThemeMode.light;
-                      await _storage.write(
-                        key: 'isDarkTheme',
-                        value: value.toString(),
-                      );
+                      themeNotifier.value = value ? ThemeMode.dark : ThemeMode.light;
+                      await _storage.write(key: 'isDarkTheme', value: value.toString());
                     },
                   ),
                 ],
@@ -503,20 +534,21 @@ class _SettingsScreenState extends State<SettingsScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.18),
+          color: Colors.white.withOpacity(0.15),
           borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: Colors.white.withOpacity(0.35)),
+          border: Border.all(color: Colors.white.withOpacity(0.3)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.info_outline,
-                size: 16, color: Colors.white.withOpacity(0.85)),
+            Icon(Icons.info_outline, size: 16, color: Colors.white.withOpacity(0.8)),
             const SizedBox(width: 8),
             Text(
               s.appVersionLabel(_version),
               style: TextStyle(
-                  color: Colors.white.withOpacity(0.85), fontSize: 12),
+                color: Colors.white.withOpacity(0.85),
+                fontSize: 12,
+              ),
             ),
           ],
         ),
@@ -534,8 +566,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             return Dialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
@@ -549,14 +580,12 @@ class _SettingsScreenState extends State<SettingsScreen>
                             color: const Color(0xFFEF6C00).withOpacity(0.1),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.language,
-                              color: Color(0xFFEF6C00), size: 24),
+                          child: const Icon(Icons.language, color: Color(0xFFEF6C00), size: 24),
                         ),
                         const SizedBox(width: 16),
                         Text(
                           s.selectLanguage,
-                          style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
@@ -564,8 +593,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     ..._languages.map((lang) {
                       final isSelected = selectedLang == lang['code'];
                       return GestureDetector(
-                        onTap: () =>
-                            setDialogState(() => selectedLang = lang['code']!),
+                        onTap: () => setDialogState(() => selectedLang = lang['code']!),
                         child: Container(
                           margin: const EdgeInsets.only(bottom: 12),
                           decoration: BoxDecoration(
@@ -574,43 +602,36 @@ class _SettingsScreenState extends State<SettingsScreen>
                                 : Theme.of(context).colorScheme.surface,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: isSelected
-                                  ? _gradientStart
-                                  : Theme.of(context).colorScheme.outline,
+                              color: isSelected ? _gradientStart : Theme.of(context).colorScheme.outline,
                               width: 1.5,
                             ),
                           ),
-                          child: RadioListTile<String>(
-                            value: lang['code']!,
-                            groupValue: selectedLang,
-                            activeColor: _gradientStart,
-                            onChanged: (v) =>
-                                setDialogState(() => selectedLang = v!),
-                            title: Text(
-                              lang['name']!,
-                              style: TextStyle(
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                                color: isSelected
-                                    ? _gradientStart
-                                    : Theme.of(context).colorScheme.onSurface,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: RadioListTile<String>(
+                              value: lang['code']!,
+                              groupValue: selectedLang,
+                              activeColor: _gradientStart,
+                              onChanged: (v) => setDialogState(() => selectedLang = v!),
+                              title: Text(
+                                lang['name']!,
+                                style: TextStyle(
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  color: isSelected
+                                      ? _gradientStart
+                                      : Theme.of(context).colorScheme.onSurface,
+                                ),
                               ),
-                            ),
-                            subtitle: Text(
-                              lang['desc']!,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurface
-                                    .withOpacity(0.6),
+                              subtitle: Text(
+                                lang['desc']!,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                ),
                               ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 4),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                       );
@@ -624,10 +645,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                           child: Text(
                             s.cancel,
                             style: TextStyle(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withOpacity(0.7),
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -641,14 +659,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _gradientStart,
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           ),
-                          child: Text(s.save,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold)),
+                          child: Text(s.save, style: const TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
@@ -667,16 +681,14 @@ class _SettingsScreenState extends State<SettingsScreen>
       context: context,
       builder: (BuildContext ctx) {
         return Dialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 72,
-                  height: 72,
+                  width: 72, height: 72,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [_gradientStart, _gradientEnd],
@@ -693,57 +705,31 @@ class _SettingsScreenState extends State<SettingsScreen>
                     ],
                   ),
                   child: const Center(
-                    child: Text(
-                      "U",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 36,
-                      ),
-                    ),
+                    child: Text("U", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 36)),
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
-                  "UZTEXPRO",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
+                const Text("UztexPro", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Text(
                   s.versionLabel(_version),
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withOpacity(0.6),
-                  ),
+                  style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
                 ),
                 const SizedBox(height: 20),
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withOpacity(0.05),
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
                     children: [
-                      const Text("© 2026 UZTEXPRO MOBILE APP.",
-                          style: TextStyle(fontSize: 13)),
+                      const Text("© 2026 UztexPro.", style: TextStyle(fontSize: 13)),
                       const SizedBox(height: 8),
                       Text(
                         s.allRightsReserved,
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withOpacity(0.6),
-                        ),
+                        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
                       ),
                     ],
                   ),
@@ -755,14 +741,9 @@ class _SettingsScreenState extends State<SettingsScreen>
                     backgroundColor: _gradientStart,
                     foregroundColor: Colors.white,
                     minimumSize: const Size(double.infinity, 46),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: Text(
-                    s.close,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
+                  child: Text(s.close, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 ),
               ],
             ),

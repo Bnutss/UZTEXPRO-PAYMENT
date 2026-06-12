@@ -573,7 +573,7 @@ class _BonusesPageState extends State<BonusesPage>
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
               child: _SearchBar(
                 controller: _searchCtrl,
-                hintText: 'Фабрика, месяц, создатель',
+                hintText: S.of(context).bonusSearchHint,
                 isDark: isDark,
               ),
             ),
@@ -700,8 +700,8 @@ class _BonusesPageState extends State<BonusesPage>
             const SizedBox(height: 4),
             Text(
               _viewMode == _kStage
-                  ? 'Нет записей, требующих подписи'
-                  : 'Список премий пуст',
+                  ? s.noRecordsForSigning
+                  : s.bonusListEmpty,
               style: TextStyle(
                 fontSize: 13,
                 color: isDark ? Colors.white38 : Colors.grey.shade500,
@@ -1026,18 +1026,17 @@ class _BonusStatusProgress extends StatelessWidget {
 
   const _BonusStatusProgress({required this.status, required this.isDark});
 
-  // Ordered workflow: 1 → 5 → 2 → 3 → 4
-  static const _steps = [
-    (1, 'Новый', Color(0xFF1E88E5)),
-    (5, 'Проверка', Color(0xFF00ACC1)),
-    (2, 'Одобрен', Color(0xFFFF8C00)),
-    (3, 'Утверждён', Color(0xFF43A047)),
-    (4, 'Оплачен', Color(0xFF7B1FA2)),
+  List<(int, String, Color)> _steps(S s) => [
+    (1, s.bonusStatusNew, Color(0xFF1E88E5)),
+    (5, s.bonusStatusReview, Color(0xFF00ACC1)),
+    (2, s.bonusStatusApproved, Color(0xFFFF8C00)),
+    (3, s.bonusStatusConfirmed, Color(0xFF43A047)),
+    (4, s.bonusStatusPaid, Color(0xFF7B1FA2)),
   ];
 
-  int get _idx {
-    for (int i = 0; i < _steps.length; i++) {
-      if (_steps[i].$1 == status) return i;
+  int _idx(List<(int, String, Color)> steps) {
+    for (int i = 0; i < steps.length; i++) {
+      if (steps[i].$1 == status) return i;
     }
     return -1;
   }
@@ -1045,7 +1044,8 @@ class _BonusStatusProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final idx = _idx;
+    final steps = _steps(S.of(context));
+    final idx = _idx(steps);
     final inactiveDot = isDark ? Colors.white12 : Colors.grey.shade200;
     final inactiveLine = isDark ? Colors.white10 : Colors.grey.shade200;
 
@@ -1054,21 +1054,21 @@ class _BonusStatusProgress extends StatelessWidget {
       children: [
         Row(
           children: [
-            for (int i = 0; i < _steps.length; i++) ...[
+            for (int i = 0; i < steps.length; i++) ...[
               _Dot(
                 done: idx >= 0 && i < idx,
                 current: i == idx,
-                color: _steps[i].$3,
+                color: steps[i].$3,
                 inactiveColor: inactiveDot,
               ),
-              if (i < _steps.length - 1)
+              if (i < steps.length - 1)
                 Expanded(
                   child: Container(
                     height: 2,
                     margin: const EdgeInsets.symmetric(horizontal: 2),
                     decoration: BoxDecoration(
                       color: (idx >= 0 && i < idx)
-                          ? _steps[i].$3
+                          ? steps[i].$3
                           : inactiveLine,
                       borderRadius: BorderRadius.circular(1),
                     ),
@@ -1080,18 +1080,18 @@ class _BonusStatusProgress extends StatelessWidget {
         const SizedBox(height: 4),
         Row(
           children: [
-            for (int i = 0; i < _steps.length; i++) ...[
+            for (int i = 0; i < steps.length; i++) ...[
               Text(
-                _steps[i].$2,
+                steps[i].$2,
                 style: TextStyle(
                   fontSize: 9,
                   fontWeight: i == idx ? FontWeight.w700 : FontWeight.w400,
                   color: (idx >= 0 && i <= idx)
-                      ? _steps[i].$3
+                      ? steps[i].$3
                       : onSurface.withOpacity(0.28),
                 ),
               ),
-              if (i < _steps.length - 1) const Spacer(),
+              if (i < steps.length - 1) const Spacer(),
             ],
           ],
         ),
@@ -1165,12 +1165,12 @@ class _ViewToggle extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _VTab(
-            label: 'На подпись',
+            label: S.of(context).forSigning,
             active: selected == 'stage',
             onTap: () => onChanged('stage'),
           ),
           _VTab(
-            label: 'Все',
+            label: S.of(context).filterAll,
             active: selected == 'all',
             onTap: () => onChanged('all'),
           ),

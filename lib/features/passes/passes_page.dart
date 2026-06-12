@@ -315,9 +315,9 @@ class _PassesPageState extends State<PassesPage>
     final ok = await _confirmDialog(
       icon: Icons.check_circle_outline_rounded,
       iconColor: const Color(0xFF43A047),
-      title: 'Подтвердить пропуск',
-      message: 'Подтвердить $number?',
-      confirmLabel: 'Подтвердить',
+      title: S.of(context).confirmPass,
+      message: S.of(context).confirmPassNumber(number),
+      confirmLabel: S.of(context).confirm,
       confirmColor: const Color(0xFF43A047),
     );
     if (!ok) return;
@@ -339,9 +339,9 @@ class _PassesPageState extends State<PassesPage>
     final ok = await _confirmDialog(
       icon: Icons.cancel_outlined,
       iconColor: Colors.grey.shade600,
-      title: 'Отменить пропуск',
-      message: '$number будет отменён. Только создатель может отменить.',
-      confirmLabel: 'Отменить',
+      title: S.of(context).cancelPass,
+      message: S.of(context).cancelPassMessage(number),
+      confirmLabel: S.of(context).cancelBtn,
       confirmColor: Colors.grey.shade600,
     );
     if (!ok) return;
@@ -373,15 +373,15 @@ class _PassesPageState extends State<PassesPage>
       if (!mounted) return;
       if (resp.statusCode == 200 || resp.statusCode == 201) {
         _snack(
-          action == 'reject' ? 'Пропуск отклонён' :
-          action == 'cancel' ? 'Пропуск отменён'  : 'Пропуск подтверждён',
+          action == 'reject' ? S.of(context).passRejected :
+          action == 'cancel' ? S.of(context).passCancelled  : S.of(context).passConfirmed,
           true,
         );
         _memCache.remove(_viewMode);
         _memCacheTime.remove(_viewMode);
         await _load(forceRefresh: true);
       } else {
-        String errMsg = 'Ошибка (${resp.statusCode})';
+        String errMsg = S.of(context).errorWithCode(resp.statusCode);
         try {
           final err = json.decode(utf8.decode(resp.bodyBytes));
           errMsg = err['error'] ?? err['detail'] ?? errMsg;
@@ -391,7 +391,7 @@ class _PassesPageState extends State<PassesPage>
       }
     } catch (e) {
       if (!mounted) return;
-      _snack('Ошибка: $e', false);
+      _snack(S.of(context).errorWithMessage(e.toString()), false);
       setState(() => pass['_busy'] = false);
     }
   }
@@ -750,7 +750,7 @@ class _RejectDialogState extends State<_RejectDialog> {
               child: const Icon(Icons.cancel_outlined, color: Colors.red, size: 28),
             ),
             const SizedBox(height: 14),
-            Text('Отклонить пропуск',
+            Text(S.of(context).rejectPass,
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: onSurface)),
             const SizedBox(height: 4),
             Text(widget.number,
@@ -762,7 +762,7 @@ class _RejectDialogState extends State<_RejectDialog> {
               autofocus: true,
               style: TextStyle(fontSize: 14, color: onSurface),
               decoration: InputDecoration(
-                hintText: 'Причина отклонения...',
+                hintText: S.of(context).rejectionReasonHint,
                 hintStyle: TextStyle(color: onSurface.withOpacity(0.4), fontSize: 13),
                 filled: true,
                 fillColor: isDark ? Colors.white10 : Colors.grey.shade50,
@@ -806,7 +806,7 @@ class _RejectDialogState extends State<_RejectDialog> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text('Отклонить', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: Text(S.of(context).reject, style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ]),
@@ -921,22 +921,22 @@ class _PassCard extends StatelessWidget {
                 _CardDivider(isDark: isDark),
                 const SizedBox(height: 8),
                 // ── Info ──────────────────────────────────────
-                _InfoLine(icon: Icons.business_outlined, label: 'Клиент', text: client, onSurface: onSurface),
+                _InfoLine(icon: Icons.business_outlined, label: S.of(context).client, text: client, onSurface: onSurface),
                 const SizedBox(height: 5),
                 Row(children: [
-                  Expanded(child: _InfoLine(icon: Icons.factory_outlined, label: 'Фабрика', text: factory, onSurface: onSurface)),
+                  Expanded(child: _InfoLine(icon: Icons.factory_outlined, label: S.of(context).factoryLabel2, text: factory, onSurface: onSurface)),
                   const SizedBox(width: 8),
                   _ItemsChip(count: itemsCount, isDark: isDark),
                 ]),
                 const SizedBox(height: 5),
-                _InfoLine(icon: Icons.person_outline_rounded, label: 'Создал', text: createdBy, onSurface: onSurface),
+                _InfoLine(icon: Icons.person_outline_rounded, label: S.of(context).createdByLabel2, text: createdBy, onSurface: onSurface),
                 if (comment.isNotEmpty) ...[
                   const SizedBox(height: 7),
                   _NoteRow(text: comment, isDark: isDark, isError: false),
                 ],
                 if (rejComment.isNotEmpty) ...[
                   const SizedBox(height: 6),
-                  _NoteRow(text: 'Причина: $rejComment', isDark: isDark, isError: true),
+                  _NoteRow(text: S.of(context).reasonWithText(rejComment), isDark: isDark, isError: true),
                 ],
                 const SizedBox(height: 10),
                 _CardDivider(isDark: isDark),
@@ -983,13 +983,14 @@ class _SignButtons extends StatelessWidget {
     required this.isDark,
   });
 
-  String get _approveLabel {
+  String _approveLabel(BuildContext context) {
+    final s = S.of(context);
     switch (status) {
-      case 0: return 'Выдать';
-      case 1: return 'Бухгалтер: подписать';
-      case 2: return 'Руководитель: подписать';
-      case 3: return 'Охрана: подписать';
-      default: return 'Подтвердить';
+      case 0: return s.issue;
+      case 1: return s.accountantSign;
+      case 2: return s.directorSign;
+      case 3: return s.securitySign;
+      default: return s.confirm;
     }
   }
 
@@ -998,7 +999,7 @@ class _SignButtons extends StatelessWidget {
     return Column(
       children: [
         _ActionBtn(
-          label: _approveLabel,
+          label: _approveLabel(context),
           icon: Icons.check_rounded,
           color: const Color(0xFF43A047),
           bgColor: const Color(0xFFE8F5E9),
@@ -1007,7 +1008,7 @@ class _SignButtons extends StatelessWidget {
         ),
         const SizedBox(height: 7),
         _ActionBtn(
-          label: 'Отклонить',
+          label: S.of(context).reject,
           icon: Icons.close_rounded,
           color: const Color(0xFFE53935),
           bgColor: const Color(0xFFFFEBEE),
@@ -1027,7 +1028,7 @@ class _CancelButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _ActionBtn(
-      label: 'Отменить пропуск',
+      label: S.of(context).cancelPass,
       icon: Icons.cancel_outlined,
       color: Colors.grey.shade600,
       bgColor: Colors.grey.shade100,
@@ -1118,22 +1119,23 @@ class _StatusProgress extends StatelessWidget {
   final bool isDark;
   const _StatusProgress({required this.status, required this.isDark});
 
-  static const _steps = [
-    (0, 'Новый',    Color(0xFF1E88E5)),
-    (1, 'Выдан',    Color(0xFFFF8C00)),
-    (2, 'Бухгалтер',Color(0xFFF57C00)),
-    (3, 'Рук-ль',   Color(0xFF43A047)),
-    (4, 'Завершён', Color(0xFF2E7D32)),
+  List<(int, String, Color)> _steps(S s) => [
+    (0, s.progressNew, Color(0xFF1E88E5)),
+    (1, s.progressIssued, Color(0xFFFF8C00)),
+    (2, s.passStatusAccountant, Color(0xFFF57C00)),
+    (3, s.passStatusShortDir, Color(0xFF43A047)),
+    (4, s.progressCompleted, Color(0xFF2E7D32)),
   ];
 
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
+    final steps = _steps(S.of(context));
     if (status == -1) {
       return Row(children: [
         const Icon(Icons.cancel_outlined, size: 14, color: Color(0xFF757575)),
         const SizedBox(width: 6),
-        Text('Пропуск отменён',
+        Text(S.of(context).passCancelled,
             style: TextStyle(fontSize: 11, color: onSurface.withOpacity(0.4), fontStyle: FontStyle.italic)),
       ]);
     }
@@ -1143,14 +1145,14 @@ class _StatusProgress extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(children: [
-          for (int i = 0; i < _steps.length; i++) ...[
-            _Dot(done: status > _steps[i].$1, current: status == _steps[i].$1,
-                color: _steps[i].$3, inactiveColor: inactiveDot),
-            if (i < _steps.length - 1)
+          for (int i = 0; i < steps.length; i++) ...[
+            _Dot(done: status > steps[i].$1, current: status == steps[i].$1,
+                color: steps[i].$3, inactiveColor: inactiveDot),
+            if (i < steps.length - 1)
               Expanded(child: Container(
                 height: 2, margin: const EdgeInsets.symmetric(horizontal: 2),
                 decoration: BoxDecoration(
-                  color: status > _steps[i].$1 ? _steps[i].$3 : inactiveLine,
+                  color: status > steps[i].$1 ? steps[i].$3 : inactiveLine,
                   borderRadius: BorderRadius.circular(1),
                 ),
               )),
@@ -1158,14 +1160,14 @@ class _StatusProgress extends StatelessWidget {
         ]),
         const SizedBox(height: 4),
         Row(children: [
-          for (int i = 0; i < _steps.length; i++) ...[
-            Text(_steps[i].$2,
+          for (int i = 0; i < steps.length; i++) ...[
+            Text(steps[i].$2,
                 style: TextStyle(
                   fontSize: 9,
-                  fontWeight: status == _steps[i].$1 ? FontWeight.w700 : FontWeight.w400,
-                  color: status >= _steps[i].$1 ? _steps[i].$3 : onSurface.withOpacity(0.28),
+                  fontWeight: status == steps[i].$1 ? FontWeight.w700 : FontWeight.w400,
+                  color: status >= steps[i].$1 ? steps[i].$3 : onSurface.withOpacity(0.28),
                 )),
-            if (i < _steps.length - 1) const Spacer(),
+            if (i < steps.length - 1) const Spacer(),
           ],
         ]),
       ],
@@ -1218,9 +1220,9 @@ class _ViewToggle extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _VTab(label: 'На подпись', active: selected == 'stage', onTap: () => onChanged('stage')),
-          _VTab(label: 'Мои',        active: selected == 'my',    onTap: () => onChanged('my')),
-          _VTab(label: 'Все',        active: selected == 'all',   onTap: () => onChanged('all')),
+          _VTab(label: S.of(context).forSigning, active: selected == 'stage', onTap: () => onChanged('stage')),
+          _VTab(label: S.of(context).my,        active: selected == 'my',    onTap: () => onChanged('my')),
+          _VTab(label: S.of(context).filterAll,  active: selected == 'all',   onTap: () => onChanged('all')),
         ],
       ),
     );

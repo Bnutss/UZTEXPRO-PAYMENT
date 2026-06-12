@@ -400,37 +400,37 @@ class _DetailProgress extends StatelessWidget {
   final int status;
   const _DetailProgress({required this.status});
 
-  // Ordered workflow: 1 → 5 → 2 → 3 → 4
-  static const _steps = [
-    (1, 'Новый',     Color(0xFF1E88E5)),
-    (5, 'Проверка',  Color(0xFF00ACC1)),
-    (2, 'Одобрен',   Color(0xFFFF8C00)),
-    (3, 'Утверждён', Color(0xFF43A047)),
-    (4, 'Оплачен',   Color(0xFF7B1FA2)),
+  List<(int, String, Color)> _steps(S s) => [
+    (1, s.bonusStatusNew, Color(0xFF1E88E5)),
+    (5, s.bonusStatusReview, Color(0xFF00ACC1)),
+    (2, s.bonusStatusApproved, Color(0xFFFF8C00)),
+    (3, s.bonusStatusConfirmed, Color(0xFF43A047)),
+    (4, s.bonusStatusPaid, Color(0xFF7B1FA2)),
   ];
 
-  int get _idx {
-    for (int i = 0; i < _steps.length; i++) {
-      if (_steps[i].$1 == status) return i;
+  int _idx(List<(int, String, Color)> steps) {
+    for (int i = 0; i < steps.length; i++) {
+      if (steps[i].$1 == status) return i;
     }
     return -1;
   }
 
   @override
   Widget build(BuildContext context) {
-    final idx = _idx;
+    final steps = _steps(S.of(context));
+    final idx = _idx(steps);
     return Column(children: [
       Row(children: [
-        for (int i = 0; i < _steps.length; i++) ...[
+        for (int i = 0; i < steps.length; i++) ...[
           _StepDot(done: idx >= 0 && i < idx, current: i == idx,
-              color: _steps[i].$3),
-          if (i < _steps.length - 1)
+              color: steps[i].$3),
+          if (i < steps.length - 1)
             Expanded(child: Container(
               height: 2,
               margin: const EdgeInsets.symmetric(horizontal: 3),
               decoration: BoxDecoration(
                 color: (idx >= 0 && i < idx)
-                    ? _steps[i].$3
+                    ? steps[i].$3
                     : Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(1),
               ),
@@ -439,15 +439,15 @@ class _DetailProgress extends StatelessWidget {
       ]),
       const SizedBox(height: 5),
       Row(children: [
-        for (int i = 0; i < _steps.length; i++) ...[
-          Text(_steps[i].$2, style: TextStyle(
+        for (int i = 0; i < steps.length; i++) ...[
+          Text(steps[i].$2, style: TextStyle(
             fontSize: 9,
             fontWeight: i == idx ? FontWeight.w700 : FontWeight.w400,
             color: (idx >= 0 && i <= idx)
                 ? Colors.white
                 : Colors.white.withOpacity(0.3),
           )),
-          if (i < _steps.length - 1) const Spacer(),
+          if (i < steps.length - 1) const Spacer(),
         ],
       ]),
     ]);
@@ -496,7 +496,7 @@ class _InfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = S.of(context);
     return _SectionCard(
-      title: 'Информация',
+      title: s.information,
       icon: Icons.info_outline_rounded,
       isDark: isDark,
       child: Column(children: [
@@ -537,13 +537,13 @@ class _EmployeesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _SectionCard(
-      title: 'Сотрудники (${details.length})',
+      title: S.of(context).employeesCountLabel(details.length),
       icon: Icons.people_outlined,
       isDark: isDark,
       child: details.isEmpty
           ? Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Center(child: Text('Нет сотрудников',
+              child: Center(child: Text(S.of(context).noEmployees,
                   style: TextStyle(fontSize: 12,
                       color: onSurface.withOpacity(0.4),
                       fontStyle: FontStyle.italic))),
@@ -622,14 +622,14 @@ class _EmployeeRow extends StatelessWidget {
                           ? Colors.orange.shade300
                           : const Color(0xFFFF8C00))),
                   if (bonusFee.isNotEmpty)
-                    Text('С нал.: $bonusFee', style: TextStyle(
+                    Text(S.of(context).withTaxAmount(bonusFee), style: TextStyle(
                         fontSize: 10, color: onSurface.withOpacity(0.45))),
                 ]),
               ],
             ),
             if (reportCard.isNotEmpty) ...[
               const SizedBox(height: 2),
-              Text('Таб: $reportCard', style: TextStyle(
+              Text(S.of(context).tabNumberLabel(reportCard), style: TextStyle(
                   fontSize: 10, color: onSurface.withOpacity(0.45))),
             ],
             // Dept + position
@@ -740,38 +740,39 @@ class _ApprovalsCard extends StatelessWidget {
     // approvals[1]: zam_direktor       (5→2) / approve_by
     // approvals[2]: gen_direktor       (2→3) / confirm_by
     // approvals[3]: oplata             (3→4)
+    final s = S.of(context);
     final steps = [
       (
         Icons.person_add_outlined,
-        'Создал',
+        s.createdByLabel2,
         item['create_by_name']?.toString(),
         item['created_at']?.toString(),
         const Color(0xFF1E88E5),
       ),
       (
         Icons.rate_review_outlined,
-        'Проверил',
+        s.verifiedBy,
         _nameAt(approvals, 0),
         _dateAt(approvals, 0),
         const Color(0xFF00ACC1),
       ),
       (
         Icons.thumb_up_outlined,
-        'Одобрил (зам.)',
+        s.approvedByDeputy,
         _nameAt(approvals, 1) ?? (approveBy.isNotEmpty ? approveBy : null),
         _dateAt(approvals, 1),
         const Color(0xFFFF8C00),
       ),
       (
         Icons.verified_outlined,
-        'Утвердил (ген.)',
+        s.confirmedByGeneral,
         _nameAt(approvals, 2) ?? (confirmBy.isNotEmpty ? confirmBy : null),
         _dateAt(approvals, 2),
         const Color(0xFF43A047),
       ),
       (
         Icons.paid_outlined,
-        'Оплатил',
+        s.paidBy,
         _nameAt(approvals, 3),
         _dateAt(approvals, 3),
         const Color(0xFF7B1FA2),
@@ -779,7 +780,7 @@ class _ApprovalsCard extends StatelessWidget {
     ];
 
     return _SectionCard(
-      title: 'История подписей',
+      title: S.of(context).signatureHistory,
       icon: Icons.draw_rounded,
       isDark: isDark,
       child: Column(children: [
@@ -882,7 +883,7 @@ class _NotesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _SectionCard(
-      title: 'Примечание',
+      title: S.of(context).noteSingle,
       icon: Icons.notes_rounded,
       isDark: isDark,
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [

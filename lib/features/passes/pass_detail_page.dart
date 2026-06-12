@@ -102,35 +102,35 @@ class _PassDetailPageState extends State<PassDetailPage> {
           _isLoading = false;
         });
       } else {
-        setState(() { _error = 'Ошибка ${resp.statusCode}'; _isLoading = false; });
+        setState(() { _error = '${S.of(context).loadDataError} (${resp.statusCode})'; _isLoading = false; });
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() { _error = 'Ошибка подключения:\n$e'; _isLoading = false; });
+      setState(() { _error = '${S.of(context).connectionError}\n$e'; _isLoading = false; });
     }
   }
 
   // ── Actions ──────────────────────────────────────────────────────────────────
 
-  String _approveLabel(int status) {
+  String _approveLabel(int status, S s) {
     switch (status) {
-      case 0: return 'Выдать';
-      case 1: return 'Подписать (Бухгалтер)';
-      case 2: return 'Подписать (Руководитель)';
-      case 3: return 'Подписать (Охрана)';
-      default: return 'Подтвердить';
+      case 0: return s.issue;
+      case 1: return s.signAccountant;
+      case 2: return s.signDirector;
+      case 3: return s.signSecurity;
+      default: return s.confirm;
     }
   }
 
   Future<void> _onApprove() async {
     final status = _pass!['status'] as int? ?? 0;
     final number = _pass!['number']?.toString() ?? '';
-    final label = _approveLabel(status);
+    final label = _approveLabel(status, S.of(context));
     final ok = await _confirmDialog(
       icon: Icons.check_circle_outline_rounded,
       iconColor: const Color(0xFF43A047),
       title: label,
-      message: 'Подтвердить $number?',
+      message: S.of(context).confirmPassNumber(number),
       confirmLabel: label,
       confirmColor: const Color(0xFF43A047),
     );
@@ -153,9 +153,9 @@ class _PassDetailPageState extends State<PassDetailPage> {
     final ok = await _confirmDialog(
       icon: Icons.cancel_outlined,
       iconColor: Colors.grey.shade600,
-      title: 'Отменить пропуск',
-      message: '$number будет отменён.',
-      confirmLabel: 'Отменить',
+      title: S.of(context).cancelPass,
+      message: S.of(context).cancelPassMessageShort(number),
+      confirmLabel: S.of(context).cancelBtn,
       confirmColor: Colors.grey.shade600,
     );
     if (!ok) return;
@@ -182,7 +182,7 @@ class _PassDetailPageState extends State<PassDetailPage> {
         widget.onActionDone();
         if (mounted) Navigator.of(context).pop();
       } else {
-        String msg = 'Ошибка (${resp.statusCode})';
+        String msg = S.of(context).errorWithCode(resp.statusCode);
         try {
           final err = json.decode(utf8.decode(resp.bodyBytes));
           msg = err['error'] ?? err['detail'] ?? msg;
@@ -192,7 +192,7 @@ class _PassDetailPageState extends State<PassDetailPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      _snack('Ошибка: $e', false);
+      _snack(S.of(context).errorWithMessage(e.toString()), false);
       setState(() => _busy = false);
     }
   }
@@ -295,7 +295,7 @@ class _PassDetailPageState extends State<PassDetailPage> {
         backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
         appBar: AppBar(
           title: Text(
-            _pass?['number']?.toString() ?? 'Пропуск',
+            _pass?['number']?.toString() ?? S.of(context).passTitle,
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
           ),
           centerTitle: true,
@@ -306,7 +306,7 @@ class _PassDetailPageState extends State<PassDetailPage> {
             IconButton(
               icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
               onPressed: _isLoading ? null : _load,
-              tooltip: 'Обновить',
+              tooltip: S.of(context).refresh,
             ),
           ],
           flexibleSpace: Container(
@@ -377,7 +377,7 @@ class _PassDetailPageState extends State<PassDetailPage> {
           FilledButton.icon(
             onPressed: _load,
             icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: const Text('Повторить'),
+            label: Text(S.of(context).retry),
             style: FilledButton.styleFrom(
               backgroundColor: _g1,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -477,7 +477,7 @@ class _PassDetailPageState extends State<PassDetailPage> {
             : _canSignNow
                 ? Row(children: [
                     Expanded(child: _ActionButton(
-                      label: _approveLabel(status),
+                      label: _approveLabel(status, S.of(context)),
                       icon: Icons.check_rounded,
                       color: const Color(0xFF2E7D32),
                       bgColor: const Color(0xFFE8F5E9),
@@ -486,7 +486,7 @@ class _PassDetailPageState extends State<PassDetailPage> {
                     )),
                     const SizedBox(width: 10),
                     Expanded(child: _ActionButton(
-                      label: 'Отклонить',
+                      label: S.of(context).reject,
                       icon: Icons.close_rounded,
                       color: const Color(0xFFD32F2F),
                       bgColor: const Color(0xFFFFEBEE),
@@ -495,7 +495,7 @@ class _PassDetailPageState extends State<PassDetailPage> {
                     )),
                   ])
                 : _ActionButton(
-                    label: 'Отменить пропуск',
+                    label: S.of(context).cancelPass,
                     icon: Icons.cancel_outlined,
                     color: Colors.grey.shade600,
                     bgColor: Colors.grey.shade100,
@@ -513,12 +513,12 @@ class _DetailProgress extends StatelessWidget {
   final int status;
   const _DetailProgress({required this.status});
 
-  static const _steps = [
-    (0, 'Новый',     Color(0xFF1E88E5)),
-    (1, 'Выдан',     Color(0xFFFF8C00)),
-    (2, 'Бухгалтер', Color(0xFFF57C00)),
-    (3, 'Рук-ль',    Color(0xFF43A047)),
-    (4, 'Завершён',  Color(0xFF2E7D32)),
+  List<(int, String, Color)> _steps(S s) => [
+    (0, s.progressNew, Color(0xFF1E88E5)),
+    (1, s.progressIssued, Color(0xFFFF8C00)),
+    (2, s.passStatusAccountant, Color(0xFFF57C00)),
+    (3, s.passStatusShortDir, Color(0xFF43A047)),
+    (4, s.progressCompleted, Color(0xFF2E7D32)),
   ];
 
   @override
@@ -527,22 +527,23 @@ class _DetailProgress extends StatelessWidget {
       return Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         const Icon(Icons.cancel_outlined, size: 14, color: Colors.white54),
         const SizedBox(width: 6),
-        Text('Пропуск отменён',
+        Text(S.of(context).passCancelled,
             style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.6),
                 fontStyle: FontStyle.italic)),
       ]);
     }
+    final steps = _steps(S.of(context));
     return Column(children: [
       Row(children: [
-        for (int i = 0; i < _steps.length; i++) ...[
-          _StepDot(done: status > _steps[i].$1,
-              current: status == _steps[i].$1, color: _steps[i].$3),
-          if (i < _steps.length - 1)
+        for (int i = 0; i < steps.length; i++) ...[
+          _StepDot(done: status > steps[i].$1,
+              current: status == steps[i].$1, color: steps[i].$3),
+          if (i < steps.length - 1)
             Expanded(child: Container(
               height: 2, margin: const EdgeInsets.symmetric(horizontal: 3),
               decoration: BoxDecoration(
-                color: status > _steps[i].$1
-                    ? _steps[i].$3
+                color: status > steps[i].$1
+                    ? steps[i].$3
                     : Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(1),
               ),
@@ -551,15 +552,15 @@ class _DetailProgress extends StatelessWidget {
       ]),
       const SizedBox(height: 5),
       Row(children: [
-        for (int i = 0; i < _steps.length; i++) ...[
-          Text(_steps[i].$2, style: TextStyle(
+        for (int i = 0; i < steps.length; i++) ...[
+          Text(steps[i].$2, style: TextStyle(
             fontSize: 9,
-            fontWeight: status == _steps[i].$1 ? FontWeight.w700 : FontWeight.w400,
-            color: status >= _steps[i].$1
+            fontWeight: status == steps[i].$1 ? FontWeight.w700 : FontWeight.w400,
+            color: status >= steps[i].$1
                 ? Colors.white
                 : Colors.white.withOpacity(0.3),
           )),
-          if (i < _steps.length - 1) const Spacer(),
+          if (i < steps.length - 1) const Spacer(),
         ],
       ]),
     ]);
@@ -624,34 +625,34 @@ class _InfoCard extends StatelessWidget {
     final typeName  = pass['pass_type_name']?.toString() ?? '';
 
     return _SectionCard(
-      title: 'Информация',
+      title: S.of(context).information,
       icon: Icons.info_outline_rounded,
       isDark: isDark,
       child: Column(children: [
-        _Row2(icon: Icons.tag_rounded,           label: 'Номер',
+        _Row2(icon: Icons.tag_rounded,           label: S.of(context).numberLabel,
             value: pass['number']?.toString() ?? '—', os: onSurface),
-        _Row2(icon: Icons.calendar_today_rounded, label: 'Дата',
+        _Row2(icon: Icons.calendar_today_rounded, label: S.of(context).dateLabel2,
             value: _fmtDate(pass['date']?.toString()), os: onSurface),
-        _Row2(icon: Icons.business_outlined,     label: 'Клиент',
+        _Row2(icon: Icons.business_outlined,     label: S.of(context).client,
             value: pass['client']?.toString() ?? '—', os: onSurface),
-        _Row2(icon: Icons.factory_outlined,      label: 'Фабрика',
+        _Row2(icon: Icons.factory_outlined,      label: S.of(context).factoryLabel2,
             value: pass['factory_name']?.toString() ?? '—', os: onSurface),
         if (typeName.isNotEmpty)
-          _Row2(icon: Icons.category_outlined,   label: 'Тип', value: typeName, os: onSurface),
+          _Row2(icon: Icons.category_outlined,   label: S.of(context).typeLabel, value: typeName, os: onSurface),
         if (warehouse.isNotEmpty)
-          _Row2(icon: Icons.warehouse_outlined,  label: 'Склад', value: warehouse, os: onSurface),
-        _Row2(icon: Icons.person_outline_rounded, label: 'Создал',
+          _Row2(icon: Icons.warehouse_outlined,  label: S.of(context).warehouseLabel, value: warehouse, os: onSurface),
+        _Row2(icon: Icons.person_outline_rounded, label: S.of(context).createdByLabel2,
             value: pass['create_by_name']?.toString() ?? '—', os: onSurface),
-        _Row2(icon: Icons.access_time_rounded,   label: 'Создан',
+        _Row2(icon: Icons.access_time_rounded,   label: S.of(context).createdLabel,
             value: _fmtDT(pass['create_at']?.toString()), os: onSurface),
         if (kppTime.isNotEmpty)
-          _Row2(icon: Icons.directions_car_outlined, label: 'КПП',
+          _Row2(icon: Icons.directions_car_outlined, label: S.of(context).kppLabel,
               value: _fmtDT(kppTime), os: onSurface),
         if (autoIn != null)
-          _Row2(icon: Icons.input_rounded, label: 'Авто-приход',
+          _Row2(icon: Icons.input_rounded, label: S.of(context).autoIncoming,
               value: '#$autoIn', os: onSurface),
         if (autoOut != null)
-          _Row2(icon: Icons.output_rounded, label: 'Авто-расход',
+          _Row2(icon: Icons.output_rounded, label: S.of(context).autoOutgoing,
               value: '#$autoOut', os: onSurface),
       ]),
     );
@@ -669,13 +670,13 @@ class _ItemsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _SectionCard(
-      title: 'Позиции (${items.length})',
+      title: S.of(context).itemsCountLabel(items.length),
       icon: Icons.layers_outlined,
       isDark: isDark,
       child: items.isEmpty
           ? Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Center(child: Text('Нет позиций',
+              child: Center(child: Text(S.of(context).noItems,
                   style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.4),
                       fontStyle: FontStyle.italic))),
             )
@@ -819,15 +820,15 @@ class _SignaturesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final steps = [
-      (Icons.person_add_outlined,       'Создал',         pass['create_by_name'],         _fmt(pass['date']?.toString()),              const Color(0xFF1E88E5)),
-      (Icons.how_to_reg_rounded,        'Отпустил',       pass['released_by_name'],       _fmt(pass['released_at']?.toString()),       const Color(0xFFFF8C00)),
-      (Icons.account_balance_outlined,  'Гл. бухгалтер',  pass['signed_accountant_name'], _fmt(pass['signed_accountant_at']?.toString()), const Color(0xFFF57C00)),
-      (Icons.verified_outlined,         'Руководитель',   pass['signed_director_name'],   _fmt(pass['signed_director_at']?.toString()), const Color(0xFF43A047)),
-      (Icons.security_rounded,          'Охрана',         pass['security_signed_by_name'],_fmt(pass['security_signed_at']?.toString()), const Color(0xFF2E7D32)),
+      (Icons.person_add_outlined,       S.of(context).createdByLabel2,         pass['create_by_name'],         _fmt(pass['date']?.toString()),              const Color(0xFF1E88E5)),
+      (Icons.how_to_reg_rounded,        S.of(context).releasedBy,       pass['released_by_name'],       _fmt(pass['released_at']?.toString()),       const Color(0xFFFF8C00)),
+      (Icons.account_balance_outlined,  S.of(context).chiefAccountant,  pass['signed_accountant_name'], _fmt(pass['signed_accountant_at']?.toString()), const Color(0xFFF57C00)),
+      (Icons.verified_outlined,         S.of(context).passStatusDirector,   pass['signed_director_name'],   _fmt(pass['signed_director_at']?.toString()), const Color(0xFF43A047)),
+      (Icons.security_rounded,          S.of(context).securitySign,         pass['security_signed_by_name'],_fmt(pass['security_signed_at']?.toString()), const Color(0xFF2E7D32)),
     ];
 
     return _SectionCard(
-      title: 'История подписей',
+      title: S.of(context).signatureHistory,
       icon: Icons.draw_rounded,
       isDark: isDark,
       child: Column(children: [
@@ -933,7 +934,7 @@ class _CommentsCard extends StatelessWidget {
     final rejComment = pass['rejection_comment']?.toString() ?? '';
 
     return _SectionCard(
-      title: 'Примечания',
+      title: S.of(context).notesSection,
       icon: Icons.notes_rounded,
       isDark: isDark,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -958,7 +959,7 @@ class _CommentsCard extends StatelessWidget {
               Icon(Icons.warning_amber_rounded, size: 14, color: Colors.red.shade400),
               const SizedBox(width: 8),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Причина отклонения',
+                Text(S.of(context).rejectionReason,
                     style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
                         color: Colors.red.shade400)),
                 const SizedBox(height: 3),
@@ -1124,7 +1125,7 @@ class _RejectDialogState extends State<_RejectDialog> {
             child: const Icon(Icons.cancel_outlined, color: Colors.red, size: 26),
           ),
           const SizedBox(height: 12),
-          Text('Отклонить пропуск',
+          Text(S.of(context).rejectPass,
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: onSurface)),
           const SizedBox(height: 3),
           Text(widget.number,
@@ -1134,7 +1135,7 @@ class _RejectDialogState extends State<_RejectDialog> {
             controller: _ctrl, maxLines: 3, autofocus: true,
             style: TextStyle(fontSize: 13, color: onSurface),
             decoration: InputDecoration(
-              hintText: 'Причина отклонения...',
+              hintText: S.of(context).rejectionReasonHint,
               hintStyle: TextStyle(color: onSurface.withOpacity(0.38), fontSize: 12),
               filled: true,
               fillColor: isDark ? Colors.white10 : Colors.grey.shade50,
@@ -1171,7 +1172,7 @@ class _RejectDialogState extends State<_RejectDialog> {
                   elevation: 0, padding: const EdgeInsets.symmetric(vertical: 11),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text('Отклонить',
+                child: Text(S.of(context).reject,
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               ),
             ),

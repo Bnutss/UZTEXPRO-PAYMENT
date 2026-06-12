@@ -642,7 +642,7 @@ class _SearchBar extends StatelessWidget {
         controller: controller,
         style: TextStyle(color: onSurface, fontSize: 14),
         decoration: InputDecoration(
-          hintText: 'Поиск по заявке, заявителю, отделу...',
+          hintText: S.of(context).searchHintSignRequests,
           hintStyle:
               TextStyle(color: onSurface.withOpacity(0.38), fontSize: 14),
           prefixIcon: Icon(Icons.search_rounded,
@@ -691,12 +691,12 @@ class _FilterBar extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         children: [
-          _chip(context, 'all', 'Все', allCount),
+          _chip(context, 'all', S.of(context).filterAll, allCount),
           const SizedBox(width: 6),
-          _chip(context, 'pending', 'Ожидает', pendingCount,
+          _chip(context, 'pending', S.of(context).pending, pendingCount,
               color: const Color(0xFFF59E0B)),
           const SizedBox(width: 6),
-          _chip(context, 'signing', 'На подписи', signingCount,
+          _chip(context, 'signing', S.of(context).filterForSigning, signingCount,
               color: const Color(0xFF3B82F6)),
         ],
       ),
@@ -951,7 +951,7 @@ class _AppCard extends StatelessWidget {
                 _Row2(
                   icon: Icons.person_outline_rounded,
                   iconColor: const Color(0xFF6366F1),
-                  label: 'Заявитель',
+                  label: S.of(context).requestApplicant,
                   value: applicant,
                   onSurface: onSurface,
                 ),
@@ -959,7 +959,7 @@ class _AppCard extends StatelessWidget {
                 _Row2(
                   icon: Icons.domain_rounded,
                   iconColor: const Color(0xFF0EA5E9),
-                  label: 'Отдел',
+                  label: S.of(context).requestDepartment,
                   value: dept,
                   onSurface: onSurface,
                 ),
@@ -967,7 +967,7 @@ class _AppCard extends StatelessWidget {
                 _Row2(
                   icon: Icons.factory_outlined,
                   iconColor: const Color(0xFFF59E0B),
-                  label: 'Фабрика',
+                  label: S.of(context).factoryLabel2,
                   value: factory,
                   onSurface: onSurface,
                 ),
@@ -975,7 +975,7 @@ class _AppCard extends StatelessWidget {
                 _Row2(
                   icon: Icons.event_rounded,
                   iconColor: const Color(0xFF10B981),
-                  label: 'Дата прихода',
+                  label: S.of(context).arrivalDate,
                   value: arriving,
                   onSurface: onSurface,
                 ),
@@ -1043,7 +1043,7 @@ class _AppCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: _ActionBtn(
-                          label: 'Отклонить',
+                          label: S.of(context).reject,
                           icon: Icons.close_rounded,
                           color: const Color(0xFFEF4444),
                           bgColor: const Color(0xFFFEF2F2),
@@ -1054,7 +1054,7 @@ class _AppCard extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: _ActionBtn(
-                          label: 'Подписать',
+                          label: S.of(context).approve,
                           icon: Icons.draw_rounded,
                           color: const Color(0xFF22C55E),
                           bgColor: const Color(0xFFF0FDF4),
@@ -1074,7 +1074,7 @@ class _AppCard extends StatelessWidget {
                           color: onSurface.withOpacity(0.28)),
                       const SizedBox(width: 4),
                       Text(
-                        'Нажмите для просмотра материалов',
+                        S.of(context).tapToViewMaterials,
                         style: TextStyle(
                             fontSize: 10,
                             color: onSurface.withOpacity(0.32)),
