@@ -541,17 +541,17 @@ class S {
   String get lightTheme =>
       _t({'ru': 'Светлая тема', 'en': 'Light theme', 'uz': 'Ochiq mavzu'});
 
-  String get appVersionLabel => _t({
-    'ru': 'Версия приложения: 1.0.0',
-    'en': 'App version: 1.0.0',
-    'uz': 'Ilova versiyasi: 1.0.0',
+  String appVersionLabel(String version) => _t({
+    'ru': 'Версия приложения: $version',
+    'en': 'App version: $version',
+    'uz': 'Ilova versiyasi: $version',
   });
 
   String get selectLanguage =>
       _t({'ru': 'Выбор языка', 'en': 'Select language', 'uz': 'Tilni tanlang'});
 
-  String get versionLabel =>
-      _t({'ru': 'Версия 1.0.0', 'en': 'Version 1.0.0', 'uz': 'Versiya 1.0.0'});
+  String versionLabel(String version) =>
+      _t({'ru': 'Версия $version', 'en': 'Version $version', 'uz': 'Versiya $version'});
 
   String get allRightsReserved => _t({
     'ru':

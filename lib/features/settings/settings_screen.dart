@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/storage/app_storage.dart';
 import 'confidentiality_page.dart';
 import '../../notifiers/theme_notifier.dart';
@@ -19,6 +20,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   late Animation<double> _animation;
   final AppStorage _storage = const AppStorage();
   String _username = '';
+  String _version = '';
 
   static const Color _gradientStart = Color(0xFFFF8C00);
   static const Color _gradientEnd = Color(0xFFCC1500);
@@ -42,6 +44,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
     _animationController.forward();
     _loadUsername();
+    _loadVersion();
     localeNotifier.addListener(_onLocaleChanged);
   }
 
@@ -51,6 +54,13 @@ class _SettingsScreenState extends State<SettingsScreen>
     final username = await _storage.read(key: 'username') ?? '';
     setState(() {
       _username = username;
+    });
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    setState(() {
+      _version = info.version;
     });
   }
 
@@ -504,7 +514,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                 size: 16, color: Colors.white.withOpacity(0.85)),
             const SizedBox(width: 8),
             Text(
-              s.appVersionLabel,
+              s.appVersionLabel(_version),
               style: TextStyle(
                   color: Colors.white.withOpacity(0.85), fontSize: 12),
             ),
@@ -700,7 +710,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  s.versionLabel,
+                  s.versionLabel(_version),
                   style: TextStyle(
                     fontSize: 14,
                     color: Theme.of(context)

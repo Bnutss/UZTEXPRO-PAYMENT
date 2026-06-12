@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:convert' show json, base64, ascii, jsonDecode;
+import 'package:upgrader/upgrader.dart';
 import 'package:uztexpro_payment/features/auth/login_page.dart';
 import 'package:uztexpro_payment/features/home/menu_page.dart';
 import '../core/storage/app_storage.dart';
@@ -51,40 +52,46 @@ class _ProMobile extends State<PROApp> {
               locale: locale,
               theme: _lightTheme(),
               darkTheme: _darkTheme(),
-              home: FutureBuilder<String>(
-                future: jwtOrEmpty,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Scaffold(
-                      body: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-                  if (snapshot.hasError) {
-                    return Scaffold(
-                      body: Center(child: Text("Ошибка: ${snapshot.error}")),
-                    );
-                  }
-                  if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                    final stored = snapshot.data!;
-                    try {
-                      // stored value is the full JSON response body
-                      final body = jsonDecode(stored) as Map<String, dynamic>;
-                      final rawToken = body['token'] as String?;
-                      if (rawToken == null) return LoginPage();
-                      final parts = rawToken.split('.');
-                      if (parts.length != 3) return LoginPage();
-                      final payload = json.decode(
-                        ascii.decode(base64.decode(base64.normalize(parts[1]))),
+              home: UpgradeAlert(
+                upgrader: Upgrader(
+                  showIgnore: false,
+                  showLater: true,
+                  dialogStyle: UpgradeDialogStyle.cupertino,
+                ),
+                child: FutureBuilder<String>(
+                  future: jwtOrEmpty,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Scaffold(
+                        body: Center(child: CircularProgressIndicator()),
                       );
-                      final exp = DateTime.fromMillisecondsSinceEpoch(
-                          payload['exp'] * 1000);
-                      if (exp.isAfter(DateTime.now())) {
-                        return MenuPage(jwtToken: stored);
-                      }
-                    } catch (_) {}
-                  }
-                  return LoginPage();
-                },
+                    }
+                    if (snapshot.hasError) {
+                      return Scaffold(
+                        body: Center(child: Text("Ошибка: ${snapshot.error}")),
+                      );
+                    }
+                    if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                      final stored = snapshot.data!;
+                      try {
+                        final body = jsonDecode(stored) as Map<String, dynamic>;
+                        final rawToken = body['token'] as String?;
+                        if (rawToken == null) return LoginPage();
+                        final parts = rawToken.split('.');
+                        if (parts.length != 3) return LoginPage();
+                        final payload = json.decode(
+                          ascii.decode(base64.decode(base64.normalize(parts[1]))),
+                        );
+                        final exp = DateTime.fromMillisecondsSinceEpoch(
+                            payload['exp'] * 1000);
+                        if (exp.isAfter(DateTime.now())) {
+                          return MenuPage(jwtToken: stored);
+                        }
+                      } catch (_) {}
+                    }
+                    return LoginPage();
+                  },
+                ),
               ),
             );
           },
