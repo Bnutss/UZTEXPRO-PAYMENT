@@ -215,9 +215,9 @@ class S {
 
   // Login
   String get enterUztexpro => _t({
-    'ru': 'Вход в UZTEXPRO',
-    'en': 'Sign in to UZTEXPRO',
-    'uz': 'UZTEXPRO ga kirish',
+    'ru': 'Вход в UztexPro',
+    'en': 'Sign in to UztexPro',
+    'uz': 'UztexPro ga kirish',
   });
 
   String get pleaseWait => _t({
@@ -550,8 +550,11 @@ class S {
   String get selectLanguage =>
       _t({'ru': 'Выбор языка', 'en': 'Select language', 'uz': 'Tilni tanlang'});
 
-  String versionLabel(String version) =>
-      _t({'ru': 'Версия $version', 'en': 'Version $version', 'uz': 'Versiya $version'});
+  String versionLabel(String version) => _t({
+    'ru': 'Версия $version',
+    'en': 'Version $version',
+    'uz': 'Versiya $version',
+  });
 
   String get allRightsReserved => _t({
     'ru':
@@ -730,119 +733,387 @@ class S {
   });
 
   // Passes Status Labels
-  String get passStatusCancelled => _t({'ru': 'Отменён', 'en': 'Cancelled', 'uz': 'Bekor qilindi'});
+  String get passStatusCancelled =>
+      _t({'ru': 'Отменён', 'en': 'Cancelled', 'uz': 'Bekor qilindi'});
+
   String get passStatusNew => _t({'ru': 'Новый', 'en': 'New', 'uz': 'Yangi'});
-  String get passStatusIssuedReleased => _t({'ru': 'Выдан (Отпустил подписал)', 'en': 'Issued (Released)', 'uz': 'Berildi (Chiqarildi)'});
-  String get passStatusIssued => _t({'ru': 'Выдан', 'en': 'Issued', 'uz': 'Berildi'});
-  String get passStatusSignedByAccountant => _t({'ru': 'Подписан гл. бухгалтером', 'en': 'Signed by chief accountant', 'uz': 'Bosh buxgalter tomonidan imzolangan'});
-  String get passStatusAccountant => _t({'ru': 'Бухгалтер', 'en': 'Accountant', 'uz': 'Buxgalter'});
-  String get passStatusSignedByDirector => _t({'ru': 'Подписан руководителем', 'en': 'Signed by director', 'uz': 'Rahbar tomonidan imzolangan'});
-  String get passStatusDirector => _t({'ru': 'Руководитель', 'en': 'Director', 'uz': 'Rahbar'});
-  String get passStatusCompleted => _t({'ru': 'Завершён', 'en': 'Completed', 'uz': 'Tugallangan'});
-  String get passStatusShortDir => _t({'ru': 'Рук-ль', 'en': 'Dir.', 'uz': 'Rah.'});
-  String passStatusWithCode(String code) => _t({'ru': 'Статус $code', 'en': 'Status $code', 'uz': 'Holat $code'});
+
+  String get passStatusIssuedReleased => _t({
+    'ru': 'Выдан (Отпустил подписал)',
+    'en': 'Issued (Released)',
+    'uz': 'Berildi (Chiqarildi)',
+  });
+
+  String get passStatusIssued =>
+      _t({'ru': 'Выдан', 'en': 'Issued', 'uz': 'Berildi'});
+
+  String get passStatusSignedByAccountant => _t({
+    'ru': 'Подписан гл. бухгалтером',
+    'en': 'Signed by chief accountant',
+    'uz': 'Bosh buxgalter tomonidan imzolangan',
+  });
+
+  String get passStatusAccountant =>
+      _t({'ru': 'Бухгалтер', 'en': 'Accountant', 'uz': 'Buxgalter'});
+
+  String get passStatusSignedByDirector => _t({
+    'ru': 'Подписан руководителем',
+    'en': 'Signed by director',
+    'uz': 'Rahbar tomonidan imzolangan',
+  });
+
+  String get passStatusDirector =>
+      _t({'ru': 'Руководитель', 'en': 'Director', 'uz': 'Rahbar'});
+
+  String get passStatusCompleted =>
+      _t({'ru': 'Завершён', 'en': 'Completed', 'uz': 'Tugallangan'});
+
+  String get passStatusShortDir =>
+      _t({'ru': 'Рук-ль', 'en': 'Dir.', 'uz': 'Rah.'});
+
+  String passStatusWithCode(String code) =>
+      _t({'ru': 'Статус $code', 'en': 'Status $code', 'uz': 'Holat $code'});
 
   // Passes Dialog Actions
-  String get confirmPass => _t({'ru': 'Подтвердить пропуск', 'en': 'Confirm pass', 'uz': 'Ruxsatnomani tasdiqlash'});
-  String confirmPassNumber(String number) => _t({'ru': 'Подтвердить $number?', 'en': 'Confirm $number?', 'uz': '$number ni tasdiqlash?'});
-  String get cancelPass => _t({'ru': 'Отменить пропуск', 'en': 'Cancel pass', 'uz': 'Ruxsatnomani bekor qilish'});
-  String cancelPassMessage(String number) => _t({'ru': '$number будет отменён. Только создатель может отменить.', 'en': '$number will be cancelled. Only the creator can cancel.', 'uz': '$number bekor qilinadi. Faqat yaratuvchi bekor qila oladi.'});
-  String cancelPassMessageShort(String number) => _t({'ru': '$number будет отменён.', 'en': '$number will be cancelled.', 'uz': '$number bekor qilinadi.'});
-  String get cancelBtn => _t({'ru': 'Отменить', 'en': 'Cancel', 'uz': 'Bekor qilish'});
-  String get rejectPass => _t({'ru': 'Отклонить пропуск', 'en': 'Reject pass', 'uz': 'Ruxsatnomani rad etish'});
-  String get rejectionReasonHint => _t({'ru': 'Причина отклонения...', 'en': 'Rejection reason...', 'uz': 'Rad etish sababi...'});
-  String get passRejected => _t({'ru': 'Пропуск отклонён', 'en': 'Pass rejected', 'uz': 'Ruxsatnoma rad etildi'});
-  String get passCancelled => _t({'ru': 'Пропуск отменён', 'en': 'Pass cancelled', 'uz': 'Ruxsatnoma bekor qilindi'});
-  String get passConfirmed => _t({'ru': 'Пропуск подтверждён', 'en': 'Pass confirmed', 'uz': 'Ruxsatnoma tasdiqlandi'});
+  String get confirmPass => _t({
+    'ru': 'Подтвердить пропуск',
+    'en': 'Confirm pass',
+    'uz': 'Ruxsatnomani tasdiqlash',
+  });
+
+  String confirmPassNumber(String number) => _t({
+    'ru': 'Подтвердить $number?',
+    'en': 'Confirm $number?',
+    'uz': '$number ni tasdiqlash?',
+  });
+
+  String get cancelPass => _t({
+    'ru': 'Отменить пропуск',
+    'en': 'Cancel pass',
+    'uz': 'Ruxsatnomani bekor qilish',
+  });
+
+  String cancelPassMessage(String number) => _t({
+    'ru': '$number будет отменён. Только создатель может отменить.',
+    'en': '$number will be cancelled. Only the creator can cancel.',
+    'uz': '$number bekor qilinadi. Faqat yaratuvchi bekor qila oladi.',
+  });
+
+  String cancelPassMessageShort(String number) => _t({
+    'ru': '$number будет отменён.',
+    'en': '$number will be cancelled.',
+    'uz': '$number bekor qilinadi.',
+  });
+
+  String get cancelBtn =>
+      _t({'ru': 'Отменить', 'en': 'Cancel', 'uz': 'Bekor qilish'});
+
+  String get rejectPass => _t({
+    'ru': 'Отклонить пропуск',
+    'en': 'Reject pass',
+    'uz': 'Ruxsatnomani rad etish',
+  });
+
+  String get rejectionReasonHint => _t({
+    'ru': 'Причина отклонения...',
+    'en': 'Rejection reason...',
+    'uz': 'Rad etish sababi...',
+  });
+
+  String get passRejected => _t({
+    'ru': 'Пропуск отклонён',
+    'en': 'Pass rejected',
+    'uz': 'Ruxsatnoma rad etildi',
+  });
+
+  String get passCancelled => _t({
+    'ru': 'Пропуск отменён',
+    'en': 'Pass cancelled',
+    'uz': 'Ruxsatnoma bekor qilindi',
+  });
+
+  String get passConfirmed => _t({
+    'ru': 'Пропуск подтверждён',
+    'en': 'Pass confirmed',
+    'uz': 'Ruxsatnoma tasdiqlandi',
+  });
 
   // Passes Action Buttons
   String get issue => _t({'ru': 'Выдать', 'en': 'Issue', 'uz': 'Chiqarish'});
-  String get accountantSign => _t({'ru': 'Бухгалтер: подписать', 'en': 'Accountant: sign', 'uz': 'Buxgalter: imzolash'});
-  String get directorSign => _t({'ru': 'Руководитель: подписать', 'en': 'Director: sign', 'uz': 'Rahbar: imzolash'});
-  String get securitySign => _t({'ru': 'Охрана: подписать', 'en': 'Security: sign', 'uz': 'Xavfsizlik: imzolash'});
-  String get signAccountant => _t({'ru': 'Подписать (Бухгалтер)', 'en': 'Sign (Accountant)', 'uz': 'Imzolash (Buxgalter)'});
-  String get signDirector => _t({'ru': 'Подписать (Руководитель)', 'en': 'Sign (Director)', 'uz': 'Imzolash (Rahbar)'});
-  String get signSecurity => _t({'ru': 'Подписать (Охрана)', 'en': 'Sign (Security)', 'uz': 'Imzolash (Xavfsizlik)'});
+
+  String get accountantSign => _t({
+    'ru': 'Бухгалтер: подписать',
+    'en': 'Accountant: sign',
+    'uz': 'Buxgalter: imzolash',
+  });
+
+  String get directorSign => _t({
+    'ru': 'Руководитель: подписать',
+    'en': 'Director: sign',
+    'uz': 'Rahbar: imzolash',
+  });
+
+  String get securitySign => _t({
+    'ru': 'Охрана: подписать',
+    'en': 'Security: sign',
+    'uz': 'Xavfsizlik: imzolash',
+  });
+
+  String get signAccountant => _t({
+    'ru': 'Подписать (Бухгалтер)',
+    'en': 'Sign (Accountant)',
+    'uz': 'Imzolash (Buxgalter)',
+  });
+
+  String get signDirector => _t({
+    'ru': 'Подписать (Руководитель)',
+    'en': 'Sign (Director)',
+    'uz': 'Imzolash (Rahbar)',
+  });
+
+  String get signSecurity => _t({
+    'ru': 'Подписать (Охрана)',
+    'en': 'Sign (Security)',
+    'uz': 'Imzolash (Xavfsizlik)',
+  });
 
   // Passes Info Labels
   String get client => _t({'ru': 'Клиент', 'en': 'Client', 'uz': 'Mijoz'});
-  String get factoryLabel2 => _t({'ru': 'Фабрика', 'en': 'Factory', 'uz': 'Fabrika'});
-  String get createdByLabel2 => _t({'ru': 'Создал', 'en': 'Created by', 'uz': 'Yaratdi'});
-  String get reasonLabel => _t({'ru': 'Причина', 'en': 'Reason', 'uz': 'Sabab'});
-  String get passTitle => _t({'ru': 'Пропуск', 'en': 'Pass', 'uz': 'Ruxsatnoma'});
-  String get retry => _t({'ru': 'Повторить', 'en': 'Retry', 'uz': 'Qayta urinish'});
-  String reasonWithText(String text) => _t({'ru': 'Причина: $text', 'en': 'Reason: $text', 'uz': 'Sabab: $text'});
+
+  String get factoryLabel2 =>
+      _t({'ru': 'Фабрика', 'en': 'Factory', 'uz': 'Fabrika'});
+
+  String get createdByLabel2 =>
+      _t({'ru': 'Создал', 'en': 'Created by', 'uz': 'Yaratdi'});
+
+  String get reasonLabel =>
+      _t({'ru': 'Причина', 'en': 'Reason', 'uz': 'Sabab'});
+
+  String get passTitle =>
+      _t({'ru': 'Пропуск', 'en': 'Pass', 'uz': 'Ruxsatnoma'});
+
+  String get retry =>
+      _t({'ru': 'Повторить', 'en': 'Retry', 'uz': 'Qayta urinish'});
+
+  String reasonWithText(String text) =>
+      _t({'ru': 'Причина: $text', 'en': 'Reason: $text', 'uz': 'Sabab: $text'});
 
   // Passes View Tabs
-  String get forSigning => _t({'ru': 'На подпись', 'en': 'For signing', 'uz': 'Imzo uchun'});
+  String get forSigning =>
+      _t({'ru': 'На подпись', 'en': 'For signing', 'uz': 'Imzo uchun'});
+
   String get my => _t({'ru': 'Мои', 'en': 'My', 'uz': 'Mening'});
 
   // Passes Detail Labels
-  String get information => _t({'ru': 'Информация', 'en': 'Information', 'uz': "Ma'lumot"});
+  String get information =>
+      _t({'ru': 'Информация', 'en': 'Information', 'uz': "Ma'lumot"});
+
   String get numberLabel => _t({'ru': 'Номер', 'en': 'Number', 'uz': 'Raqam'});
+
   String get dateLabel2 => _t({'ru': 'Дата', 'en': 'Date', 'uz': 'Sana'});
+
   String get typeLabel => _t({'ru': 'Тип', 'en': 'Type', 'uz': 'Turi'});
-  String get warehouseLabel => _t({'ru': 'Склад', 'en': 'Warehouse', 'uz': 'Ombor'});
-  String get createdLabel => _t({'ru': 'Создан', 'en': 'Created', 'uz': 'Yaratilgan'});
+
+  String get warehouseLabel =>
+      _t({'ru': 'Склад', 'en': 'Warehouse', 'uz': 'Ombor'});
+
+  String get createdLabel =>
+      _t({'ru': 'Создан', 'en': 'Created', 'uz': 'Yaratilgan'});
+
   String get kppLabel => _t({'ru': 'КПП', 'en': 'Checkpoint', 'uz': 'Karaxon'});
-  String get autoIncoming => _t({'ru': 'Авто-приход', 'en': 'Auto incoming', 'uz': 'Avtokirish'});
-  String get autoOutgoing => _t({'ru': 'Авто-расход', 'en': 'Auto outgoing', 'uz': 'Avtoketish'});
-  String itemsCountLabel(int count) => _t({'ru': 'Позиции ($count)', 'en': 'Items ($count)', 'uz': 'Pozitsiyalar ($count)'});
-  String get noItems => _t({'ru': 'Нет позиций', 'en': 'No items', 'uz': "Pozitsiyalar yo'q"});
-  String get releasedBy => _t({'ru': 'Отпустил', 'en': 'Released by', 'uz': 'Chiqardi'});
-  String get chiefAccountant => _t({'ru': 'Гл. бухгалтер', 'en': 'Chief accountant', 'uz': 'Bosh buxgalter'});
-  String get signatureHistory => _t({'ru': 'История подписей', 'en': 'Signature history', 'uz': 'Imzo tarixi'});
-  String get notesSection => _t({'ru': 'Примечания', 'en': 'Notes', 'uz': 'Izohlar'});
+
+  String get autoIncoming =>
+      _t({'ru': 'Авто-приход', 'en': 'Auto incoming', 'uz': 'Avtokirish'});
+
+  String get autoOutgoing =>
+      _t({'ru': 'Авто-расход', 'en': 'Auto outgoing', 'uz': 'Avtoketish'});
+
+  String itemsCountLabel(int count) => _t({
+    'ru': 'Позиции ($count)',
+    'en': 'Items ($count)',
+    'uz': 'Pozitsiyalar ($count)',
+  });
+
+  String get noItems =>
+      _t({'ru': 'Нет позиций', 'en': 'No items', 'uz': "Pozitsiyalar yo'q"});
+
+  String get releasedBy =>
+      _t({'ru': 'Отпустил', 'en': 'Released by', 'uz': 'Chiqardi'});
+
+  String get chiefAccountant => _t({
+    'ru': 'Гл. бухгалтер',
+    'en': 'Chief accountant',
+    'uz': 'Bosh buxgalter',
+  });
+
+  String get signatureHistory => _t({
+    'ru': 'История подписей',
+    'en': 'Signature history',
+    'uz': 'Imzo tarixi',
+  });
+
+  String get notesSection =>
+      _t({'ru': 'Примечания', 'en': 'Notes', 'uz': 'Izohlar'});
+
   String get noteSingle => _t({'ru': 'Примечание', 'en': 'Note', 'uz': 'Izoh'});
-  String get rejectionReason => _t({'ru': 'Причина отклонения', 'en': 'Rejection reason', 'uz': 'Rad etish sababi'});
-  String get arrivalDate => _t({'ru': 'Дата прихода', 'en': 'Arrival date', 'uz': 'Kelish sanasi'});
+
+  String get rejectionReason => _t({
+    'ru': 'Причина отклонения',
+    'en': 'Rejection reason',
+    'uz': 'Rad etish sababi',
+  });
+
+  String get arrivalDate =>
+      _t({'ru': 'Дата прихода', 'en': 'Arrival date', 'uz': 'Kelish sanasi'});
 
   // Passes Progress Steps
   String get progressNew => _t({'ru': 'Новый', 'en': 'New', 'uz': 'Yangi'});
-  String get progressIssued => _t({'ru': 'Выдан', 'en': 'Issued', 'uz': 'Berildi'});
-  String get progressCompleted => _t({'ru': 'Завершён', 'en': 'Completed', 'uz': 'Tugallangan'});
+
+  String get progressIssued =>
+      _t({'ru': 'Выдан', 'en': 'Issued', 'uz': 'Berildi'});
+
+  String get progressCompleted =>
+      _t({'ru': 'Завершён', 'en': 'Completed', 'uz': 'Tugallangan'});
 
   // Sign Requests
-  String get searchHintSignRequests => _t({'ru': 'Поиск по заявке, заявителю, отделу...', 'en': 'Search by request, applicant, department...', 'uz': "Ariza, arizachi, bo'lim bo'yicha qidirish..."});
-  String get filterForSigning => _t({'ru': 'На подписи', 'en': 'For signing', 'uz': 'Imzo uchun'});
-  String get positions => _t({'ru': 'позиций', 'en': 'items', 'uz': 'pozitsiya'});
-  String get awaitingLabel => _t({'ru': 'ожидают', 'en': 'awaiting', 'uz': 'kutilmoqda'});
-  String get quantity => _t({'ru': 'Количество', 'en': 'Quantity', 'uz': 'Miqdor'});
+  String get searchHintSignRequests => _t({
+    'ru': 'Поиск по заявке, заявителю, отделу...',
+    'en': 'Search by request, applicant, department...',
+    'uz': "Ariza, arizachi, bo'lim bo'yicha qidirish...",
+  });
+
+  String get filterForSigning =>
+      _t({'ru': 'На подписи', 'en': 'For signing', 'uz': 'Imzo uchun'});
+
+  String get positions =>
+      _t({'ru': 'позиций', 'en': 'items', 'uz': 'pozitsiya'});
+
+  String get awaitingLabel =>
+      _t({'ru': 'ожидают', 'en': 'awaiting', 'uz': 'kutilmoqda'});
+
+  String get quantity =>
+      _t({'ru': 'Количество', 'en': 'Quantity', 'uz': 'Miqdor'});
+
   String get costLabel => _t({'ru': 'Стоимость', 'en': 'Cost', 'uz': 'Narx'});
-  String get tapToViewMaterials => _t({'ru': 'Нажмите для просмотра материалов', 'en': 'Tap to view materials', 'uz': "Materiallarni ko'rish uchun bosing"});
-  String get requestInfo => _t({'ru': 'Информация о заявке', 'en': 'Request information', 'uz': 'Ariza haqida malumot'});
+
+  String get tapToViewMaterials => _t({
+    'ru': 'Нажмите для просмотра материалов',
+    'en': 'Tap to view materials',
+    'uz': "Materiallarni ko'rish uchun bosing",
+  });
+
+  String get requestInfo => _t({
+    'ru': 'Информация о заявке',
+    'en': 'Request information',
+    'uz': 'Ariza haqida malumot',
+  });
 
   // Bonuses Status Labels
   String get bonusStatusNew => _t({'ru': 'Новый', 'en': 'New', 'uz': 'Yangi'});
-  String get bonusStatusUnderReview => _t({'ru': 'На проверке', 'en': 'Under review', 'uz': 'Tekshirilmoqda'});
-  String get bonusStatusReview => _t({'ru': 'Проверка', 'en': 'Review', 'uz': 'Tekshirish'});
-  String get bonusStatusApproved => _t({'ru': 'Одобрен', 'en': 'Approved', 'uz': 'Tasdiqlangan'});
-  String get bonusStatusConfirmed => _t({'ru': 'Утверждён', 'en': 'Confirmed', 'uz': 'Tasdiqlangan'});
-  String get bonusStatusPaid => _t({'ru': 'Оплачен', 'en': 'Paid', 'uz': "To'langan"});
+
+  String get bonusStatusUnderReview =>
+      _t({'ru': 'На проверке', 'en': 'Under review', 'uz': 'Tekshirilmoqda'});
+
+  String get bonusStatusReview =>
+      _t({'ru': 'Проверка', 'en': 'Review', 'uz': 'Tekshirish'});
+
+  String get bonusStatusApproved =>
+      _t({'ru': 'Одобрен', 'en': 'Approved', 'uz': 'Tasdiqlangan'});
+
+  String get bonusStatusConfirmed =>
+      _t({'ru': 'Утверждён', 'en': 'Confirmed', 'uz': 'Tasdiqlangan'});
+
+  String get bonusStatusPaid =>
+      _t({'ru': 'Оплачен', 'en': 'Paid', 'uz': "To'langan"});
 
   // Bonuses
-  String get bonusSearchHint => _t({'ru': 'Фабрика, месяц, создатель', 'en': 'Factory, month, creator', 'uz': "Fabrika, oy, yaratuvchi"});
-  String get noRecordsForSigning => _t({'ru': 'Нет записей, требующих подписи', 'en': 'No records requiring signature', 'uz': "Imzo talab qilinadigan yozuvlar yo'q"});
-  String get bonusListEmpty => _t({'ru': 'Список премий пуст', 'en': 'Bonus list is empty', 'uz': "Mukofotlar ro'yxati bo'sh"});
-  String employeesCountLabel(int count) => _t({'ru': 'Сотрудники ($count)', 'en': 'Employees ($count)', 'uz': 'Xodimlar ($count)'});
-  String get noEmployees => _t({'ru': 'Нет сотрудников', 'en': 'No employees', 'uz': "Xodimlar yo'q"});
-  String get verifiedBy => _t({'ru': 'Проверил', 'en': 'Verified by', 'uz': 'Tekshirdi'});
-  String get approvedByDeputy => _t({'ru': 'Одобрил (зам.)', 'en': 'Approved (deputy)', 'uz': "Tasdiqladi (o'rinbosar)"});
-  String get confirmedByGeneral => _t({'ru': 'Утвердил (ген.)', 'en': 'Confirmed (general)', 'uz': 'Tasdiqladi (bosh)'});
+  String get bonusSearchHint => _t({
+    'ru': 'Фабрика, месяц, создатель',
+    'en': 'Factory, month, creator',
+    'uz': "Fabrika, oy, yaratuvchi",
+  });
+
+  String get noRecordsForSigning => _t({
+    'ru': 'Нет записей, требующих подписи',
+    'en': 'No records requiring signature',
+    'uz': "Imzo talab qilinadigan yozuvlar yo'q",
+  });
+
+  String get bonusListEmpty => _t({
+    'ru': 'Список премий пуст',
+    'en': 'Bonus list is empty',
+    'uz': "Mukofotlar ro'yxati bo'sh",
+  });
+
+  String employeesCountLabel(int count) => _t({
+    'ru': 'Сотрудники ($count)',
+    'en': 'Employees ($count)',
+    'uz': 'Xodimlar ($count)',
+  });
+
+  String get noEmployees => _t({
+    'ru': 'Нет сотрудников',
+    'en': 'No employees',
+    'uz': "Xodimlar yo'q",
+  });
+
+  String get verifiedBy =>
+      _t({'ru': 'Проверил', 'en': 'Verified by', 'uz': 'Tekshirdi'});
+
+  String get approvedByDeputy => _t({
+    'ru': 'Одобрил (зам.)',
+    'en': 'Approved (deputy)',
+    'uz': "Tasdiqladi (o'rinbosar)",
+  });
+
+  String get confirmedByGeneral => _t({
+    'ru': 'Утвердил (ген.)',
+    'en': 'Confirmed (general)',
+    'uz': 'Tasdiqladi (bosh)',
+  });
+
   String get paidBy => _t({'ru': 'Оплатил', 'en': 'Paid by', 'uz': "To'ladi"});
-  String withTaxAmount(String amount) => _t({'ru': 'С нал.: $amount', 'en': 'With tax: $amount', 'uz': 'Soliq bilan: $amount'});
-  String tabNumberLabel(String number) => _t({'ru': 'Таб: $number', 'en': 'Card: $number', 'uz': 'Karta: $number'});
+
+  String withTaxAmount(String amount) => _t({
+    'ru': 'С нал.: $amount',
+    'en': 'With tax: $amount',
+    'uz': 'Soliq bilan: $amount',
+  });
+
+  String tabNumberLabel(String number) =>
+      _t({'ru': 'Таб: $number', 'en': 'Card: $number', 'uz': 'Karta: $number'});
 
   // Menu / Access
-  String get accessRestricted => _t({'ru': 'Доступ ограничен', 'en': 'Access restricted', 'uz': "Kirish cheklangan"});
-  String get noAccessMessage => _t({'ru': 'У вас нет доступа ни к одному разделу.\nОбратитесь к администратору.', 'en': "You don't have access to any section.\nContact the administrator.", 'uz': "Hech qanday bo'limga kirish huquqingiz yo'q.\nAdministrator bilan bog'laning."});
+  String get accessRestricted => _t({
+    'ru': 'Доступ ограничен',
+    'en': 'Access restricted',
+    'uz': "Kirish cheklangan",
+  });
+
+  String get noAccessMessage => _t({
+    'ru':
+        'У вас нет доступа ни к одному разделу.\nОбратитесь к администратору.',
+    'en': "You don't have access to any section.\nContact the administrator.",
+    'uz':
+        "Hech qanday bo'limga kirish huquqingiz yo'q.\nAdministrator bilan bog'laning.",
+  });
 
   // Main Page tooltips
   String get openTooltip => _t({'ru': 'Открыть', 'en': 'Open', 'uz': 'Ochish'});
-  String get copyTooltip => _t({'ru': 'Копировать', 'en': 'Copy', 'uz': 'Nusxalash'});
+
+  String get copyTooltip =>
+      _t({'ru': 'Копировать', 'en': 'Copy', 'uz': 'Nusxalash'});
 
   // Error messages
-  String errorWithCode(int code) => _t({'ru': 'Ошибка ($code)', 'en': 'Error ($code)', 'uz': 'Xato ($code)'});
-  String errorWithMessage(String e) => _t({'ru': 'Ошибка: $e', 'en': 'Error: $e', 'uz': 'Xato: $e'});
-  String connectionErrorMessage(String e) => _t({'ru': 'Ошибка подключения:\n$e', 'en': 'Connection error:\n$e', 'uz': 'Ulanish xatosi:\n$e'});
+  String errorWithCode(int code) =>
+      _t({'ru': 'Ошибка ($code)', 'en': 'Error ($code)', 'uz': 'Xato ($code)'});
+
+  String errorWithMessage(String e) =>
+      _t({'ru': 'Ошибка: $e', 'en': 'Error: $e', 'uz': 'Xato: $e'});
+
+  String connectionErrorMessage(String e) => _t({
+    'ru': 'Ошибка подключения:\n$e',
+    'en': 'Connection error:\n$e',
+    'uz': 'Ulanish xatosi:\n$e',
+  });
 }

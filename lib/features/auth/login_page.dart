@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -53,15 +54,13 @@ class _LoginPageState extends State<LoginPage>
       ),
     );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.2),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.2, 0.7, curve: Curves.easeOut),
-      ),
-    );
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: const Interval(0.2, 0.7, curve: Curves.easeOut),
+          ),
+        );
 
     _animationController.forward();
     localeNotifier.addListener(_onLocaleChanged);
@@ -117,13 +116,15 @@ class _LoginPageState extends State<LoginPage>
 
   Future<String?> attemptLogIn(String username, String password) async {
     try {
-      var res = await http.post(
-        Uri.parse("$API/auth/login/"),
-        body: {"username": username, "password": password},
-      ).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () => http.Response('Timeout', 408),
-      );
+      var res = await http
+          .post(
+            Uri.parse("$API/auth/login/"),
+            body: {"username": username, "password": password},
+          )
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () => http.Response('Timeout', 408),
+          );
       if (res.statusCode == 200) return res.body;
       return null;
     } catch (e) {
@@ -149,7 +150,10 @@ class _LoginPageState extends State<LoginPage>
     if (authenticated) {
       final username = await storage.read(key: 'username');
       final password = await storage.read(key: 'password');
-      if (username != null && password != null && username.isNotEmpty && password.isNotEmpty) {
+      if (username != null &&
+          password != null &&
+          username.isNotEmpty &&
+          password.isNotEmpty) {
         setState(() => isLoading = true);
         var jwt = await attemptLogIn(username, password);
         if (jwt != null) {
@@ -172,7 +176,9 @@ class _LoginPageState extends State<LoginPage>
           children: [
             const Icon(Icons.info_outline, color: Colors.white),
             const SizedBox(width: 12),
-            Expanded(child: Text(message, style: const TextStyle(fontSize: 14))),
+            Expanded(
+              child: Text(message, style: const TextStyle(fontSize: 14)),
+            ),
           ],
         ),
         backgroundColor: accentColor,
@@ -208,6 +214,7 @@ class _LoginPageState extends State<LoginPage>
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
       ),
       child: Scaffold(
         body: isLoading ? _buildLoadingView(s) : _buildLoginView(s),
@@ -252,7 +259,10 @@ class _LoginPageState extends State<LoginPage>
             const SizedBox(height: 8),
             Text(
               s.pleaseWait,
-              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16),
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.8),
+                fontSize: 16,
+              ),
             ),
           ],
         ),
@@ -323,59 +333,8 @@ class _LoginPageState extends State<LoginPage>
             ),
           ),
         ),
-        SafeArea(
-          child: Column(
-            children: [
-              _buildAppBar(s),
-              Expanded(child: _buildLoginForm(s)),
-            ],
-          ),
-        ),
+        SafeArea(child: _buildLoginForm(s)),
       ],
-    );
-  }
-
-  Widget _buildAppBar(S s) {
-    return Container(
-      height: 90,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
-            child: ClipOval(
-              child: Image.asset('assets/images/fon.png', fit: BoxFit.contain),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "UZTEXPRO",
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                  color: Colors.white,
-                  shadows: [Shadow(color: Colors.black26, offset: Offset(1, 1), blurRadius: 4)],
-                ),
-              ),
-              Text(
-                s.paymentSystem,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withOpacity(0.9),
-                  letterSpacing: 1,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -386,15 +345,15 @@ class _LoginPageState extends State<LoginPage>
         position: _slideAnimation,
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 20.0),
+            padding: const EdgeInsets.fromLTRB(28, 8, 28, 28),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 _buildLogo(),
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
                 _buildWelcomeText(s),
-                const SizedBox(height: 40),
+                const SizedBox(height: 32),
                 _buildTextField(
                   controller: _usernameController,
                   icon: Icons.person_outline,
@@ -444,7 +403,7 @@ class _LoginPageState extends State<LoginPage>
         ],
       ),
       child: ClipOval(
-        child: Image.asset('assets/images/fon.png', fit: BoxFit.contain),
+        child: Image.asset('assets/icon/logo.png', fit: BoxFit.contain),
       ),
     );
   }
@@ -458,7 +417,13 @@ class _LoginPageState extends State<LoginPage>
             fontSize: 26,
             fontWeight: FontWeight.bold,
             color: Colors.white,
-            shadows: [Shadow(color: Colors.black26, offset: Offset(0, 1), blurRadius: 4)],
+            shadows: [
+              Shadow(
+                color: Colors.black26,
+                offset: Offset(0, 1),
+                blurRadius: 4,
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 8),
@@ -490,7 +455,10 @@ class _LoginPageState extends State<LoginPage>
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.4), width: 1.5),
+          borderSide: BorderSide(
+            color: Colors.white.withOpacity(0.4),
+            width: 1.5,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -498,9 +466,15 @@ class _LoginPageState extends State<LoginPage>
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.4), width: 1.5),
+          borderSide: BorderSide(
+            color: Colors.white.withOpacity(0.4),
+            width: 1.5,
+          ),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 18,
+        ),
         prefixIcon: Icon(icon, color: Colors.white.withOpacity(0.9)),
         suffixIcon: isPassword
             ? IconButton(
@@ -508,7 +482,8 @@ class _LoginPageState extends State<LoginPage>
                   isPasswordVisible ? Icons.visibility_off : Icons.visibility,
                   color: Colors.white70,
                 ),
-                onPressed: () => setState(() => isPasswordVisible = !isPasswordVisible),
+                onPressed: () =>
+                    setState(() => isPasswordVisible = !isPasswordVisible),
               )
             : null,
         filled: true,
@@ -518,24 +493,57 @@ class _LoginPageState extends State<LoginPage>
   }
 
   Widget _buildLoginButton(S s) {
-    return SizedBox(
+    return Container(
       width: double.infinity,
-      height: 55,
-      child: ElevatedButton(
-        onPressed: _login,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
-          shadowColor: Colors.black.withOpacity(0.25),
-          elevation: 6,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-        child: Text(
-          s.signIn,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.5,
-            color: primaryColor,
+      height: 56,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.14),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _login,
+              splashColor: Colors.white.withOpacity(0.08),
+              highlightColor: Colors.white.withOpacity(0.05),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.22),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.5),
+                    width: 1,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  s.signIn,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.8,
+                    color: Colors.white,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black26,
+                        offset: Offset(0, 1),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -564,7 +572,11 @@ class _LoginPageState extends State<LoginPage>
                     color: Colors.white.withOpacity(0.2),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.fingerprint, color: Colors.white, size: 24),
+                  child: const Icon(
+                    Icons.fingerprint,
+                    color: Colors.white,
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -582,7 +594,10 @@ class _LoginPageState extends State<LoginPage>
                       const SizedBox(height: 4),
                       Text(
                         s.useFingerprint,
-                        style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.75)),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withOpacity(0.75),
+                        ),
                       ),
                     ],
                   ),

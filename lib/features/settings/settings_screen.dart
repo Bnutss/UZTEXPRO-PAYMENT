@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -39,7 +40,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 450),
     );
     _animation = CurvedAnimation(
       parent: _animationController,
@@ -64,7 +65,9 @@ class _SettingsScreenState extends State<SettingsScreen>
           final lastName = (user['last_name'] as String?) ?? '';
           final fullName = '$firstName $lastName'.trim();
           setState(() {
-            _displayName = fullName.isNotEmpty ? fullName : (user['username'] as String? ?? '');
+            _displayName = fullName.isNotEmpty
+                ? fullName
+                : (user['username'] as String? ?? '');
             _email = (user['email'] as String?) ?? '';
             _login = (user['username'] as String?) ?? '';
           });
@@ -106,99 +109,61 @@ class _SettingsScreenState extends State<SettingsScreen>
       ),
       child: Scaffold(
         extendBodyBehindAppBar: true,
-        appBar: AppBar(
-          title: Text(
-            s.settingsTitle,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
-            ),
-          ),
-          centerTitle: true,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: gradientColors,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
-            ),
-          ),
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.info_outline, color: Colors.white, size: 24),
-              onPressed: () => _showAboutDialog(s),
-              tooltip: s.aboutApp,
-            ),
-          ],
+        appBar: _GlassAppBar(
+          title: s.settingsTitle,
+          onBack: () => Navigator.of(context).pop(),
+          onInfo: () => _showAboutDialog(s),
+          infoTooltip: s.aboutApp,
         ),
-        body: Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: gradientColors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: gradientColors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Stack(
+            children: [
+              Positioned(top: -60, right: -40, child: _circle(200, 0.06)),
+              Positioned(bottom: 60, left: -70, child: _circle(220, 0.05)),
+              Positioned(top: 240, right: 20, child: _circle(60, 0.04)),
+              SafeArea(
+                child: FadeTransition(
+                  opacity: _animation,
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+                    children: [
+                      _buildProfileCard(s),
+                      const SizedBox(height: 28),
+                      _buildSectionHeader(s.generalSettings),
+                      const SizedBox(height: 10),
+                      _buildSettingButton(
+                        Icons.language_rounded,
+                        s.language,
+                        s.languageDesc,
+                        onTap: () => _showLanguageDialog(s),
+                      ),
+                      const SizedBox(height: 28),
+                      _buildSectionHeader(s.appearance),
+                      const SizedBox(height: 10),
+                      _buildThemeButton(s),
+                      const SizedBox(height: 36),
+                      _buildVersionInfo(s),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            Positioned(
-              top: -60, right: -40,
-              child: _circle(200, 0.07),
-            ),
-            Positioned(
-              bottom: 60, left: -70,
-              child: _circle(220, 0.06),
-            ),
-            Positioned(
-              top: 200, right: 20,
-              child: _circle(60, 0.05),
-            ),
-            SafeArea(
-              child: FadeTransition(
-                opacity: _animation,
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-                  children: [
-                    _buildProfileCard(s),
-                    const SizedBox(height: 24),
-                    _buildSectionHeader(s.generalSettings),
-                    _buildSettingButton(
-                      Icons.language_rounded,
-                      s.language,
-                      s.languageDesc,
-                      const Color(0xFFEF6C00),
-                      onTap: () => _showLanguageDialog(s),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildSectionHeader(s.appearance),
-                    _buildThemeButton(s),
-                    const SizedBox(height: 32),
-                    _buildVersionInfo(s),
-                  ],
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _circle(double size, double opacity) => Container(
-    width: size, height: size,
+    width: size,
+    height: size,
     decoration: BoxDecoration(
       shape: BoxShape.circle,
       color: Colors.white.withOpacity(opacity),
@@ -207,29 +172,15 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Widget _buildProfileCard(S s) {
     final initials = _displayName.isNotEmpty
-        ? _displayName.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
+        ? _displayName
+              .split(' ')
+              .map((w) => w.isNotEmpty ? w[0] : '')
+              .take(2)
+              .join()
+              .toUpperCase()
         : 'U';
 
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.white.withOpacity(0.22),
-            Colors.white.withOpacity(0.08),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.12),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+    return _GlassCard(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -239,15 +190,11 @@ class _SettingsScreenState extends State<SettingsScreen>
               height: 80,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [Colors.white, Color(0xFFF5F5F5)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 16,
+                    color: Colors.black.withOpacity(0.18),
+                    blurRadius: 18,
                     offset: const Offset(0, 6),
                   ),
                 ],
@@ -274,7 +221,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                 fontSize: 22,
                 letterSpacing: 0.3,
                 shadows: [
-                  Shadow(color: Colors.black26, offset: Offset(0, 1), blurRadius: 4),
+                  Shadow(
+                    color: Colors.black26,
+                    offset: Offset(0, 1),
+                    blurRadius: 4,
+                  ),
                 ],
               ),
             ),
@@ -283,14 +234,18 @@ class _SettingsScreenState extends State<SettingsScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.email_outlined, color: Colors.white.withOpacity(0.7), size: 14),
+                  Icon(
+                    Icons.email_outlined,
+                    color: Colors.white.withOpacity(0.65),
+                    size: 14,
+                  ),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
                       _email,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withOpacity(0.75),
                         fontSize: 13,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -304,12 +259,16 @@ class _SettingsScreenState extends State<SettingsScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.person_outline, color: Colors.white.withOpacity(0.6), size: 13),
+                  Icon(
+                    Icons.person_outline,
+                    color: Colors.white.withOpacity(0.55),
+                    size: 13,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     _login,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.6),
+                      color: Colors.white.withOpacity(0.55),
                       fontSize: 12,
                     ),
                   ),
@@ -318,21 +277,28 @@ class _SettingsScreenState extends State<SettingsScreen>
             ],
             const SizedBox(height: 16),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
+                color: Colors.white.withOpacity(0.14),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withOpacity(0.2)),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.22),
+                  width: 0.8,
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.business_center_outlined, color: Colors.white.withOpacity(0.8), size: 14),
-                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.business_center_outlined,
+                    color: Colors.white.withOpacity(0.75),
+                    size: 13,
+                  ),
+                  const SizedBox(width: 7),
                   Text(
                     s.paymentSystem,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withOpacity(0.85),
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
@@ -348,25 +314,31 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 12),
+      padding: const EdgeInsets.only(left: 4),
       child: Row(
         children: [
           Container(
-            width: 4, height: 18,
+            width: 3,
+            height: 16,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withOpacity(0.85),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
           const SizedBox(width: 10),
           Text(
             title,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.9),
               fontWeight: FontWeight.bold,
-              fontSize: 16,
-              shadows: [
-                Shadow(color: Colors.black26, offset: Offset(0, 1), blurRadius: 3),
+              fontSize: 14,
+              letterSpacing: 0.4,
+              shadows: const [
+                Shadow(
+                  color: Colors.black26,
+                  offset: Offset(0, 1),
+                  blurRadius: 3,
+                ),
               ],
             ),
           ),
@@ -378,150 +350,130 @@ class _SettingsScreenState extends State<SettingsScreen>
   Widget _buildSettingButton(
     IconData icon,
     String title,
-    String subtitle,
-    Color iconColor, {
+    String subtitle, {
     required VoidCallback onTap,
   }) {
-    final theme = Theme.of(context);
-    final isDarkBtn = theme.brightness == Brightness.dark;
-    final onSurface = theme.colorScheme.onSurface;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDarkBtn ? theme.colorScheme.surface : Colors.white.withOpacity(0.95),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+    return _GlassCard(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.18),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: Colors.white, size: 22),
             ),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: iconColor.withOpacity(0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(icon, color: iconColor, size: 24),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          subtitle,
-                          style: TextStyle(
-                            color: onSurface.withOpacity(0.55),
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
                     ),
                   ),
-                  Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    color: onSurface.withOpacity(0.3),
-                    size: 16,
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: Colors.white.withOpacity(0.7),
+                size: 13,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildThemeButton(S s) {
-    final theme = Theme.of(context);
-    final isDarkBtn = theme.brightness == Brightness.dark;
-    final onSurface = theme.colorScheme.onSurface;
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: themeNotifier,
       builder: (context, themeMode, _) {
         final isDark = themeMode == ThemeMode.dark;
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDarkBtn ? theme.colorScheme.surface : Colors.white.withOpacity(0.95),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+        return _GlassCard(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.theme,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        isDark ? s.darkTheme : s.lightTheme,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.6),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: isDark,
+                  activeColor: Colors.white,
+                  activeTrackColor: Colors.white.withOpacity(0.35),
+                  inactiveThumbColor: Colors.white,
+                  inactiveTrackColor: Colors.white.withOpacity(0.2),
+                  onChanged: (value) async {
+                    themeNotifier.value = value
+                        ? ThemeMode.dark
+                        : ThemeMode.light;
+                    await _storage.write(
+                      key: 'isDarkTheme',
+                      value: value.toString(),
+                    );
+                  },
                 ),
               ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF7B1FA2).withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.palette, color: Color(0xFF7B1FA2), size: 24),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          s.theme,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          isDark ? s.darkTheme : s.lightTheme,
-                          style: TextStyle(
-                            color: onSurface.withOpacity(0.55),
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Switch(
-                    value: isDark,
-                    activeColor: const Color(0xFF7B1FA2),
-                    onChanged: (value) async {
-                      themeNotifier.value = value ? ThemeMode.dark : ThemeMode.light;
-                      await _storage.write(key: 'isDarkTheme', value: value.toString());
-                    },
-                  ),
-                ],
-              ),
             ),
           ),
         );
@@ -532,21 +484,25 @@ class _SettingsScreenState extends State<SettingsScreen>
   Widget _buildVersionInfo(S s) {
     return Center(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 18),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
+          color: Colors.white.withOpacity(0.1),
           borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: Colors.white.withOpacity(0.3)),
+          border: Border.all(color: Colors.white.withOpacity(0.2), width: 0.8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.info_outline, size: 16, color: Colors.white.withOpacity(0.8)),
-            const SizedBox(width: 8),
+            Icon(
+              Icons.info_outline,
+              size: 14,
+              color: Colors.white.withOpacity(0.7),
+            ),
+            const SizedBox(width: 7),
             Text(
               s.appVersionLabel(_version),
               style: TextStyle(
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withOpacity(0.75),
                 fontSize: 12,
               ),
             ),
@@ -562,111 +518,235 @@ class _SettingsScreenState extends State<SettingsScreen>
 
     showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.45),
       builder: (BuildContext ctx) {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEF6C00).withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.language, color: Color(0xFFEF6C00), size: 24),
-                        ),
-                        const SizedBox(width: 16),
-                        Text(
-                          s.selectLanguage,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                      ],
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 40,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.25),
+                        width: 0.8,
+                      ),
                     ),
-                    const SizedBox(height: 20),
-                    ..._languages.map((lang) {
-                      final isSelected = selectedLang == lang['code'];
-                      return GestureDetector(
-                        onTap: () => setDialogState(() => selectedLang = lang['code']!),
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? _gradientStart.withOpacity(0.1)
-                                : Theme.of(context).colorScheme.surface,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected ? _gradientStart : Theme.of(context).colorScheme.outline,
-                              width: 1.5,
+                    padding: const EdgeInsets.all(22),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.18),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.language_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
                             ),
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: RadioListTile<String>(
-                              value: lang['code']!,
-                              groupValue: selectedLang,
-                              activeColor: _gradientStart,
-                              onChanged: (v) => setDialogState(() => selectedLang = v!),
-                              title: Text(
-                                lang['name']!,
-                                style: TextStyle(
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            const SizedBox(width: 14),
+                            Text(
+                              s.selectLanguage,
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        ..._languages.map((lang) {
+                          final isSelected = selectedLang == lang['code'];
+                          return GestureDetector(
+                            onTap: () => setDialogState(
+                              () => selectedLang = lang['code']!,
+                            ),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.white.withOpacity(0.22)
+                                    : Colors.white.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(13),
+                                border: Border.all(
                                   color: isSelected
-                                      ? _gradientStart
-                                      : Theme.of(context).colorScheme.onSurface,
+                                      ? Colors.white.withOpacity(0.7)
+                                      : Colors.white.withOpacity(0.18),
+                                  width: isSelected ? 1.2 : 0.8,
                                 ),
                               ),
-                              subtitle: Text(
-                                lang['desc']!,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                              child: Row(
+                                children: [
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    width: 22,
+                                    height: 22,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : Colors.transparent,
+                                      border: Border.all(
+                                        color: isSelected
+                                            ? Colors.white
+                                            : Colors.white.withOpacity(0.4),
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: isSelected
+                                        ? Center(
+                                            child: Container(
+                                              width: 10,
+                                              height: 10,
+                                              decoration: const BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: _gradientStart,
+                                              ),
+                                            ),
+                                          )
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 13),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          lang['name']!,
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: isSelected
+                                                ? FontWeight.bold
+                                                : FontWeight.w500,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          lang['desc']!,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.white.withOpacity(
+                                              0.55,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (isSelected)
+                                    Icon(
+                                      Icons.check_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => Navigator.of(ctx).pop(),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 13,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.22),
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      s.cancel,
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.75),
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.of(ctx).pop(),
-                          child: Text(
-                            s.cancel,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                              fontWeight: FontWeight.bold,
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  localeNotifier.value = Locale(selectedLang);
+                                  _storage.write(
+                                    key: 'locale',
+                                    value: selectedLang,
+                                  );
+                                  Navigator.of(ctx).pop();
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 13,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [_gradientStart, _gradientEnd],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: _gradientStart.withOpacity(0.4),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      s.save,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        ElevatedButton(
-                          onPressed: () {
-                            localeNotifier.value = Locale(selectedLang);
-                            Navigator.of(ctx).pop();
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _gradientStart,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          ),
-                          child: Text(s.save, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             );
@@ -681,14 +761,17 @@ class _SettingsScreenState extends State<SettingsScreen>
       context: context,
       builder: (BuildContext ctx) {
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 72, height: 72,
+                  width: 72,
+                  height: 72,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [_gradientStart, _gradientEnd],
@@ -699,37 +782,67 @@ class _SettingsScreenState extends State<SettingsScreen>
                     boxShadow: [
                       BoxShadow(
                         color: _gradientStart.withOpacity(0.35),
-                        blurRadius: 12,
+                        blurRadius: 14,
                         offset: const Offset(0, 4),
                       ),
                     ],
                   ),
                   child: const Center(
-                    child: Text("U", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 36)),
+                    child: Text(
+                      'U',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 36,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text("UztexPro", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const Text(
+                  'UztexPro',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 8),
                 Text(
                   s.versionLabel(_version),
-                  style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withOpacity(0.55),
+                  ),
                 ),
                 const SizedBox(height: 20),
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withOpacity(0.04),
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.08),
+                    ),
                   ),
                   child: Column(
                     children: [
-                      const Text("© 2026 UztexPro.", style: TextStyle(fontSize: 13)),
+                      const Text(
+                        '© 2026 UztexPro.',
+                        style: TextStyle(fontSize: 13),
+                      ),
                       const SizedBox(height: 8),
                       Text(
                         s.allRightsReserved,
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withOpacity(0.55),
+                        ),
                       ),
                     ],
                   ),
@@ -740,16 +853,155 @@ class _SettingsScreenState extends State<SettingsScreen>
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _gradientStart,
                     foregroundColor: Colors.white,
+                    elevation: 0,
                     minimumSize: const Size(double.infinity, 46),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  child: Text(s.close, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  child: Text(
+                    s.close,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
         );
       },
+    );
+  }
+}
+
+// ── Reusable glass card ─────────────────────────────────────────────────────
+
+class _GlassCard extends StatelessWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+
+  const _GlassCard({required this.child, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.13),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.22),
+                width: 0.8,
+              ),
+            ),
+            child: onTap != null
+                ? Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onTap,
+                      borderRadius: BorderRadius.circular(18),
+                      splashColor: Colors.white.withOpacity(0.08),
+                      highlightColor: Colors.white.withOpacity(0.05),
+                      child: child,
+                    ),
+                  )
+                : child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Glass AppBar ────────────────────────────────────────────────────────────
+
+class _GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
+  final String title;
+  final VoidCallback onBack;
+  final VoidCallback onInfo;
+  final String infoTooltip;
+
+  const _GlassAppBar({
+    required this.title,
+    required this.onBack,
+    required this.onInfo,
+    required this.infoTooltip,
+  });
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: ColoredBox(
+          color: Colors.white.withOpacity(0.08),
+          child: AppBar(
+            systemOverlayStyle: const SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.light,
+              statusBarBrightness: Brightness.dark,
+            ),
+            title: Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+            centerTitle: true,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            surfaceTintColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            leading: IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.white,
+                size: 20,
+              ),
+              onPressed: onBack,
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(
+                  Icons.info_outline,
+                  color: Colors.white,
+                  size: 22,
+                ),
+                onPressed: onInfo,
+                tooltip: infoTooltip,
+              ),
+            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(0.5),
+              child: Container(
+                height: 0.5,
+                color: Colors.white.withOpacity(0.15),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

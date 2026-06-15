@@ -496,6 +496,7 @@ class _PassesPageState extends State<PassesPage>
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
       ),
       child: Scaffold(
         extendBodyBehindAppBar: true,
@@ -503,6 +504,11 @@ class _PassesPageState extends State<PassesPage>
           title: Text(s.menuPasses,
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
           centerTitle: true,
+          systemOverlayStyle: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
+          ),
           backgroundColor: Colors.transparent,
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.white),

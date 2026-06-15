@@ -20,12 +20,20 @@ class _ProMobile extends State<PROApp> {
   void initState() {
     super.initState();
     _restoreTheme();
+    _restoreLocale();
   }
 
   Future<void> _restoreTheme() async {
     final saved = await storage.read(key: 'isDarkTheme');
     if (saved == 'true') {
       themeNotifier.value = ThemeMode.dark;
+    }
+  }
+
+  Future<void> _restoreLocale() async {
+    final saved = await storage.read(key: 'locale');
+    if (saved != null && saved.isNotEmpty) {
+      localeNotifier.value = Locale(saved);
     }
   }
 

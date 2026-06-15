@@ -298,6 +298,7 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
       ),
       child: Scaffold(
         extendBodyBehindAppBar: true,
@@ -310,6 +311,11 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
                 fontSize: 18),
           ),
           centerTitle: true,
+          systemOverlayStyle: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
+          ),
           backgroundColor: Colors.transparent,
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.white),

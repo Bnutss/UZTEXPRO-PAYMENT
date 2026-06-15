@@ -238,6 +238,7 @@ class _BonusDetailPageState extends State<BonusDetailPage> {
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
       ),
       child: Scaffold(
         extendBodyBehindAppBar: true,
@@ -250,6 +251,11 @@ class _BonusDetailPageState extends State<BonusDetailPage> {
                 color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
           ),
           centerTitle: true,
+          systemOverlayStyle: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
+          ),
           backgroundColor: Colors.transparent,
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.white),

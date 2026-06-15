@@ -14,19 +14,34 @@ import '../../core/localization/locale_notifier.dart';
 class PayStatusCfg {
   final Color color;
   final IconData icon;
+
   const PayStatusCfg(this.color, this.icon);
 }
 
 PayStatusCfg payStatusConfig(int code) {
   switch (code) {
-    case 1:  return const PayStatusCfg(Color(0xFF1976D2), Icons.fiber_new_rounded);
-    case 2:  return const PayStatusCfg(Color(0xFF43A047), Icons.verified_outlined);
-    case 4:  return const PayStatusCfg(Color(0xFF2E7D32), Icons.paid_outlined);
-    case 5:  return const PayStatusCfg(Color(0xFFEF6C00), Icons.account_balance_wallet_outlined);
-    case 6:  return const PayStatusCfg(Color(0xFFD32F2F), Icons.cancel_outlined);
-    case 9:  return const PayStatusCfg(Color(0xFF0288D1), Icons.how_to_reg_outlined);
-    case 10: return const PayStatusCfg(Color(0xFF1B5E20), Icons.workspace_premium_outlined);
-    default: return const PayStatusCfg(Color(0xFF1976D2), Icons.pending_outlined);
+    case 1:
+      return const PayStatusCfg(Color(0xFF1976D2), Icons.fiber_new_rounded);
+    case 2:
+      return const PayStatusCfg(Color(0xFF43A047), Icons.verified_outlined);
+    case 4:
+      return const PayStatusCfg(Color(0xFF2E7D32), Icons.paid_outlined);
+    case 5:
+      return const PayStatusCfg(
+        Color(0xFFEF6C00),
+        Icons.account_balance_wallet_outlined,
+      );
+    case 6:
+      return const PayStatusCfg(Color(0xFFD32F2F), Icons.cancel_outlined);
+    case 9:
+      return const PayStatusCfg(Color(0xFF0288D1), Icons.how_to_reg_outlined);
+    case 10:
+      return const PayStatusCfg(
+        Color(0xFF1B5E20),
+        Icons.workspace_premium_outlined,
+      );
+    default:
+      return const PayStatusCfg(Color(0xFF1976D2), Icons.pending_outlined);
   }
 }
 
@@ -34,6 +49,7 @@ PayStatusCfg payStatusConfig(int code) {
 
 class MainPageScreen extends StatefulWidget {
   final String jwtToken;
+
   const MainPageScreen({Key? key, required this.jwtToken}) : super(key: key);
 
   @override
@@ -59,7 +75,7 @@ class _MainPageScreenState extends State<MainPageScreen>
   int? _selectedStatusFilterId;
 
   static const Color _gradientStart = Color(0xFFFF8C00);
-  static const Color _gradientEnd   = Color(0xFFCC1500);
+  static const Color _gradientEnd = Color(0xFFCC1500);
 
   static List<dynamic>? _memStatuses;
   static List<dynamic>? _memReports;
@@ -73,7 +89,8 @@ class _MainPageScreenState extends State<MainPageScreen>
     final q = _searchController.text.toLowerCase().trim();
     return paymentReports.where((r) {
       if (_selectedStatusFilterId != null &&
-          r['status'] != _selectedStatusFilterId) return false;
+          r['status'] != _selectedStatusFilterId)
+        return false;
       if (q.isEmpty) return true;
       return r['id'].toString().contains(q) ||
           (r['bussines_name'] ?? '').toString().toLowerCase().contains(q) ||
@@ -131,26 +148,39 @@ class _MainPageScreenState extends State<MainPageScreen>
   }
 
   void showNotification(String message, bool isSuccess) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(children: [
-        Icon(isSuccess ? Icons.check_circle : Icons.error,
-            color: Colors.white, size: 16),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(message,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 2),
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isSuccess ? Icons.check_circle : Icons.error,
+              color: Colors.white,
+              size: 16,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+              ),
+            ),
+          ],
         ),
-      ]),
-      backgroundColor:
-          isSuccess ? const Color(0xFF43A047) : const Color(0xFFD32F2F),
-      duration: const Duration(seconds: 3),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      margin: const EdgeInsets.all(12),
-      elevation: 6,
-    ));
+        backgroundColor: isSuccess
+            ? const Color(0xFF43A047)
+            : const Color(0xFFD32F2F),
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(12),
+        elevation: 6,
+      ),
+    );
   }
 
   Future<void> fetchPaymentStatuses() async {
@@ -171,11 +201,18 @@ class _MainPageScreenState extends State<MainPageScreen>
         _memStatusesTime = now;
         if (mounted) setState(() => statuses = decoded);
       } else {
-        final response = await http.get(
-          Uri.parse('$API/edo/payment-raport-status/'),
-          headers: {'Authorization': 'Bearer ${jsonDecode(widget.jwtToken)["token"]}'},
-        ).timeout(const Duration(seconds: 15),
-            onTimeout: () => throw Exception('Timeout'));
+        final response = await http
+            .get(
+              Uri.parse('$API/edo/payment-raport-status/'),
+              headers: {
+                'Authorization':
+                    'Bearer ${jsonDecode(widget.jwtToken)["token"]}',
+              },
+            )
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () => throw Exception('Timeout'),
+            );
         if (response.statusCode == 200) {
           final jsonResponse = json.decode(utf8.decode(response.bodyBytes));
           _memStatuses = jsonResponse as List;
@@ -205,7 +242,8 @@ class _MainPageScreenState extends State<MainPageScreen>
         _animationController.forward();
       }
       if (_memReportsTime != null &&
-          now.difference(_memReportsTime!) < _kMemTTL) return;
+          now.difference(_memReportsTime!) < _kMemTTL)
+        return;
     } else {
       try {
         final cached = await storage.read(key: cacheKey);
@@ -223,11 +261,17 @@ class _MainPageScreenState extends State<MainPageScreen>
     }
 
     try {
-      final response = await http.get(
-        Uri.parse('$API/edo/payment-raport/?for_mobile=1'),
-        headers: {'Authorization': 'Bearer ${jsonDecode(widget.jwtToken)["token"]}'},
-      ).timeout(const Duration(seconds: 15),
-          onTimeout: () => throw Exception('Timeout'));
+      final response = await http
+          .get(
+            Uri.parse('$API/edo/payment-raport/?for_mobile=1'),
+            headers: {
+              'Authorization': 'Bearer ${jsonDecode(widget.jwtToken)["token"]}',
+            },
+          )
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () => throw Exception('Timeout'),
+          );
       if (!mounted) return;
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(utf8.decode(response.bodyBytes));
@@ -309,8 +353,11 @@ class _MainPageScreenState extends State<MainPageScreen>
                     ],
                   ),
                   child: Center(
-                    child: Icon(Icons.check_circle,
-                        color: Colors.green.shade600, size: 50),
+                    child: Icon(
+                      Icons.check_circle,
+                      color: Colors.green.shade600,
+                      size: 50,
+                    ),
                   ),
                 ),
               );
@@ -334,7 +381,8 @@ class _MainPageScreenState extends State<MainPageScreen>
     final outline = theme.colorScheme.outline;
     final cfg = payStatusConfig(selectedStatus['id'] as int);
 
-    bool confirmed = await showModalBottomSheet<bool>(
+    bool confirmed =
+        await showModalBottomSheet<bool>(
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
@@ -371,28 +419,37 @@ class _MainPageScreenState extends State<MainPageScreen>
                       ),
                     ),
                   ),
-                  Row(children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [_gradientStart, _gradientEnd],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [_gradientStart, _gradientEnd],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        borderRadius: BorderRadius.circular(12),
+                        child: const Icon(
+                          Icons.sync,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
-                      child: const Icon(Icons.sync, color: Colors.white, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(s.confirmAction,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          s.confirmAction,
                           style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: onSurface)),
-                    ),
-                  ]),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: onSurface,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -404,39 +461,51 @@ class _MainPageScreenState extends State<MainPageScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(s.changePaymentStatusTo,
-                            style: TextStyle(
-                                fontSize: 14,
-                                color: onSurface.withOpacity(0.7))),
+                        Text(
+                          s.changePaymentStatusTo,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: onSurface.withOpacity(0.7),
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: cfg.color.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
-                            border:
-                                Border.all(color: cfg.color.withOpacity(0.3)),
+                            border: Border.all(
+                              color: cfg.color.withOpacity(0.3),
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(cfg.icon, color: cfg.color, size: 18),
                               const SizedBox(width: 8),
-                              Text(selectedStatus['name'],
-                                  style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: cfg.color)),
+                              Text(
+                                selectedStatus['name'],
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: cfg.color,
+                                ),
+                              ),
                             ],
                           ),
                         ),
                         if (notes.isNotEmpty) ...[
                           const SizedBox(height: 12),
-                          Text(s.noteColon,
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  color: onSurface.withOpacity(0.7))),
+                          Text(
+                            s.noteColon,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: onSurface.withOpacity(0.7),
+                            ),
+                          ),
                           const SizedBox(height: 4),
                           Container(
                             width: double.infinity,
@@ -444,22 +513,27 @@ class _MainPageScreenState extends State<MainPageScreen>
                             decoration: BoxDecoration(
                               color: Colors.amber.shade50,
                               borderRadius: BorderRadius.circular(8),
-                              border:
-                                  Border.all(color: Colors.amber.shade200),
+                              border: Border.all(color: Colors.amber.shade200),
                             ),
-                            child: Text(notes,
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    color: onSurface.withOpacity(0.8))),
+                            child: Text(
+                              notes,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: onSurface.withOpacity(0.8),
+                              ),
+                            ),
                           ),
                         ],
                         if (partialPrice != null &&
                             partialPrice.isNotEmpty) ...[
                           const SizedBox(height: 12),
-                          Text(s.partialAmountColon,
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  color: onSurface.withOpacity(0.7))),
+                          Text(
+                            s.partialAmountColon,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: onSurface.withOpacity(0.7),
+                            ),
+                          ),
                           const SizedBox(height: 4),
                           Container(
                             width: double.infinity,
@@ -470,52 +544,65 @@ class _MainPageScreenState extends State<MainPageScreen>
                               border: Border.all(color: Colors.green.shade200),
                             ),
                             child: Text(
-                                '$partialPrice ${report['currency_name'] ?? ''}',
-                                style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green.shade800)),
+                              '$partialPrice ${report['currency_name'] ?? ''}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade800,
+                              ),
+                            ),
                           ),
                         ],
                       ],
                     ),
                   ),
                   const SizedBox(height: 20),
-                  Row(children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.of(context).pop(false),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                          side: BorderSide(color: outline),
-                        ),
-                        child: Text(s.cancel,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: BorderSide(color: outline),
+                          ),
+                          child: Text(
+                            s.cancel,
                             style: TextStyle(
-                                color: onSurface.withOpacity(0.7),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14)),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.of(context).pop(true),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          backgroundColor: _gradientStart,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
+                              color: onSurface.withOpacity(0.7),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
-                        child: Text(s.confirm,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 14)),
                       ),
-                    ),
-                  ]),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.of(context).pop(true),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            backgroundColor: _gradientStart,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            s.confirm,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             );
@@ -531,16 +618,16 @@ class _MainPageScreenState extends State<MainPageScreen>
         child: Center(
           child: Container(
             width: 180,
-            padding:
-                const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 12,
-                    spreadRadius: 2),
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 12,
+                  spreadRadius: 2,
+                ),
               ],
             ),
             child: Column(
@@ -551,17 +638,21 @@ class _MainPageScreenState extends State<MainPageScreen>
                   height: 40,
                   child: CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(
-                        Colors.orange.shade700),
+                      Colors.orange.shade700,
+                    ),
                     strokeWidth: 3,
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text(s.updating,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 14,
-                        color: Theme.of(context).colorScheme.onSurface)),
+                Text(
+                  s.updating,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
               ],
             ),
           ),
@@ -585,8 +676,7 @@ class _MainPageScreenState extends State<MainPageScreen>
             Uri.parse('$API/edo/payment-raport/${report['id']}/'),
             headers: {
               'Content-Type': 'application/json',
-              'Authorization':
-                  'Bearer ${jsonDecode(widget.jwtToken)["token"]}',
+              'Authorization': 'Bearer ${jsonDecode(widget.jwtToken)["token"]}',
             },
             body: jsonEncode(requestData),
           )
@@ -614,27 +704,35 @@ class _MainPageScreenState extends State<MainPageScreen>
       children: [
         Icon(icon, size: 16, color: Colors.orange.shade700),
         const SizedBox(width: 6),
-        Text(label,
-            style: TextStyle(
-                fontSize: 13,
-                color: onSurface.withOpacity(0.7),
-                fontWeight: FontWeight.w500)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: onSurface.withOpacity(0.7),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
         const SizedBox(width: 6),
         Expanded(
-          child: Text(value,
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: onSurface),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1),
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: onSurface,
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
         ),
       ],
     );
   }
 
   void showUpdateStatusDialog(
-      BuildContext context, Map<String, dynamic> report) {
+    BuildContext context,
+    Map<String, dynamic> report,
+  ) {
     final s = S.of(context);
     final theme = Theme.of(context);
     final surface = theme.colorScheme.surface;
@@ -660,7 +758,8 @@ class _MainPageScreenState extends State<MainPageScreen>
 
             return Padding(
               padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).viewInsets.bottom),
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
               child: Container(
                 decoration: BoxDecoration(
                   color: surface,
@@ -670,9 +769,10 @@ class _MainPageScreenState extends State<MainPageScreen>
                   ),
                   boxShadow: const [
                     BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 10,
-                        offset: Offset(0, -2)),
+                      color: Colors.black26,
+                      blurRadius: 10,
+                      offset: Offset(0, -2),
+                    ),
                   ],
                 ),
                 child: Column(
@@ -690,53 +790,66 @@ class _MainPageScreenState extends State<MainPageScreen>
                       ),
                     ),
                     Padding(
-                      padding:
-                          const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                      child: Row(children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [_gradientStart, _gradientEnd],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [_gradientStart, _gradientEnd],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            borderRadius: BorderRadius.circular(12),
+                            child: const Icon(
+                              Icons.edit_note,
+                              color: Colors.white,
+                              size: 24,
+                            ),
                           ),
-                          child: const Icon(Icons.edit_note,
-                              color: Colors.white, size: 24),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(s.changeStatus,
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  s.changeStatus,
                                   style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: onSurface)),
-                              const SizedBox(height: 4),
-                              Text(report['bussines_name'] ?? s.unnamed,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: onSurface,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  report['bussines_name'] ?? s.unnamed,
                                   style: TextStyle(
-                                      fontSize: 13,
-                                      color: onSurface.withOpacity(0.6)),
+                                    fontSize: 13,
+                                    color: onSurface.withOpacity(0.6),
+                                  ),
                                   maxLines: 1,
-                                  overflow: TextOverflow.ellipsis),
-                            ],
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        IconButton(
-                          onPressed: () =>
-                              Navigator.of(dialogContext).pop(),
-                          icon: Icon(Icons.close,
+                          IconButton(
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                            icon: Icon(
+                              Icons.close,
                               size: 20,
-                              color: onSurface.withOpacity(0.7)),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                              minWidth: 32, minHeight: 32),
-                        ),
-                      ]),
+                              color: onSurface.withOpacity(0.7),
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     Container(
                       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -746,33 +859,42 @@ class _MainPageScreenState extends State<MainPageScreen>
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: outline),
                       ),
-                      child: Column(children: [
-                        _buildCompactInfoRow(Icons.description_outlined,
+                      child: Column(
+                        children: [
+                          _buildCompactInfoRow(
+                            Icons.description_outlined,
                             s.contractColon,
-                            report['contract'] ?? s.noData),
-                        const SizedBox(height: 8),
-                        _buildCompactInfoRow(Icons.subject_outlined,
+                            report['contract'] ?? s.noData,
+                          ),
+                          const SizedBox(height: 8),
+                          _buildCompactInfoRow(
+                            Icons.subject_outlined,
                             s.subjectColon,
-                            report['sub_contract'] ?? s.noData),
-                        const SizedBox(height: 8),
-                        _buildCompactInfoRow(
+                            report['sub_contract'] ?? s.noData,
+                          ),
+                          const SizedBox(height: 8),
+                          _buildCompactInfoRow(
                             Icons.monetization_on_outlined,
                             s.amountColon,
-                            '${formatCurrency(report['contract_price'])} ${report['currency_name'] ?? ''}'),
-                      ]),
+                            '${formatCurrency(report['contract_price'])} ${report['currency_name'] ?? ''}',
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Padding(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 20),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(s.paymentStatus,
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: onSurface)),
+                          Text(
+                            s.paymentStatus,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: onSurface,
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           Container(
                             decoration: BoxDecoration(
@@ -782,143 +904,167 @@ class _MainPageScreenState extends State<MainPageScreen>
                             ),
                             child:
                                 DropdownButtonFormField<Map<String, dynamic>>(
-                              value: selectedStatus,
-                              isExpanded: true,
-                              dropdownColor: surface,
-                              decoration: InputDecoration(
-                                contentPadding:
-                                    const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 12),
-                                border: InputBorder.none,
-                                prefixIcon: Icon(
-                                    Icons.playlist_add_check,
-                                    color: Colors.orange.shade700),
-                                fillColor: Colors.transparent,
-                              ),
-                              hint: Text(s.selectPaymentStatus,
-                                  style:
-                                      const TextStyle(fontSize: 14)),
-                              icon: Icon(Icons.arrow_drop_down,
-                                  color: Colors.orange.shade700),
-                              items: statuses.map<
-                                  DropdownMenuItem<
-                                      Map<String, dynamic>>>((status) {
-                                final sc =
-                                    payStatusConfig(status['id'] as int);
-                                return DropdownMenuItem<
-                                    Map<String, dynamic>>(
-                                  value: status,
-                                  child: Row(children: [
-                                    Icon(sc.icon,
-                                        size: 18, color: sc.color),
-                                    const SizedBox(width: 8),
-                                    Text(status['name'],
-                                        style: TextStyle(
-                                            fontSize: 14,
-                                            color: onSurface)),
-                                  ]),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                setModalState(() {
-                                  selectedStatus = value;
-                                  showAmountField =
-                                      selectedStatus?['id'] == 5;
-                                });
-                              },
-                            ),
+                                  value: selectedStatus,
+                                  isExpanded: true,
+                                  dropdownColor: surface,
+                                  decoration: InputDecoration(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                    border: InputBorder.none,
+                                    prefixIcon: Icon(
+                                      Icons.playlist_add_check,
+                                      color: Colors.orange.shade700,
+                                    ),
+                                    fillColor: Colors.transparent,
+                                  ),
+                                  hint: Text(
+                                    s.selectPaymentStatus,
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                  icon: Icon(
+                                    Icons.arrow_drop_down,
+                                    color: Colors.orange.shade700,
+                                  ),
+                                  items: statuses
+                                      .map<
+                                        DropdownMenuItem<Map<String, dynamic>>
+                                      >((status) {
+                                        final sc = payStatusConfig(
+                                          status['id'] as int,
+                                        );
+                                        return DropdownMenuItem<
+                                          Map<String, dynamic>
+                                        >(
+                                          value: status,
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                sc.icon,
+                                                size: 18,
+                                                color: sc.color,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                status['name'],
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: onSurface,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      })
+                                      .toList(),
+                                  onChanged: (value) {
+                                    setModalState(() {
+                                      selectedStatus = value;
+                                      showAmountField =
+                                          selectedStatus?['id'] == 5;
+                                    });
+                                  },
+                                ),
                           ),
                         ],
                       ),
                     ),
                     if (showAmountField)
                       Padding(
-                        padding:
-                            const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(s.partialAmountLabel,
-                                style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: onSurface)),
+                            Text(
+                              s.partialAmountLabel,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: onSurface,
+                              ),
+                            ),
                             const SizedBox(height: 8),
                             TextField(
                               controller: amountController,
                               keyboardType: TextInputType.number,
-                              style: TextStyle(
-                                  fontSize: 14, color: onSurface),
+                              style: TextStyle(fontSize: 14, color: onSurface),
                               decoration: InputDecoration(
                                 hintText: s.enterAmount,
                                 hintStyle: TextStyle(
-                                    fontSize: 14,
-                                    color: onSurface.withOpacity(0.4)),
+                                  fontSize: 14,
+                                  color: onSurface.withOpacity(0.4),
+                                ),
                                 border: OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(12),
-                                  borderSide:
-                                      BorderSide(color: outline),
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: outline),
                                 ),
                                 focusedBorder: OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: Colors.orange.shade700,
-                                      width: 2),
+                                    color: Colors.orange.shade700,
+                                    width: 2,
+                                  ),
                                 ),
-                                prefixIcon: Icon(Icons.monetization_on,
-                                    size: 20,
-                                    color: Colors.orange.shade700),
-                                suffixText:
-                                    report['currency_name'] ?? '',
-                                contentPadding:
-                                    const EdgeInsets.symmetric(
-                                        vertical: 12, horizontal: 16),
+                                prefixIcon: Icon(
+                                  Icons.monetization_on,
+                                  size: 20,
+                                  color: Colors.orange.shade700,
+                                ),
+                                suffixText: report['currency_name'] ?? '',
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 16,
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
                     Padding(
-                      padding:
-                          const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(s.noteLabel,
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: onSurface)),
+                          Text(
+                            s.noteLabel,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: onSurface,
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           TextField(
                             controller: notesController,
                             maxLines: 2,
-                            style: TextStyle(
-                                fontSize: 14, color: onSurface),
+                            style: TextStyle(fontSize: 14, color: onSurface),
                             decoration: InputDecoration(
                               hintText: s.addComment,
                               hintStyle: TextStyle(
-                                  fontSize: 14,
-                                  color: onSurface.withOpacity(0.4)),
+                                fontSize: 14,
+                                color: onSurface.withOpacity(0.4),
+                              ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide:
-                                    BorderSide(color: outline),
+                                borderSide: BorderSide(color: outline),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
-                                    color: Colors.orange.shade700,
-                                    width: 2),
+                                  color: Colors.orange.shade700,
+                                  width: 2,
+                                ),
                               ),
-                              prefixIcon: Icon(Icons.comment,
-                                  size: 20,
-                                  color: Colors.orange.shade700),
-                              contentPadding:
-                                  const EdgeInsets.symmetric(
-                                      vertical: 12, horizontal: 16),
+                              prefixIcon: Icon(
+                                Icons.comment,
+                                size: 20,
+                                color: Colors.orange.shade700,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                                horizontal: 16,
+                              ),
                             ),
                           ),
                         ],
@@ -926,63 +1072,75 @@ class _MainPageScreenState extends State<MainPageScreen>
                     ),
                     Padding(
                       padding: const EdgeInsets.all(20),
-                      child: Row(children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () =>
-                                Navigator.of(dialogContext).pop(),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(12)),
-                              side: BorderSide(color: outline),
-                            ),
-                            child: Text(s.cancel,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () =>
+                                  Navigator.of(dialogContext).pop(),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                side: BorderSide(color: outline),
+                              ),
+                              child: Text(
+                                s.cancel,
                                 style: TextStyle(
-                                    color: onSurface.withOpacity(0.7),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14)),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              if (selectedStatus == null) {
-                                showNotification(
-                                    s.selectStatusFirst, false);
-                                return;
-                              }
-                              Navigator.of(dialogContext).pop();
-                              final statusToUpdate =
-                                  Map<String, dynamic>.from(
-                                      selectedStatus!);
-                              final notesText = notesController.text;
-                              final partialPrice = showAmountField
-                                  ? amountController.text
-                                  : null;
-                              updateReportStatus(report, statusToUpdate,
-                                  notesText, partialPrice);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 12),
-                              backgroundColor: _gradientStart,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(12)),
+                                  color: onSurface.withOpacity(0.7),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
                             ),
-                            child: Text(s.save,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14)),
                           ),
-                        ),
-                      ]),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                if (selectedStatus == null) {
+                                  showNotification(s.selectStatusFirst, false);
+                                  return;
+                                }
+                                Navigator.of(dialogContext).pop();
+                                final statusToUpdate =
+                                    Map<String, dynamic>.from(selectedStatus!);
+                                final notesText = notesController.text;
+                                final partialPrice = showAmountField
+                                    ? amountController.text
+                                    : null;
+                                updateReportStatus(
+                                  report,
+                                  statusToUpdate,
+                                  notesText,
+                                  partialPrice,
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                backgroundColor: _gradientStart,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                s.save,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -998,7 +1156,7 @@ class _MainPageScreenState extends State<MainPageScreen>
 
   Widget _shimmer(bool isDark) {
     final base = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
-    final hi   = isDark ? Colors.grey.shade700 : Colors.grey.shade100;
+    final hi = isDark ? Colors.grey.shade700 : Colors.grey.shade100;
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 32),
       itemCount: 6,
@@ -1034,18 +1192,28 @@ class _MainPageScreenState extends State<MainPageScreen>
               shape: BoxShape.circle,
               boxShadow: isDark
                   ? []
-                  : [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12)],
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 12,
+                      ),
+                    ],
             ),
-            child: Icon(Icons.business_center_outlined,
-                size: 38,
-                color: isDark ? Colors.white38 : Colors.grey.shade400),
+            child: Icon(
+              Icons.business_center_outlined,
+              size: 38,
+              color: isDark ? Colors.white38 : Colors.grey.shade400,
+            ),
           ),
           const SizedBox(height: 16),
-          Text(s.noContracts,
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white70 : Colors.grey.shade700)),
+          Text(
+            s.noContracts,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white70 : Colors.grey.shade700,
+            ),
+          ),
           const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: _refreshData,
@@ -1054,7 +1222,8 @@ class _MainPageScreenState extends State<MainPageScreen>
             style: FilledButton.styleFrom(
               backgroundColor: _gradientStart,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ],
@@ -1074,16 +1243,21 @@ class _MainPageScreenState extends State<MainPageScreen>
               color: isDark ? Colors.white10 : Colors.white,
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.search_off_rounded,
-                size: 38,
-                color: isDark ? Colors.white38 : Colors.grey.shade400),
+            child: Icon(
+              Icons.search_off_rounded,
+              size: 38,
+              color: isDark ? Colors.white38 : Colors.grey.shade400,
+            ),
           ),
           const SizedBox(height: 16),
-          Text(s.paymentNoResults,
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white70 : Colors.grey.shade700)),
+          Text(
+            s.paymentNoResults,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white70 : Colors.grey.shade700,
+            ),
+          ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: () {
@@ -1096,7 +1270,8 @@ class _MainPageScreenState extends State<MainPageScreen>
               foregroundColor: _gradientStart,
               side: const BorderSide(color: _gradientStart),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ],
@@ -1114,29 +1289,39 @@ class _MainPageScreenState extends State<MainPageScreen>
         ? [const Color(0xFF3D1800), const Color(0xFF1F0000)]
         : [_gradientStart, _gradientEnd];
     final surface = Theme.of(context).colorScheme.surface;
-    final listBg  = isDark ? surface : const Color(0xFFF4F4F4);
+    final listBg = isDark ? surface : const Color(0xFFF4F4F4);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
       ),
       child: Scaffold(
         appBar: AppBar(
-          title: Text(s.paymentAgreements,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18)),
+          title: Text(
+            s.paymentAgreements,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
           centerTitle: true,
+          systemOverlayStyle: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
+          ),
           backgroundColor: Colors.transparent,
           elevation: 0,
           flexibleSpace: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                  colors: gradColors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight),
+                colors: gradColors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
             ),
           ),
         ),
@@ -1146,19 +1331,22 @@ class _MainPageScreenState extends State<MainPageScreen>
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                    colors: gradColors,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight),
+                  colors: gradColors,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: Row(children: [
-                const Spacer(),
-                if (!isLoading)
-                  _PayCountBadge(
-                    shown: _filteredReports.length,
-                    total: paymentReports.length,
-                  ),
-              ]),
+              child: Row(
+                children: [
+                  const Spacer(),
+                  if (!isLoading)
+                    _PayCountBadge(
+                      shown: _filteredReports.length,
+                      total: paymentReports.length,
+                    ),
+                ],
+              ),
             ),
             // ── Search bar ──────────────────────────────────────────────────
             Container(
@@ -1183,24 +1371,25 @@ class _MainPageScreenState extends State<MainPageScreen>
                 isDark: isDark,
                 allLabel: s.filterAll,
                 onSelect: (id) => setState(
-                    () => _selectedStatusFilterId =
-                        _selectedStatusFilterId == id ? null : id),
+                  () => _selectedStatusFilterId = _selectedStatusFilterId == id
+                      ? null
+                      : id,
+                ),
               ),
             ),
             // ── List ────────────────────────────────────────────────────────
             Expanded(
-              child: Container(
-                color: listBg,
-                child: _buildBody(isDark, s),
-              ),
+              child: Container(color: listBg, child: _buildBody(isDark, s)),
             ),
           ],
         ),
         floatingActionButton: _showBackToTopButton
             ? FloatingActionButton(
-                onPressed: () => _scrollController.animateTo(0,
-                    duration: const Duration(milliseconds: 500),
-                    curve: Curves.easeInOut),
+                onPressed: () => _scrollController.animateTo(
+                  0,
+                  duration: const Duration(milliseconds: 500),
+                  curve: Curves.easeInOut,
+                ),
                 backgroundColor: Colors.white,
                 foregroundColor: _gradientStart,
                 mini: true,
@@ -1287,25 +1476,27 @@ class _PayCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme    = Theme.of(context);
-    final onSurf   = theme.colorScheme.onSurface;
-    final cardBg   = isDark ? theme.colorScheme.surfaceContainerHighest : Colors.white;
-    final s        = S.of(context);
+    final theme = Theme.of(context);
+    final onSurf = theme.colorScheme.onSurface;
+    final cardBg = isDark
+        ? theme.colorScheme.surfaceContainerHighest
+        : Colors.white;
+    final s = S.of(context);
 
-    final id          = report['id'] as int? ?? 0;
-    final statusId    = report['status'] as int? ?? 0;
-    final cfg         = payStatusConfig(statusId);
-    final statusName  = report['status_name']?.toString() ?? '-';
-    final bizName     = report['bussines_name']?.toString() ?? s.unnamed;
-    final contract    = report['contract']?.toString() ?? s.noData;
+    final id = report['id'] as int? ?? 0;
+    final statusId = report['status'] as int? ?? 0;
+    final cfg = payStatusConfig(statusId);
+    final statusName = report['status_name']?.toString() ?? '-';
+    final bizName = report['bussines_name']?.toString() ?? s.unnamed;
+    final contract = report['contract']?.toString() ?? s.noData;
     final subContract = report['sub_contract']?.toString() ?? s.noData;
-    final applicant   = report['applicant_name']?.toString() ?? s.notSpecified;
-    final payType     = report['raport_paying_type_name']?.toString() ?? '';
+    final applicant = report['applicant_name']?.toString() ?? s.notSpecified;
+    final payType = report['raport_paying_type_name']?.toString() ?? '';
     final contractAmt = _fmt(report['contract_price']);
-    final paid        = _fmt(report['paid']);
-    final currency    = report['currency_name']?.toString() ?? '';
-    final notes       = report['notes']?.toString() ?? '';
-    final hasChange   = report['has_change'] == true;
+    final paid = _fmt(report['paid']);
+    final currency = report['currency_name']?.toString() ?? '';
+    final notes = report['notes']?.toString() ?? '';
+    final hasChange = report['has_change'] == true;
 
     final payTypeColor = payType.toLowerCase().contains('пост')
         ? const Color(0xFF43A047)
@@ -1343,47 +1534,67 @@ class _PayCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(children: [
-                            // ID badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 7, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: cfg.color
-                                    .withOpacity(isDark ? 0.2 : 0.1),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                    color: cfg.color.withOpacity(0.35)),
+                          Row(
+                            children: [
+                              // ID badge
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: cfg.color.withOpacity(
+                                    isDark ? 0.2 : 0.1,
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: cfg.color.withOpacity(0.35),
+                                  ),
+                                ),
+                                child: Text(
+                                  '#$id',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: cfg.color,
+                                  ),
+                                ),
                               ),
-                              child: Text('#$id',
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  bizName,
                                   style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: cfg.color)),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(bizName,
-                                  style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: onSurf),
-                                  overflow: TextOverflow.ellipsis),
-                            ),
-                          ]),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: onSurf,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
                           if (hasChange)
                             Padding(
                               padding: const EdgeInsets.only(top: 4),
-                              child: Row(children: [
-                                Icon(Icons.edit_rounded,
-                                    size: 11, color: cfg.color),
-                                const SizedBox(width: 4),
-                                Text(s.available,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.edit_rounded,
+                                    size: 11,
+                                    color: cfg.color,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    s.available,
                                     style: TextStyle(
-                                        fontSize: 11,
-                                        color: cfg.color,
-                                        fontWeight: FontWeight.w600)),
-                              ]),
+                                      fontSize: 11,
+                                      color: cfg.color,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                         ],
                       ),
@@ -1395,36 +1606,41 @@ class _PayCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: isDark ? Colors.white10 : Colors.grey.shade100),
+                  height: 1,
+                  thickness: 1,
+                  color: isDark ? Colors.white10 : Colors.grey.shade100,
+                ),
                 const SizedBox(height: 8),
                 // ── Info rows ──────────────────────────────────────────────
                 _PayInfoLine(
-                    icon: Icons.description_outlined,
-                    label: s.contract,
-                    text: contract,
-                    onSurface: onSurf),
+                  icon: Icons.description_outlined,
+                  label: s.contract,
+                  text: contract,
+                  onSurface: onSurf,
+                ),
                 const SizedBox(height: 5),
                 _PayInfoLine(
-                    icon: Icons.subject_outlined,
-                    label: s.subject,
-                    text: subContract,
-                    onSurface: onSurf),
+                  icon: Icons.subject_outlined,
+                  label: s.subject,
+                  text: subContract,
+                  onSurface: onSurf,
+                ),
                 const SizedBox(height: 5),
                 _PayInfoLine(
-                    icon: Icons.person_outline_rounded,
-                    label: s.applicant,
-                    text: applicant,
-                    onSurface: onSurf),
+                  icon: Icons.person_outline_rounded,
+                  label: s.applicant,
+                  text: applicant,
+                  onSurface: onSurf,
+                ),
                 if (payType.isNotEmpty) ...[
                   const SizedBox(height: 5),
                   _PayInfoLine(
-                      icon: Icons.credit_card_outlined,
-                      label: s.paymentType,
-                      text: payType,
-                      onSurface: onSurf,
-                      valueColor: payTypeColor),
+                    icon: Icons.credit_card_outlined,
+                    label: s.paymentType,
+                    text: payType,
+                    onSurface: onSurf,
+                    valueColor: payTypeColor,
+                  ),
                 ],
                 const SizedBox(height: 8),
                 // ── Amount row ─────────────────────────────────────────────
@@ -1445,37 +1661,48 @@ class _PayCard extends StatelessWidget {
                 if (onOpenFile != null || onCopyUrl != null || hasChange) ...[
                   const SizedBox(height: 8),
                   Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: isDark ? Colors.white10 : Colors.grey.shade100),
+                    height: 1,
+                    thickness: 1,
+                    color: isDark ? Colors.white10 : Colors.grey.shade100,
+                  ),
                   const SizedBox(height: 6),
-                  Row(children: [
-                    if (hasChange) ...[
-                      Icon(Icons.touch_app_rounded,
-                          size: 13, color: cfg.color),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(s.tapToChangeStatus,
+                  Row(
+                    children: [
+                      if (hasChange) ...[
+                        Icon(
+                          Icons.touch_app_rounded,
+                          size: 13,
+                          color: cfg.color,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            s.tapToChangeStatus,
                             style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: cfg.color)),
-                      ),
-                    ] else
-                      const Spacer(),
-                    if (onOpenFile != null)
-                      _PayIconBtn(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: cfg.color,
+                            ),
+                          ),
+                        ),
+                      ] else
+                        const Spacer(),
+                      if (onOpenFile != null)
+                        _PayIconBtn(
                           icon: Icons.open_in_new_rounded,
                           tooltip: 'Открыть',
-                          onTap: onOpenFile!),
-                    if (onCopyUrl != null) ...[
-                      const SizedBox(width: 6),
-                      _PayIconBtn(
+                          onTap: onOpenFile!,
+                        ),
+                      if (onCopyUrl != null) ...[
+                        const SizedBox(width: 6),
+                        _PayIconBtn(
                           icon: Icons.copy_rounded,
                           tooltip: 'Копировать',
-                          onTap: onCopyUrl!),
+                          onTap: onCopyUrl!,
+                        ),
+                      ],
                     ],
-                  ]),
+                  ),
                 ],
               ],
             ),
@@ -1492,10 +1719,12 @@ class _PaySearchBar extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final bool isDark;
-  const _PaySearchBar(
-      {required this.controller,
-      required this.hint,
-      required this.isDark});
+
+  const _PaySearchBar({
+    required this.controller,
+    required this.hint,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1503,19 +1732,19 @@ class _PaySearchBar extends StatelessWidget {
     return Container(
       height: 46,
       decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withOpacity(0.07)
-            : Colors.grey.shade100,
+        color: isDark ? Colors.white.withOpacity(0.07) : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-            color: isDark ? Colors.white12 : Colors.grey.shade200),
+          color: isDark ? Colors.white12 : Colors.grey.shade200,
+        ),
         boxShadow: isDark
             ? []
             : [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2))
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
               ],
       ),
       child: TextField(
@@ -1524,17 +1753,24 @@ class _PaySearchBar extends StatelessWidget {
         decoration: InputDecoration(
           hintText: '$hint...',
           hintStyle: TextStyle(
-              color: onSurface.withOpacity(0.38), fontSize: 14),
-          prefixIcon: Icon(Icons.search_rounded,
-              color: onSurface.withOpacity(0.38), size: 20),
+            color: onSurface.withOpacity(0.38),
+            fontSize: 14,
+          ),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            color: onSurface.withOpacity(0.38),
+            size: 20,
+          ),
           suffixIcon: ValueListenableBuilder<TextEditingValue>(
             valueListenable: controller,
             builder: (_, v, __) => v.text.isEmpty
                 ? const SizedBox.shrink()
                 : IconButton(
-                    icon: Icon(Icons.clear_rounded,
-                        size: 18,
-                        color: onSurface.withOpacity(0.4)),
+                    icon: Icon(
+                      Icons.clear_rounded,
+                      size: 18,
+                      color: onSurface.withOpacity(0.4),
+                    ),
                     onPressed: controller.clear,
                   ),
           ),
@@ -1608,12 +1844,14 @@ class _PaySChip extends StatelessWidget {
   final Color color;
   final bool isDark;
   final VoidCallback onTap;
-  const _PaySChip(
-      {required this.label,
-      required this.selected,
-      required this.color,
-      required this.isDark,
-      required this.onTap});
+
+  const _PaySChip({
+    required this.label,
+    required this.selected,
+    required this.color,
+    required this.isDark,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1621,32 +1859,32 @@ class _PaySChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: selected
               ? color
-              : (isDark
-                  ? Colors.white.withOpacity(0.07)
-                  : Colors.white),
+              : (isDark ? Colors.white.withOpacity(0.07) : Colors.white),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-              color: selected
-                  ? color
-                  : (isDark ? Colors.white12 : Colors.grey.shade200)),
+            color: selected
+                ? color
+                : (isDark ? Colors.white12 : Colors.grey.shade200),
+          ),
           boxShadow: selected
               ? [
                   BoxShadow(
-                      color: color.withOpacity(0.28),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2))
+                    color: color.withOpacity(0.28),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
                 ]
               : [
                   if (!isDark)
                     BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1))
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
                 ],
         ),
         child: Row(
@@ -1657,18 +1895,18 @@ class _PaySChip extends StatelessWidget {
                 width: 7,
                 height: 7,
                 margin: const EdgeInsets.only(right: 6),
-                decoration:
-                    BoxDecoration(shape: BoxShape.circle, color: color),
+                decoration: BoxDecoration(shape: BoxShape.circle, color: color),
               ),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: selected
-                        ? Colors.white
-                        : (isDark
-                            ? Colors.white70
-                            : Colors.grey.shade700))),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: selected
+                    ? Colors.white
+                    : (isDark ? Colors.white70 : Colors.grey.shade700),
+              ),
+            ),
           ],
         ),
       ),
@@ -1681,6 +1919,7 @@ class _PaySChip extends StatelessWidget {
 class _PayCountBadge extends StatelessWidget {
   final int shown;
   final int total;
+
   const _PayCountBadge({required this.shown, required this.total});
 
   @override
@@ -1690,14 +1929,16 @@ class _PayCountBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.2),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-            color: Colors.white.withOpacity(0.35), width: 1),
+        border: Border.all(color: Colors.white.withOpacity(0.35), width: 1),
       ),
-      child: Text(shown == total ? '$total' : '$shown / $total',
-          style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.white)),
+      child: Text(
+        shown == total ? '$total' : '$shown / $total',
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
     );
   }
 }
@@ -1707,33 +1948,38 @@ class _PayCountBadge extends StatelessWidget {
 class _PayStatusBadge extends StatelessWidget {
   final PayStatusCfg cfg;
   final String label;
+
   const _PayStatusBadge({required this.cfg, required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
         color: cfg.color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(20),
-        border:
-            Border.all(color: cfg.color.withOpacity(0.35), width: 1),
+        border: Border.all(color: cfg.color.withOpacity(0.35), width: 1),
       ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(cfg.icon, size: 12, color: cfg.color),
-        const SizedBox(width: 5),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 120),
-          child: Text(label,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(cfg.icon, size: 12, color: cfg.color),
+          const SizedBox(width: 5),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 120),
+            child: Text(
+              label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: cfg.color)),
-        ),
-      ]),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: cfg.color,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1746,31 +1992,40 @@ class _PayInfoLine extends StatelessWidget {
   final String text;
   final Color onSurface;
   final Color? valueColor;
-  const _PayInfoLine(
-      {required this.icon,
-      required this.label,
-      required this.text,
-      required this.onSurface,
-      this.valueColor});
+
+  const _PayInfoLine({
+    required this.icon,
+    required this.label,
+    required this.text,
+    required this.onSurface,
+    this.valueColor,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Icon(icon, size: 13, color: onSurface.withOpacity(0.35)),
-      const SizedBox(width: 6),
-      Text('$label: ',
-          style: TextStyle(
-              fontSize: 12, color: onSurface.withOpacity(0.45))),
-      Expanded(
-        child: Text(text,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 13, color: onSurface.withOpacity(0.35)),
+        const SizedBox(width: 6),
+        Text(
+          '$label: ',
+          style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.45)),
+        ),
+        Expanded(
+          child: Text(
+            text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: valueColor ?? onSurface.withOpacity(0.85))),
-      ),
-    ]);
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: valueColor ?? onSurface.withOpacity(0.85),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -1783,63 +2038,68 @@ class _PayAmountRow extends StatelessWidget {
   final bool isDark;
   final Color onSurface;
   final S s;
-  const _PayAmountRow(
-      {required this.contractAmt,
-      required this.paid,
-      required this.currency,
-      required this.isDark,
-      required this.onSurface,
-      required this.s});
+
+  const _PayAmountRow({
+    required this.contractAmt,
+    required this.paid,
+    required this.currency,
+    required this.isDark,
+    required this.onSurface,
+    required this.s,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withOpacity(0.04)
-            : Colors.grey.shade50,
+        color: isDark ? Colors.white.withOpacity(0.04) : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-            color: isDark ? Colors.white10 : Colors.grey.shade200),
+          color: isDark ? Colors.white10 : Colors.grey.shade200,
+        ),
       ),
-      child: Row(children: [
-        Expanded(
-          child: _AmtCell(
-            icon: Icons.account_balance_outlined,
-            label: s.contractAmount,
-            value: contractAmt,
-            color: Colors.orange.shade700,
-            onSurface: onSurface,
+      child: Row(
+        children: [
+          Expanded(
+            child: _AmtCell(
+              icon: Icons.account_balance_outlined,
+              label: s.contractAmount,
+              value: contractAmt,
+              color: Colors.orange.shade700,
+              onSurface: onSurface,
+            ),
           ),
-        ),
-        Container(
+          Container(
             width: 1,
             height: 36,
-            color: isDark ? Colors.white10 : Colors.grey.shade200),
-        Expanded(
-          child: _AmtCell(
-            icon: Icons.payment_outlined,
-            label: s.toPay,
-            value: paid,
-            color: Colors.green.shade700,
-            onSurface: onSurface,
+            color: isDark ? Colors.white10 : Colors.grey.shade200,
           ),
-        ),
-        Container(
+          Expanded(
+            child: _AmtCell(
+              icon: Icons.payment_outlined,
+              label: s.toPay,
+              value: paid,
+              color: Colors.green.shade700,
+              onSurface: onSurface,
+            ),
+          ),
+          Container(
             width: 1,
             height: 36,
-            color: isDark ? Colors.white10 : Colors.grey.shade200),
-        Expanded(
-          child: _AmtCell(
-            icon: Icons.currency_exchange_outlined,
-            label: s.currency,
-            value: currency.isEmpty ? '-' : currency,
-            color: Colors.indigo.shade700,
-            onSurface: onSurface,
+            color: isDark ? Colors.white10 : Colors.grey.shade200,
           ),
-        ),
-      ]),
+          Expanded(
+            child: _AmtCell(
+              icon: Icons.currency_exchange_outlined,
+              label: s.currency,
+              value: currency.isEmpty ? '-' : currency,
+              color: Colors.indigo.shade700,
+              onSurface: onSurface,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1850,32 +2110,44 @@ class _AmtCell extends StatelessWidget {
   final String value;
   final Color color;
   final Color onSurface;
-  const _AmtCell(
-      {required this.icon,
-      required this.label,
-      required this.value,
-      required this.color,
-      required this.onSurface});
+
+  const _AmtCell({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.onSurface,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
-      Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 11, color: color),
-        const SizedBox(width: 3),
-        Text(label,
-            style: TextStyle(
-                fontSize: 9, color: onSurface.withOpacity(0.5))),
-      ]),
-      const SizedBox(height: 3),
-      Text(value,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 11, color: color),
+            const SizedBox(width: 3),
+            Text(
+              label,
+              style: TextStyle(fontSize: 9, color: onSurface.withOpacity(0.5)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
           style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: onSurface),
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: onSurface,
+          ),
           overflow: TextOverflow.ellipsis,
-          maxLines: 1),
-    ]);
+          maxLines: 1,
+        ),
+      ],
+    );
   }
 }
 
@@ -1885,14 +2157,17 @@ class _PayIconBtn extends StatelessWidget {
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
-  const _PayIconBtn(
-      {required this.icon, required this.tooltip, required this.onTap});
+
+  const _PayIconBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color =
-        isDark ? Colors.blue.shade300 : Colors.blue.shade600;
+    final color = isDark ? Colors.blue.shade300 : Colors.blue.shade600;
     return Tooltip(
       message: tooltip,
       preferBelow: false,
@@ -1907,19 +2182,26 @@ class _PayIconBtn extends StatelessWidget {
                 : Colors.blue.shade50,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-                color: isDark
-                    ? Colors.blue.withValues(alpha: 0.25)
-                    : Colors.blue.shade100),
+              color: isDark
+                  ? Colors.blue.withValues(alpha: 0.25)
+                  : Colors.blue.shade100,
+            ),
           ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 5),
-            Text(tooltip,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 5),
+              Text(
+                tooltip,
                 style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: color)),
-          ]),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1931,26 +2213,33 @@ class _PayIconBtn extends StatelessWidget {
 class _PayNoteRow extends StatelessWidget {
   final String text;
   final bool isDark;
+
   const _PayNoteRow({required this.text, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
-    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Icon(Icons.notes_rounded,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          Icons.notes_rounded,
           size: 13,
-          color: isDark ? Colors.amber.shade300 : Colors.amber.shade700),
-      const SizedBox(width: 6),
-      Expanded(
-        child: Text(text,
+          color: isDark ? Colors.amber.shade300 : Colors.amber.shade700,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-                fontSize: 11,
-                fontStyle: FontStyle.italic,
-                color: isDark
-                    ? Colors.amber.shade300
-                    : Colors.amber.shade800)),
-      ),
-    ]);
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+              color: isDark ? Colors.amber.shade300 : Colors.amber.shade800,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
