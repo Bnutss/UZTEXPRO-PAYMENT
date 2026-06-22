@@ -770,15 +770,10 @@ class _SettingsScreenState extends State<SettingsScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 72,
-                  height: 72,
+                  width: 80,
+                  height: 80,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [_gradientStart, _gradientEnd],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
                         color: _gradientStart.withOpacity(0.35),
@@ -787,22 +782,15 @@ class _SettingsScreenState extends State<SettingsScreen>
                       ),
                     ],
                   ),
-                  child: const Center(
-                    child: Text(
-                      'U',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 36,
-                      ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Image.asset(
+                      'assets/icon/uztexpro.png',
+                      fit: BoxFit.cover,
                     ),
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
-                  'UztexPro',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
                 const SizedBox(height: 8),
                 Text(
                   s.versionLabel(_version),
@@ -829,9 +817,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ),
                   child: Column(
                     children: [
-                      const Text(
-                        '© 2026 UztexPro.',
-                        style: TextStyle(fontSize: 13),
+                      Text(
+                        DateTime.now().year > 2026
+                            ? '© 2026–${DateTime.now().year} UztexPro.'
+                            : '© 2026 UztexPro.',
+                        style: const TextStyle(fontSize: 13),
                       ),
                       const SizedBox(height: 8),
                       Text(

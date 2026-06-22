@@ -558,11 +558,11 @@ class S {
 
   String get allRightsReserved => _t({
     'ru':
-        'Все права защищены. Приложение предназначено для управления платежными договорами.',
+        'Все права защищены. Приложение предназначено для управления производственными данными.',
     'en':
-        'All rights reserved. The application is designed for managing payment agreements.',
+        'All rights reserved. The application is designed for managing production data.',
     'uz':
-        "Barcha huquqlar himoyalangan. Ilova to'lov shartnomalari boshqarish uchun mo'ljallangan.",
+        "Barcha huquqlar himoyalangan. Ilova ishlab chiqarish ma'lumotlarini boshqarish uchun mo'ljallangan.",
   });
 
   // Confidentiality

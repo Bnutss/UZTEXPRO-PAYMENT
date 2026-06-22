@@ -375,8 +375,7 @@ class _MenuPageState extends State<MenuPage>
                     width: 52,
                     height: 52,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.16),
@@ -385,10 +384,11 @@ class _MenuPageState extends State<MenuPage>
                         ),
                       ],
                     ),
-                    child: ClipOval(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
                       child: Image.asset(
-                        'assets/icon/logo.png',
-                        fit: BoxFit.contain,
+                        'assets/icon/uztexpro.png',
+                        fit: BoxFit.cover,
                       ),
                     ),
                   ),

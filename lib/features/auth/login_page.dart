@@ -388,22 +388,22 @@ class _LoginPageState extends State<LoginPage>
 
   Widget _buildLogo() {
     return Container(
-      width: 100,
-      height: 100,
+      width: 110,
+      height: 110,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withOpacity(0.25),
             blurRadius: 24,
             spreadRadius: 2,
             offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: ClipOval(
-        child: Image.asset('assets/icon/logo.png', fit: BoxFit.contain),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Image.asset('assets/icon/uztexpro.png', fit: BoxFit.cover),
       ),
     );
   }
