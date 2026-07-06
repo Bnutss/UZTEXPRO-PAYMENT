@@ -69,6 +69,18 @@ class S {
     'uz': 'Mukofotlarni tasdiqlash',
   });
 
+  String get menuProductModels => _t({
+    'ru': 'Подтверждение моделей',
+    'en': 'Model Confirmation',
+    'uz': 'Modellarni tasdiqlash',
+  });
+
+  String get menuProductModelsDesc => _t({
+    'ru': 'Подтверждение цен моделей',
+    'en': 'Confirm model prices',
+    'uz': 'Model narxlarini tasdiqlash',
+  });
+
   // Sign Requests Page
   String get signRequestsTitle => _t({
     'ru': 'Подпись заявок',
@@ -688,6 +700,179 @@ class S {
     'ru': 'Превышено время ожидания. Попробуйте ещё раз.',
     'en': 'Request timed out. Please try again.',
     'uz': "Kutish vaqti tugadi. Qayta urinib ko'ring.",
+  });
+
+  // Product Models Page
+  String get productModelsTitle => _t({
+    'ru': 'Подтверждение моделей',
+    'en': 'Model Confirmation',
+    'uz': 'Modellarni tasdiqlash',
+  });
+
+  String get productModelsEmpty => _t({
+    'ru': 'Модели не найдены',
+    'en': 'No models found',
+    'uz': 'Modellar topilmadi',
+  });
+
+  String get productModelSearchHint => _t({
+    'ru': 'Артикул, название или заказчик',
+    'en': 'Code, name or customer',
+    'uz': "Artikul, nomi yoki mijoz",
+  });
+
+  String get firmLabel =>
+      _t({'ru': 'Заказчик', 'en': 'Customer', 'uz': 'Mijoz'});
+
+  String get vendorCodeLabel =>
+      _t({'ru': 'Артикул', 'en': 'Vendor code', 'uz': 'Artikul'});
+
+  String get priceLabel => _t({'ru': 'Цена', 'en': 'Price', 'uz': 'Narx'});
+
+  String get priceConfirmed => _t({
+    'ru': 'Цена подтверждена',
+    'en': 'Price confirmed',
+    'uz': 'Narx tasdiqlangan',
+  });
+
+  String get priceNotConfirmed => _t({
+    'ru': 'Цена не подтверждена',
+    'en': 'Price not confirmed',
+    'uz': 'Narx tasdiqlanmagan',
+  });
+
+  String get confirmPriceTitle => _t({
+    'ru': 'Подтвердить цену?',
+    'en': 'Confirm price?',
+    'uz': 'Narxni tasdiqlaysizmi?',
+  });
+
+  String get confirmPriceDesc => _t({
+    'ru': 'Вы подтверждаете правильность цены модели',
+    'en': 'You confirm that the model price is correct',
+    'uz': "Model narxi to'g'riligini tasdiqlaysiz",
+  });
+
+  String get confirmPriceBtn =>
+      _t({'ru': 'Подтвердить', 'en': 'Confirm', 'uz': 'Tasdiqlash'});
+
+  String get confirmPriceSuccess => _t({
+    'ru': 'Цена подтверждена',
+    'en': 'Price confirmed',
+    'uz': 'Narx tasdiqlandi',
+  });
+
+  String get unconfirmPriceTitle => _t({
+    'ru': 'Снять подтверждение цены?',
+    'en': 'Revoke price confirmation?',
+    'uz': "Narx tasdig'ini bekor qilasizmi?",
+  });
+
+  String get unconfirmPriceDesc => _t({
+    'ru': 'Подтверждение цены будет отменено',
+    'en': 'The price confirmation will be revoked',
+    'uz': "Narx tasdig'i bekor qilinadi",
+  });
+
+  String get unconfirmPriceBtn => _t({
+    'ru': 'Снять подтверждение',
+    'en': 'Revoke confirmation',
+    'uz': "Tasdiqni bekor qilish",
+  });
+
+  String get unconfirmPriceSuccess => _t({
+    'ru': 'Подтверждение снято',
+    'en': 'Confirmation revoked',
+    'uz': "Tasdiq bekor qilindi",
+  });
+
+  String get noPricePermission => _t({
+    'ru': 'Нет прав для подтверждения цены',
+    'en': 'No permission to confirm price',
+    'uz': "Narxni tasdiqlashga ruxsat yo'q",
+  });
+
+  String get productModelDetailTitle =>
+      _t({'ru': 'Модель', 'en': 'Model', 'uz': 'Model'});
+
+  String get seasonLabel => _t({'ru': 'Сезон', 'en': 'Season', 'uz': 'Mavsum'});
+
+  String get categoryLabel =>
+      _t({'ru': 'Категория', 'en': 'Category', 'uz': 'Kategoriya'});
+
+  String get pricingSection =>
+      _t({'ru': 'Ценообразование', 'en': 'Pricing', 'uz': "Narx shakllantirish"});
+
+  String get cuttingPriceLabel =>
+      _t({'ru': 'Раскрой', 'en': 'Cutting', 'uz': 'Kesish'});
+
+  String get transferPriceLabel =>
+      _t({'ru': 'Перевод', 'en': 'Transfer', 'uz': "O'tkazma"});
+
+  String get printPriceLabel =>
+      _t({'ru': 'Печать', 'en': 'Print', 'uz': 'Bosma'});
+
+  String get embroideryPriceLabel =>
+      _t({'ru': 'Вышивка', 'en': 'Embroidery', 'uz': 'Kashta'});
+
+  String get accessoryCostLabel =>
+      _t({'ru': 'Аксессуары', 'en': 'Accessories', 'uz': 'Aksessuarlar'});
+
+  String get sewingLossLabel => _t({
+    'ru': 'Потери на пошив, %',
+    'en': 'Sewing loss, %',
+    'uz': "Tikuvda yo'qotish, %",
+  });
+
+  String get otherExpensesLabel => _t({
+    'ru': 'Прочие расходы, %',
+    'en': 'Other expenses, %',
+    'uz': 'Boshqa xarajatlar, %',
+  });
+
+  String get profitabilityLabel =>
+      _t({'ru': 'Рентабельность, %', 'en': 'Profitability, %', 'uz': 'Rentabellik, %'});
+
+  String get commissionLabel =>
+      _t({'ru': 'Комиссия, %', 'en': 'Commission, %', 'uz': 'Komissiya, %'});
+
+  String get discountLabel =>
+      _t({'ru': 'Скидка, %', 'en': 'Discount, %', 'uz': 'Chegirma, %'});
+
+  String get discountCostLabel => _t({
+    'ru': 'Цена со скидкой',
+    'en': 'Discounted price',
+    'uz': 'Chegirmali narx',
+  });
+
+  String get confirmationSection => _t({
+    'ru': 'Подтверждение цены',
+    'en': 'Price confirmation',
+    'uz': "Narx tasdig'i",
+  });
+
+  String materialsCountLabel(int count) => _t({
+    'ru': 'Материалы ($count)',
+    'en': 'Materials ($count)',
+    'uz': 'Materiallar ($count)',
+  });
+
+  String get noMaterials => _t({
+    'ru': 'Материалы не указаны',
+    'en': 'No materials specified',
+    'uz': "Materiallar ko'rsatilmagan",
+  });
+
+  String accessoriesCountLabel(int count) => _t({
+    'ru': 'Аксессуары ($count)',
+    'en': 'Accessories ($count)',
+    'uz': 'Aksessuarlar ($count)',
+  });
+
+  String get noAccessories => _t({
+    'ru': 'Аксессуары не указаны',
+    'en': 'No accessories specified',
+    'uz': "Aksessuarlar ko'rsatilmagan",
   });
 
   // Passes Page

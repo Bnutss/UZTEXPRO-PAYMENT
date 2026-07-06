@@ -8,6 +8,7 @@ import 'main_page.dart';
 import '../passes/passes_page.dart';
 import '../sign_requests/sign_requests_page.dart';
 import '../bonuses/bonuses_page.dart';
+import '../product_models/product_models_page.dart';
 import '../settings/settings_screen.dart';
 import '../auth/login_page.dart';
 import '../../core/localization/app_strings.dart';
@@ -559,6 +560,18 @@ class _MenuPageState extends State<MenuPage>
           context,
           MaterialPageRoute(
             builder: (_) => BonusesPage(jwtToken: widget.jwtToken),
+          ),
+        ),
+      ),
+      const SizedBox(height: 12),
+      _MenuCard(
+        icon: Icons.checkroom_rounded,
+        label: s.menuProductModels,
+        description: s.menuProductModelsDesc,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProductModelsPage(jwtToken: widget.jwtToken),
           ),
         ),
       ),
