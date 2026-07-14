@@ -202,8 +202,19 @@ class _LoginPageState extends State<LoginPage>
         statusBarIconBrightness: Brightness.light,
         statusBarBrightness: Brightness.dark,
       ),
-      child: Scaffold(
-        body: isLoading ? _buildLoadingView(s) : _buildLoginView(s),
+      // Same reasoning as MenuPage's tab bar: the native iOS 26 Liquid Glass
+      // buttons/switch on this screen sit on our own vivid orange/red
+      // gradient, and the system's real light-mode glass reads as washed
+      // out on it. Nothing else on this screen depends on the real
+      // light/dark brightness, so it's safe to force the more contrasty
+      // dark glass style everywhere here.
+      child: MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(platformBrightness: Brightness.dark),
+        child: Scaffold(
+          body: isLoading ? _buildLoadingView(s) : _buildLoginView(s),
+        ),
       ),
     );
   }
@@ -548,7 +559,10 @@ class _LoginPageState extends State<LoginPage>
                 AdaptiveSwitch(
                   value: _useBiometrics,
                   onChanged: toggleBiometricPreference,
-                  activeColor: Colors.white,
+                  // A pure-white "on" track is invisible against this
+                  // translucent white card — use the brand accent instead.
+                  activeColor: primaryColor,
+                  thumbColor: Colors.white,
                 ),
               ],
             ),
