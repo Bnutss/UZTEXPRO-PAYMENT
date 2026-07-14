@@ -81,6 +81,37 @@ class S {
     'uz': 'Model narxlarini tasdiqlash',
   });
 
+  // Dashboard
+  String get exchangeRates =>
+      _t({'ru': 'Курс валют', 'en': 'Exchange rates', 'uz': 'Valyuta kursi'});
+
+  String get reportsSection =>
+      _t({'ru': 'Рапорты', 'en': 'Reports', 'uz': 'Hisobotlar'});
+
+  String get dashboardSignPending => _t({
+    'ru': 'Заявки на подпись',
+    'en': 'Sign requests',
+    'uz': 'Imzolash arizalari',
+  });
+
+  String get dashboardNewReports => _t({
+    'ru': 'Новые рапорты',
+    'en': 'New reports',
+    'uz': 'Yangi hisobotlar',
+  });
+
+  // Bottom navigation
+  String get navHome => _t({'ru': 'Главная', 'en': 'Home', 'uz': 'Asosiy'});
+
+  String get navConfirmations =>
+      _t({'ru': 'Подтверждения', 'en': 'Confirmations', 'uz': 'Tasdiqlashlar'});
+
+  String get navProduction =>
+      _t({'ru': 'Производство', 'en': 'Production', 'uz': "Ishlab chiqarish"});
+
+  String get navSettings =>
+      _t({'ru': 'Настройки', 'en': 'Settings', 'uz': 'Sozlamalar'});
+
   // Sign Requests Page
   String get signRequestsTitle => _t({
     'ru': 'Подпись заявок',

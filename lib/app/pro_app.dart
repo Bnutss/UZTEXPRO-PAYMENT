@@ -15,12 +15,14 @@ class PROApp extends StatefulWidget {
 
 class _ProMobile extends State<PROApp> {
   final storage = AppStorage();
+  late final Future<String> _jwtFuture;
 
   @override
   void initState() {
     super.initState();
     _restoreTheme();
     _restoreLocale();
+    _jwtFuture = jwtOrEmpty;
   }
 
   Future<void> _restoreTheme() async {
@@ -60,13 +62,30 @@ class _ProMobile extends State<PROApp> {
               locale: locale,
               theme: _lightTheme(),
               darkTheme: _darkTheme(),
+              // adaptive_platform_ui's native iOS 26 platform views (tab bar,
+              // buttons) read MediaQuery.platformBrightness to sync their own
+              // Liquid Glass appearance — that reflects the phone's system
+              // Dark Mode setting, not our in-app themeNotifier. Without this
+              // override the native bar drifts out of sync with our theme
+              // toggle and re-syncs to the *system* brightness on every
+              // didChangeDependencies (e.g. after any navigation).
+              builder: (context, child) {
+                return MediaQuery(
+                  data: MediaQuery.of(context).copyWith(
+                    platformBrightness: themeMode == ThemeMode.dark
+                        ? Brightness.dark
+                        : Brightness.light,
+                  ),
+                  child: child!,
+                );
+              },
               home: UpgradeAlert(
                 upgrader: Upgrader(),
                 showIgnore: false,
                 showLater: true,
                 dialogStyle: UpgradeDialogStyle.cupertino,
                 child: FutureBuilder<String>(
-                  future: jwtOrEmpty,
+                  future: _jwtFuture,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Scaffold(

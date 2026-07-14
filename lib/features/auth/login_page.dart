@@ -1,10 +1,9 @@
-import 'dart:convert';
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:local_auth/local_auth.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import '../../core/storage/app_storage.dart';
 import 'package:uztexpro_payment/features/home/menu_page.dart';
 import 'package:uztexpro_payment/main.dart';
@@ -170,23 +169,10 @@ class _LoginPageState extends State<LoginPage>
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.info_outline, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(message, style: const TextStyle(fontSize: 14)),
-            ),
-          ],
-        ),
-        backgroundColor: accentColor,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(12),
-        duration: const Duration(seconds: 4),
-      ),
+    AdaptiveSnackBar.show(
+      context,
+      message: message,
+      type: AdaptiveSnackBarType.error,
     );
   }
 
@@ -493,59 +479,16 @@ class _LoginPageState extends State<LoginPage>
   }
 
   Widget _buildLoginButton(S s) {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       height: 56,
-      decoration: BoxDecoration(
+      child: AdaptiveButton(
+        onPressed: _login,
+        label: s.signIn,
+        textColor: Colors.white,
+        style: AdaptiveButtonStyle.glass,
+        size: AdaptiveButtonSize.large,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.14),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _login,
-              splashColor: Colors.white.withOpacity(0.08),
-              highlightColor: Colors.white.withOpacity(0.05),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.22),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.5),
-                    width: 1,
-                  ),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  s.signIn,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.8,
-                    color: Colors.white,
-                    shadows: [
-                      Shadow(
-                        color: Colors.black26,
-                        offset: Offset(0, 1),
-                        blurRadius: 4,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -602,13 +545,10 @@ class _LoginPageState extends State<LoginPage>
                     ],
                   ),
                 ),
-                Switch(
+                AdaptiveSwitch(
                   value: _useBiometrics,
                   onChanged: toggleBiometricPreference,
                   activeColor: Colors.white,
-                  activeTrackColor: Colors.white.withOpacity(0.4),
-                  inactiveThumbColor: Colors.white.withOpacity(0.6),
-                  inactiveTrackColor: Colors.white.withOpacity(0.2),
                 ),
               ],
             ),
@@ -622,26 +562,26 @@ class _LoginPageState extends State<LoginPage>
     return SizedBox(
       width: double.infinity,
       height: 50,
-      child: ElevatedButton.icon(
+      child: AdaptiveButton.child(
         onPressed: () => loginWithBiometrics(context),
-        icon: const Icon(Icons.fingerprint, size: 24, color: Colors.white),
-        label: Text(
-          s.signInBiometric,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1,
-            color: Colors.white,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white.withOpacity(0.2),
-          shadowColor: Colors.transparent,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: Colors.white.withOpacity(0.6), width: 1.5),
-          ),
+        style: AdaptiveButtonStyle.glass,
+        size: AdaptiveButtonSize.large,
+        borderRadius: BorderRadius.circular(16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.fingerprint, size: 22, color: Colors.white),
+            const SizedBox(width: 10),
+            Text(
+              s.signInBiometric,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1,
+                color: Colors.white,
+              ),
+            ),
+          ],
         ),
       ),
     );
