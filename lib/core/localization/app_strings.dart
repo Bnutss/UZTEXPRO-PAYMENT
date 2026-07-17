@@ -823,6 +823,54 @@ class S {
     'uz': "Narxni tasdiqlashga ruxsat yo'q",
   });
 
+  String get filterByStatus =>
+      _t({'ru': 'Статус', 'en': 'Status', 'uz': 'Holat'});
+
+  String get confirmedShort =>
+      _t({'ru': 'Подтверждена', 'en': 'Confirmed', 'uz': 'Tasdiqlangan'});
+
+  String get notConfirmedShort => _t({
+    'ru': 'Не подтверждена',
+    'en': 'Not confirmed',
+    'uz': 'Tasdiqlanmagan',
+  });
+
+  String get selectCustomerTitle => _t({
+    'ru': 'Выберите заказчика',
+    'en': 'Select customer',
+    'uz': 'Mijozni tanlang',
+  });
+
+  String get selectStatusTitle => _t({
+    'ru': 'Статус цены',
+    'en': 'Price status',
+    'uz': 'Narx holati',
+  });
+
+  String get searchCustomerHint => _t({
+    'ru': 'Поиск заказчика',
+    'en': 'Search customer',
+    'uz': 'Mijozni qidirish',
+  });
+
+  String get noCustomersFound => _t({
+    'ru': 'Заказчики не найдены',
+    'en': 'No customers found',
+    'uz': 'Mijozlar topilmadi',
+  });
+
+  String get noFilterResults => _t({
+    'ru': 'Нет моделей по выбранным фильтрам',
+    'en': 'No models match the selected filters',
+    'uz': "Tanlangan filtrlar bo'yicha model topilmadi",
+  });
+
+  String get resetFilters => _t({
+    'ru': 'Сбросить фильтры',
+    'en': 'Reset filters',
+    'uz': 'Filtrlarni tozalash',
+  });
+
   String get productModelDetailTitle =>
       _t({'ru': 'Модель', 'en': 'Model', 'uz': 'Model'});
 

@@ -58,6 +58,7 @@ class _ProductModelsPageState extends State<ProductModelsPage>
   int _count = 0;
   final Set<String> _knownFirms = {};
   bool _skipNextSearchEvent = false;
+  bool? _statusFilter; // null = all, true = confirmed, false = not confirmed
 
   final _searchCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
@@ -161,6 +162,36 @@ class _ProductModelsPageState extends State<ProductModelsPage>
     }
   }
 
+  // The status filter is client-side only (the API has no such query param),
+  // so it only ever narrows down items already fetched.
+  List<dynamic> get _filteredItems {
+    if (_statusFilter == null) return _items;
+    return _items
+        .where((e) => ((e as Map)['price_confirmed'] == true) == _statusFilter)
+        .toList();
+  }
+
+  // When a status filter hides most of the loaded page, the list can end up
+  // too short to scroll, so the normal "load more on scroll" trigger never
+  // fires. Keep pulling more pages in the background until there's enough
+  // visible content or the server runs out.
+  void _maybeAutoFillFilter() {
+    if (_statusFilter == null) return;
+    if (!_hasMore || _isLoadingMore || _isLoading) return;
+    if (_filteredItems.length >= 10) return;
+    _loadMore();
+  }
+
+  void _setStatusFilter(bool? value) {
+    setState(() => _statusFilter = value);
+    _maybeAutoFillFilter();
+  }
+
+  void _resetFilters() {
+    setState(() => _statusFilter = null);
+    if (_query.isNotEmpty) _selectFirm('');
+  }
+
   @override
   void dispose() {
     _animCtrl.dispose();
@@ -204,6 +235,7 @@ class _ProductModelsPageState extends State<ProductModelsPage>
       _refreshing = refreshing;
       _error = null;
     });
+    _maybeAutoFillFilter();
   }
 
   Future<void> _load({required bool reset}) async {
@@ -311,6 +343,7 @@ class _ProductModelsPageState extends State<ProductModelsPage>
           _hasMore = page.hasMore;
           _isLoadingMore = false;
         });
+        _maybeAutoFillFilter();
       } else {
         setState(() => _isLoadingMore = false);
       }
@@ -391,6 +424,78 @@ class _ProductModelsPageState extends State<ProductModelsPage>
       _snack(S.of(context).connectionError, false);
       setState(() => item['_busy'] = false);
     }
+  }
+
+  // ── Filter pickers ───────────────────────────────────────────────────────────
+
+  Future<void> _showFirmPicker() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final s = S.of(context);
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _FirmPickerSheet(
+        isDark: isDark,
+        firms: _knownFirms.toList()..sort(),
+        selected: _query,
+        allLabel: s.filterAll,
+        title: s.selectCustomerTitle,
+        searchHint: s.searchCustomerHint,
+        emptyLabel: s.noCustomersFound,
+        onSelect: (firm) {
+          Navigator.pop(context);
+          _selectFirm(firm);
+        },
+      ),
+    );
+  }
+
+  Future<void> _showStatusPicker() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final s = S.of(context);
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _PickerSheet(
+        isDark: isDark,
+        title: s.selectStatusTitle,
+        children: [
+          _PickerTile(
+            icon: Icons.apps_rounded,
+            label: s.filterAll,
+            selected: _statusFilter == null,
+            isDark: isDark,
+            onTap: () {
+              Navigator.pop(ctx);
+              _setStatusFilter(null);
+            },
+          ),
+          _PickerTile(
+            icon: Icons.check_circle_outline_rounded,
+            label: s.priceConfirmed,
+            selected: _statusFilter == true,
+            isDark: isDark,
+            accentColor: const Color(0xFF43A047),
+            onTap: () {
+              Navigator.pop(ctx);
+              _setStatusFilter(true);
+            },
+          ),
+          _PickerTile(
+            icon: Icons.hourglass_empty_rounded,
+            label: s.priceNotConfirmed,
+            selected: _statusFilter == false,
+            isDark: isDark,
+            onTap: () {
+              Navigator.pop(ctx);
+              _setStatusFilter(false);
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   // ── Dialogs ──────────────────────────────────────────────────────────────────
@@ -622,13 +727,27 @@ class _ProductModelsPageState extends State<ProductModelsPage>
             if (_knownFirms.isNotEmpty)
               Container(
                 color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _FirmFilterRow(
-                  firms: _knownFirms.toList()..sort(),
-                  selected: _query,
-                  isDark: isDark,
-                  allLabel: s.filterAll,
-                  onSelect: _selectFirm,
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                child: Builder(
+                  builder: (_) {
+                    final firmActive =
+                        _query.isNotEmpty && _knownFirms.contains(_query);
+                    return _FilterBar(
+                      isDark: isDark,
+                      firmActive: firmActive,
+                      firmLabel: firmActive ? _query : s.firmLabel,
+                      statusActive: _statusFilter != null,
+                      statusLabel: _statusFilter == null
+                          ? s.filterByStatus
+                          : (_statusFilter == true
+                                ? s.confirmedShort
+                                : s.notConfirmedShort),
+                      showReset: firmActive || _statusFilter != null,
+                      onFirmTap: _showFirmPicker,
+                      onStatusTap: _showStatusPicker,
+                      onReset: _resetFilters,
+                    );
+                  },
                 ),
               ),
             Expanded(
@@ -737,6 +856,23 @@ class _ProductModelsPageState extends State<ProductModelsPage>
       );
     }
 
+    final filteredItems = _filteredItems;
+    if (filteredItems.isEmpty && !_hasMore) {
+      return _buildFilterEmptyState(isDark);
+    }
+    if (filteredItems.isEmpty && _hasMore) {
+      return const Center(
+        child: SizedBox(
+          width: 26,
+          height: 26,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            valueColor: AlwaysStoppedAnimation(Color(0xFFFF8C00)),
+          ),
+        ),
+      );
+    }
+
     return FadeTransition(
       opacity: _fadeAnim,
       child: RefreshIndicator(
@@ -745,9 +881,9 @@ class _ProductModelsPageState extends State<ProductModelsPage>
         child: ListView.builder(
           controller: _scrollCtrl,
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 32),
-          itemCount: _items.length + (_hasMore ? 1 : 0),
+          itemCount: filteredItems.length + (_hasMore ? 1 : 0),
           itemBuilder: (_, i) {
-            if (i >= _items.length) {
+            if (i >= filteredItems.length) {
               return const Padding(
                 padding: EdgeInsets.symmetric(vertical: 20),
                 child: Center(
@@ -762,7 +898,7 @@ class _ProductModelsPageState extends State<ProductModelsPage>
                 ),
               );
             }
-            final item = _items[i] as Map<String, dynamic>;
+            final item = filteredItems[i] as Map<String, dynamic>;
             return _ProductModelCard(
               item: item,
               isDark: isDark,
@@ -784,6 +920,64 @@ class _ProductModelsPageState extends State<ProductModelsPage>
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterEmptyState(bool isDark) {
+    final s = S.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white10 : Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: isDark
+                    ? []
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 12,
+                        ),
+                      ],
+              ),
+              child: Icon(
+                Icons.filter_alt_off_rounded,
+                size: 34,
+                color: isDark ? Colors.white38 : Colors.grey.shade400,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              s.noFilterResults,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white70 : Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 18),
+            OutlinedButton.icon(
+              onPressed: _resetFilters,
+              icon: const Icon(Icons.filter_alt_off_outlined, size: 16),
+              label: Text(s.resetFilters),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _g1,
+                side: BorderSide(color: _g1.withOpacity(0.4)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1268,61 +1462,74 @@ class _CountBadge extends StatelessWidget {
   }
 }
 
-// ─── Firm filter chips ─────────────────────────────────────────────────────────
+// ─── Filter bar (client / status dropdowns) ────────────────────────────────────
 
-class _FirmFilterRow extends StatelessWidget {
-  final List<String> firms;
-  final String selected;
+class _FilterBar extends StatelessWidget {
   final bool isDark;
-  final String allLabel;
-  final ValueChanged<String> onSelect;
+  final bool firmActive;
+  final String firmLabel;
+  final bool statusActive;
+  final String statusLabel;
+  final bool showReset;
+  final VoidCallback onFirmTap;
+  final VoidCallback onStatusTap;
+  final VoidCallback onReset;
 
-  const _FirmFilterRow({
-    required this.firms,
-    required this.selected,
+  const _FilterBar({
     required this.isDark,
-    required this.allLabel,
-    required this.onSelect,
+    required this.firmActive,
+    required this.firmLabel,
+    required this.statusActive,
+    required this.statusLabel,
+    required this.showReset,
+    required this.onFirmTap,
+    required this.onStatusTap,
+    required this.onReset,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 34,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        children: [
-          _FirmChip(
-            label: allLabel,
-            selected: selected.isEmpty,
+    return Row(
+      children: [
+        Expanded(
+          child: _FilterPill(
+            icon: Icons.storefront_outlined,
+            label: firmLabel,
+            active: firmActive,
             isDark: isDark,
-            onTap: () => onSelect(''),
+            onTap: onFirmTap,
           ),
-          for (final firm in firms) ...[
-            const SizedBox(width: 6),
-            _FirmChip(
-              label: firm,
-              selected: selected == firm,
-              isDark: isDark,
-              onTap: () => onSelect(firm),
-            ),
-          ],
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _FilterPill(
+            icon: Icons.verified_outlined,
+            label: statusLabel,
+            active: statusActive,
+            isDark: isDark,
+            onTap: onStatusTap,
+          ),
+        ),
+        if (showReset) ...[
+          const SizedBox(width: 8),
+          _ResetFiltersButton(isDark: isDark, onTap: onReset),
         ],
-      ),
+      ],
     );
   }
 }
 
-class _FirmChip extends StatelessWidget {
+class _FilterPill extends StatelessWidget {
+  final IconData icon;
   final String label;
-  final bool selected;
+  final bool active;
   final bool isDark;
   final VoidCallback onTap;
 
-  const _FirmChip({
+  const _FilterPill({
+    required this.icon,
     required this.label,
-    required this.selected,
+    required this.active,
     required this.isDark,
     required this.onTap,
   });
@@ -1331,73 +1538,365 @@ class _FirmChip extends StatelessWidget {
   Widget build(BuildContext context) {
     const color = Color(0xFFFF8C00);
     const color2 = Color(0xFFCC1500);
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        constraints: const BoxConstraints(maxWidth: 160),
-        decoration: BoxDecoration(
-          gradient: selected
-              ? const LinearGradient(
-                  colors: [color, color2],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          color: selected
-              ? null
-              : (isDark ? Colors.white.withOpacity(0.07) : Colors.white),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: selected
-                ? Colors.transparent
-                : (isDark ? Colors.white12 : Colors.grey.shade200),
-          ),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: color.withOpacity(0.32),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : [
-                  if (!isDark)
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            gradient: active
+                ? const LinearGradient(
+                    colors: [color, color2],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            color: active
+                ? null
+                : (isDark ? Colors.white.withOpacity(0.07) : Colors.white),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: active
+                  ? Colors.transparent
+                  : (isDark ? Colors.white12 : Colors.grey.shade200),
+            ),
+            boxShadow: active
+                ? [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
+                      color: color.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
-                ],
+                  ]
+                : [
+                    if (!isDark)
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                  ],
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: active
+                    ? Colors.white
+                    : (isDark ? Colors.white54 : Colors.grey.shade500),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: active
+                        ? Colors.white
+                        : (isDark ? Colors.white70 : Colors.grey.shade700),
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 16,
+                color: active
+                    ? Colors.white
+                    : (isDark ? Colors.white54 : Colors.grey.shade500),
+              ),
+            ],
+          ),
         ),
-        child: Row(
+      ),
+    );
+  }
+}
+
+class _ResetFiltersButton extends StatelessWidget {
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _ResetFiltersButton({required this.isDark, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.red.shade900.withOpacity(0.25)
+                : Colors.red.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark
+                  ? Colors.red.shade300.withOpacity(0.3)
+                  : Colors.red.shade100,
+            ),
+          ),
+          child: Icon(
+            Icons.filter_alt_off_rounded,
+            size: 17,
+            color: isDark ? Colors.red.shade300 : Colors.red.shade400,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Filter picker bottom sheets ────────────────────────────────────────────────
+
+class _PickerSheet extends StatelessWidget {
+  final bool isDark;
+  final String title;
+  final Widget? search;
+  final List<Widget> children;
+
+  const _PickerSheet({
+    required this.isDark,
+    required this.title,
+    this.search,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (!selected)
-              Icon(
-                Icons.storefront_outlined,
-                size: 12,
-                color: isDark ? Colors.white54 : Colors.grey.shade500,
+            const SizedBox(height: 10),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white24 : Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(4),
               ),
-            if (!selected) const SizedBox(width: 5),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: isDark ? Colors.white54 : Colors.grey.shade500,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            if (search != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: search!,
+              ),
             Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: selected
-                      ? Colors.white
-                      : (isDark ? Colors.white70 : Colors.grey.shade700),
-                ),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
+                children: children,
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PickerTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final bool isDark;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  const _PickerTile({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.isDark,
+    this.accentColor = const Color(0xFFFF8C00),
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? accentColor.withOpacity(isDark ? 0.18 : 0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? accentColor.withOpacity(0.4) : Colors.transparent,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: selected
+                    ? accentColor
+                    : (isDark ? Colors.white38 : Colors.grey.shade400),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: selected
+                        ? accentColor
+                        : (isDark ? Colors.white70 : Colors.grey.shade800),
+                  ),
+                ),
+              ),
+              if (selected)
+                Icon(Icons.check_rounded, size: 18, color: accentColor),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FirmPickerSheet extends StatefulWidget {
+  final bool isDark;
+  final List<String> firms;
+  final String selected;
+  final String allLabel;
+  final String title;
+  final String searchHint;
+  final String emptyLabel;
+  final ValueChanged<String> onSelect;
+
+  const _FirmPickerSheet({
+    required this.isDark,
+    required this.firms,
+    required this.selected,
+    required this.allLabel,
+    required this.title,
+    required this.searchHint,
+    required this.emptyLabel,
+    required this.onSelect,
+  });
+
+  @override
+  State<_FirmPickerSheet> createState() => _FirmPickerSheetState();
+}
+
+class _FirmPickerSheetState extends State<_FirmPickerSheet> {
+  final _ctrl = TextEditingController();
+  String _q = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.addListener(() => setState(() => _q = _ctrl.text.trim()));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _q.isEmpty
+        ? widget.firms
+        : widget.firms
+              .where((f) => f.toLowerCase().contains(_q.toLowerCase()))
+              .toList();
+    return _PickerSheet(
+      isDark: widget.isDark,
+      title: widget.title,
+      search: _SearchBar(
+        controller: _ctrl,
+        hintText: widget.searchHint,
+        isDark: widget.isDark,
+      ),
+      children: [
+        if (_q.isEmpty)
+          _PickerTile(
+            icon: Icons.apps_rounded,
+            label: widget.allLabel,
+            selected: widget.selected.isEmpty,
+            isDark: widget.isDark,
+            onTap: () => widget.onSelect(''),
+          ),
+        for (final f in filtered)
+          _PickerTile(
+            icon: Icons.storefront_outlined,
+            label: f,
+            selected: widget.selected == f,
+            isDark: widget.isDark,
+            onTap: () => widget.onSelect(f),
+          ),
+        if (filtered.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 30),
+            child: Center(
+              child: Text(
+                widget.emptyLabel,
+                style: TextStyle(
+                  color: widget.isDark ? Colors.white38 : Colors.grey.shade400,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
