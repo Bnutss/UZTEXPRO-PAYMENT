@@ -3,15 +3,26 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:uztexpro_payment/main.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import 'product_model_detail_page.dart';
+import 'product_photo.dart';
 
 const _kProductModelListPath = 'sewing/product-model-list';
 const _kConfirmPricePath = 'sewing/product-model';
 const _kPageLimit = 30;
+
+String _fmtDateTime(String? raw) {
+  if (raw == null || raw.isEmpty) return '—';
+  try {
+    return DateFormat('dd.MM.yyyy HH:mm:ss').format(DateTime.parse(raw));
+  } catch (_) {
+    return raw;
+  }
+}
 
 class _Page {
   final List<dynamic> items;
@@ -1040,6 +1051,7 @@ class _ProductModelCard extends StatelessWidget {
     final confirmed = item['price_confirmed'] == true;
     final confirmedBy = item['price_confirmed_by_name']?.toString() ?? '';
     final confirmedAt = item['price_confirmed_at']?.toString() ?? '';
+    final confirmedAtDisplay = confirmedAt.isEmpty ? '' : _fmtDateTime(confirmedAt);
     final busy = item['_busy'] == true;
 
     final statusColor = confirmed
@@ -1073,18 +1085,11 @@ class _ProductModelCard extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: statusColor.withOpacity(isDark ? 0.2 : 0.12),
-                      ),
-                      child: Icon(
-                        Icons.checkroom_rounded,
-                        color: statusColor,
-                        size: 20,
-                      ),
+                    ProductPhotoThumbnail(
+                      imageUrl: resolveProductImageUrl(item['image_url']),
+                      size: 52,
+                      heroTag: 'product_photo_${item['id']}',
+                      isDark: isDark,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -1160,7 +1165,7 @@ class _ProductModelCard extends StatelessWidget {
                     label: s.confirmedByLabel,
                     text: [
                       confirmedBy,
-                      confirmedAt,
+                      confirmedAtDisplay,
                     ].where((e) => e.isNotEmpty).join(' · '),
                     onSurface: onSurface,
                   ),

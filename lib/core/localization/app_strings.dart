@@ -886,7 +886,7 @@ class S {
       _t({'ru': 'Раскрой', 'en': 'Cutting', 'uz': 'Kesish'});
 
   String get transferPriceLabel =>
-      _t({'ru': 'Перевод', 'en': 'Transfer', 'uz': "O'tkazma"});
+      _t({'ru': 'Трансфер', 'en': 'Transfer', 'uz': "O'tkazma"});
 
   String get printPriceLabel =>
       _t({'ru': 'Печать', 'en': 'Print', 'uz': 'Bosma'});
@@ -952,6 +952,12 @@ class S {
     'ru': 'Аксессуары не указаны',
     'en': 'No accessories specified',
     'uz': "Aksessuarlar ko'rsatilmagan",
+  });
+
+  String get noPricingData => _t({
+    'ru': 'Данные о ценообразовании не заполнены',
+    'en': 'Pricing details not filled in',
+    'uz': "Narx shakllantirish ma'lumotlari kiritilmagan",
   });
 
   // Passes Page

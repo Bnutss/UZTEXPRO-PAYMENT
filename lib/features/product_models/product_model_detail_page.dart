@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:uztexpro_payment/main.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
+import 'product_photo.dart';
 
 const _kDetailPath = 'sewing/product-model-list';
 const _kConfirmPricePath = 'sewing/product-model';
@@ -16,6 +18,15 @@ String _fmtNum(dynamic raw) {
   if (n == null) return raw.toString();
   if (n == n.truncateToDouble()) return n.toInt().toString();
   return n.toStringAsFixed(2);
+}
+
+String _fmtDateTime(String? raw) {
+  if (raw == null || raw.isEmpty) return '—';
+  try {
+    return DateFormat('dd.MM.yyyy HH:mm:ss').format(DateTime.parse(raw));
+  } catch (_) {
+    return raw;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -496,29 +507,12 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
                 padding: const EdgeInsets.fromLTRB(20, 10, 20, 22),
                 child: Column(
                   children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.16),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
-                          width: 1.2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.12),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.checkroom_rounded,
-                        color: Colors.white,
-                        size: 28,
-                      ),
+                    ProductPhotoThumbnail(
+                      imageUrl: resolveProductImageUrl(model['image_url']),
+                      size: 88,
+                      heroTag: 'product_photo_${widget.modelId}',
+                      isDark: isDark,
+                      showRing: true,
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -823,7 +817,7 @@ class _PricingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
-    final tiles = [
+    final allTiles = [
       (
         Icons.content_cut_rounded,
         s.cuttingPriceLabel,
@@ -885,30 +879,50 @@ class _PricingCard extends StatelessWidget {
         const Color(0xFFE53935),
       ),
     ];
+    final tiles = allTiles.where((t) => t.$3 != '—').toList();
 
     return _SectionCard(
       title: s.pricingSection,
       icon: Icons.payments_outlined,
       isDark: isDark,
-      child: GridView.count(
-        crossAxisCount: 2,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        childAspectRatio: 2.3,
-        children: [
-          for (final t in tiles)
-            _StatTile(
-              icon: t.$1,
-              label: t.$2,
-              value: t.$3,
-              color: t.$4,
-              isDark: isDark,
-              onSurface: onSurface,
+      child: tiles.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Center(
+                child: Text(
+                  s.noPricingData,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: onSurface.withOpacity(0.4),
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            )
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                const spacing = 8.0;
+                final tileWidth = (constraints.maxWidth - spacing) / 2;
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: [
+                    for (final t in tiles)
+                      SizedBox(
+                        width: tileWidth,
+                        child: _StatTile(
+                          icon: t.$1,
+                          label: t.$2,
+                          value: t.$3,
+                          color: t.$4,
+                          isDark: isDark,
+                          onSurface: onSurface,
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
-        ],
-      ),
     );
   }
 }
@@ -935,22 +949,32 @@ class _StatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: color.withOpacity(isDark ? 0.14 : 0.07),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withOpacity(isDark ? 0.3 : 0.16)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 13, color: color),
-              const SizedBox(width: 5),
-              Expanded(
-                child: Text(
+          Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color.withOpacity(isDark ? 0.22 : 0.14),
+            ),
+            child: Icon(icon, size: 14, color: color),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -960,18 +984,18 @@ class _StatTile extends StatelessWidget {
                     color: onSurface.withOpacity(0.5),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              color: onSurface,
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: onSurface,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -998,7 +1022,8 @@ class _ConfirmationCard extends StatelessWidget {
     final s = S.of(context);
     final confirmed = model['price_confirmed'] == true;
     final byName = model['price_confirmed_by_name']?.toString() ?? '';
-    final at = model['price_confirmed_at']?.toString() ?? '';
+    final rawAt = model['price_confirmed_at']?.toString() ?? '';
+    final at = _fmtDateTime(rawAt);
     final color = confirmed ? const Color(0xFF43A047) : const Color(0xFFFF8C00);
 
     return Container(
@@ -1049,7 +1074,7 @@ class _ConfirmationCard extends StatelessWidget {
                     ),
                   ),
                 ],
-                if (confirmed && at.isNotEmpty) ...[
+                if (confirmed && rawAt.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
                     at,
