@@ -82,23 +82,57 @@ class S {
   });
 
   // Dashboard
-  String get exchangeRates =>
-      _t({'ru': 'Курс валют', 'en': 'Exchange rates', 'uz': 'Valyuta kursi'});
-
-  String get reportsSection =>
-      _t({'ru': 'Рапорты', 'en': 'Reports', 'uz': 'Hisobotlar'});
-
-  String get dashboardSignPending => _t({
-    'ru': 'Заявки на подпись',
-    'en': 'Sign requests',
-    'uz': 'Imzolash arizalari',
+  String get dashboardOverview => _t({
+    'ru': 'Обзор производства',
+    'en': 'Production overview',
+    'uz': "Ishlab chiqarish sharhi",
   });
 
-  String get dashboardNewReports => _t({
-    'ru': 'Новые рапорты',
-    'en': 'New reports',
-    'uz': 'Yangi hisobotlar',
+  String get dashboardInTerritory => _t({
+    'ru': 'На территории',
+    'en': 'On-site',
+    'uz': 'Hududda',
   });
+
+  String dashboardOutOf(int total) => _t({
+    'ru': 'из $total чел.',
+    'en': 'out of $total',
+    'uz': "$total kishidan",
+  });
+
+  String get dashboardProductionYesterday => _t({
+    'ru': 'Производство вчера',
+    'en': 'Production yesterday',
+    'uz': 'Kechagi ishlab chiqarish',
+  });
+
+  String get dashboardProductionShort =>
+      _t({'ru': 'Произв.', 'en': 'Prod.', 'uz': 'Ishlab chiq.'});
+
+  String get dashboardReportDate =>
+      _t({'ru': 'Дата отчёта', 'en': 'Report date', 'uz': 'Hisobot sanasi'});
+
+  String get dashboardProductionIndicators => _t({
+    'ru': 'Производственные показатели',
+    'en': 'Production indicators',
+    'uz': "Ishlab chiqarish ko'rsatkichlari",
+  });
+
+  String get dashboardFactoriesDetail => _t({
+    'ru': 'Филиалы',
+    'en': 'Factories',
+    'uz': 'Filiallar',
+  });
+
+  String get dashboardPlan => _t({'ru': 'План', 'en': 'Plan', 'uz': 'Reja'});
+
+  String get dashboardFact => _t({'ru': 'Факт', 'en': 'Fact', 'uz': 'Fakt'});
+
+  String get dashboardFactoryTotal =>
+      _t({'ru': 'Всего', 'en': 'Total', 'uz': 'Jami'});
+
+  String get dashboardEntered =>
+      _t({'ru': 'Вошли', 'en': 'Entered', 'uz': 'Kirdi'});
 
   // Bottom navigation
   String get navHome => _t({'ru': 'Главная', 'en': 'Home', 'uz': 'Asosiy'});
@@ -572,17 +606,6 @@ class S {
     'en': 'Select app interface language',
     'uz': 'Ilova interfeysi tilini tanlang',
   });
-
-  String get appearance =>
-      _t({'ru': 'Внешний вид', 'en': 'Appearance', 'uz': "Ko'rinish"});
-
-  String get theme => _t({'ru': 'Тема', 'en': 'Theme', 'uz': 'Mavzu'});
-
-  String get darkTheme =>
-      _t({'ru': 'Тёмная тема', 'en': 'Dark theme', 'uz': 'Qora mavzu'});
-
-  String get lightTheme =>
-      _t({'ru': 'Светлая тема', 'en': 'Light theme', 'uz': 'Ochiq mavzu'});
 
   String appVersionLabel(String version) => _t({
     'ru': 'Версия приложения: $version',

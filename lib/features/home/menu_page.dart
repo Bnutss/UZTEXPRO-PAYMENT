@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'main_page.dart';
@@ -47,22 +50,18 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   bool _rubUp = true;
   bool _ratesLoaded = false;
 
-  bool _statsLoading = true;
-  bool _statsError = false;
-  int _pendingSignRequests = 0;
-  int _newPaymentReports = 0;
-
-  // Each category is "loaded" once either a cached value or a fresh network
-  // response has populated it — used to tell a genuinely-empty dashboard
-  // apart from one where a slow backend just hasn't answered yet.
-  bool _signRequestsLoaded = false;
-  bool _paymentsLoaded = false;
-
-  bool get _dashboardHasGaps => !_signRequestsLoaded || !_paymentsLoaded;
-
   final AppStorage _dashStorage = const AppStorage();
-  static const _kSignRequestsCacheKey = 'dashboard_sign_stats_v1';
-  static const _kPaymentsCacheKey = 'dashboard_payments_stats_v1';
+
+  // Production overview (KPIs / productions / factories) — kept fully
+  // separate from the sign/payment stats above: it hits a different
+  // endpoint that needs its own `view_employee` permission, which not every
+  // full-access mobile role is guaranteed to carry. A 401/403 here just
+  // hides the section instead of tripping the shared error banner.
+  bool _dashOverviewLoading = true;
+  bool _dashOverviewLoaded = false;
+  bool _dashOverviewUnavailable = false;
+  Map<String, dynamic>? _dashOverview;
+  static const _kDashOverviewCacheKey = 'dashboard_overview_v1';
 
   String get _apiToken {
     try {
@@ -105,7 +104,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     _shimmer = Tween<double>(begin: 0.0, end: 1.0).animate(_shimmerController);
     localeNotifier.addListener(_onLocaleChanged);
     _fetchRates();
-    _loadDashboardStats();
+    _loadDashboardOverview();
   }
 
   Future<void> _fetchRates() async {
@@ -144,132 +143,85 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     return rate.toStringAsFixed(1);
   }
 
-  Future<void> _loadDashboardStats() async {
+  Future<void> _loadDashboardOverview() async {
     if (!_hasFullAccess) {
-      if (mounted) setState(() => _statsLoading = false);
+      if (mounted) setState(() => _dashOverviewLoading = false);
       return;
     }
-    // Cache-first: show whatever we last saw immediately (matching how the
-    // Bonuses/ProductModels screens themselves feel instant off their own
-    // cache) instead of blocking every launch on a live round-trip to a
-    // backend that sometimes takes longer than we'd like.
-    await _loadCachedStats();
-    if (mounted) {
-      setState(() {
-        _statsError = false;
-        if (_signRequestsLoaded && _paymentsLoaded) {
-          _statsLoading = false;
-        }
-      });
+    final cached = await _dashStorage.read(key: _kDashOverviewCacheKey);
+    if (cached != null && mounted) {
+      try {
+        setState(() {
+          _dashOverview = jsonDecode(cached) as Map<String, dynamic>;
+          _dashOverviewLoaded = true;
+        });
+      } catch (_) {}
     }
-    // Run in parallel: these hit independent endpoints, and if any one of
-    // them is genuinely slow/timing out server-side, awaiting them one at a
-    // time would serialize the timeouts instead of bounding total wait to
-    // the single slowest request.
-    await Future.wait([
-      _fetchSignRequestsStats(),
-      _fetchPaymentsStats(),
-    ]);
-    if (mounted) setState(() => _statsLoading = false);
+    await _fetchDashboardOverview();
+    if (mounted) setState(() => _dashOverviewLoading = false);
   }
 
-  Future<void> _loadCachedStats() async {
-    final cached = await Future.wait([
-      _dashStorage.read(key: _kSignRequestsCacheKey),
-      _dashStorage.read(key: _kPaymentsCacheKey),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      final signRequests = cached[0];
-      if (signRequests != null) {
-        _pendingSignRequests = int.tryParse(signRequests) ?? 0;
-        _signRequestsLoaded = true;
-      }
-      final payments = cached[1];
-      if (payments != null) {
-        _newPaymentReports = int.tryParse(payments) ?? 0;
-        _paymentsLoaded = true;
-      }
-    });
-  }
-
-  void _retryDashboardStats() {
-    setState(() {
-      _statsLoading = true;
-      _statsError = false;
-    });
-    _loadDashboardStats();
-  }
-
-  List _asItemList(dynamic decoded) {
-    if (decoded is List) return decoded;
-    if (decoded is Map) return (decoded['results'] ?? decoded['data'] ?? []) as List;
-    return const [];
-  }
-
-  void _markStatsFailed(String source, Object error) {
-    debugPrint('[dashboard] $source failed: $error');
-    // A slow/timed-out refresh isn't worth flagging if we're already showing
-    // a cached number for every category — only surface the error banner
-    // when something has never loaded at all.
-    if (mounted && _dashboardHasGaps) setState(() => _statsError = true);
-  }
-
-  Future<void> _fetchSignRequestsStats() async {
+  Future<void> _fetchDashboardOverview() async {
     try {
       final res = await http
           .get(
-            Uri.parse(
-              '$API/texmansys/material-purchase-application/?limit=1000',
-            ),
+            Uri.parse('$API/texmansys/professional-dashboard/'),
             headers: _apiHeaders,
           )
           .timeout(const Duration(seconds: 20));
-      if (res.statusCode != 200) {
-        _markStatsFailed('sign requests', 'HTTP ${res.statusCode}');
+      if (res.statusCode == 401 || res.statusCode == 403) {
+        if (mounted) setState(() => _dashOverviewUnavailable = true);
         return;
       }
-      final items = _asItemList(json.decode(utf8.decode(res.bodyBytes)));
-      final pending = items.where((raw) => (raw as Map)['status'] == 0).length;
+      if (res.statusCode != 200) return;
+      final decoded = json.decode(utf8.decode(res.bodyBytes));
+      final results = decoded is Map ? decoded['results'] : null;
+      if (results is! Map<String, dynamic>) return;
       unawaited(
-        _dashStorage.write(key: _kSignRequestsCacheKey, value: '$pending'),
+        _dashStorage.write(
+          key: _kDashOverviewCacheKey,
+          value: jsonEncode(results),
+        ),
       );
       if (!mounted) return;
       setState(() {
-        _pendingSignRequests = pending;
-        _signRequestsLoaded = true;
+        _dashOverview = results;
+        _dashOverviewLoaded = true;
       });
     } catch (e) {
-      _markStatsFailed('sign requests', e);
+      debugPrint('[dashboard] overview failed: $e');
     }
   }
 
-  Future<void> _fetchPaymentsStats() async {
-    try {
-      final res = await http
-          .get(
-            Uri.parse('$API/edo/payment-raport/?for_mobile=1'),
-            headers: _apiHeaders,
-          )
-          .timeout(const Duration(seconds: 20));
-      if (res.statusCode != 200) {
-        _markStatsFailed('payments', 'HTTP ${res.statusCode}');
-        return;
-      }
-      final items = _asItemList(json.decode(utf8.decode(res.bodyBytes)));
-      final newCount = items.where((raw) => (raw as Map)['status'] == 1).length;
-      unawaited(
-        _dashStorage.write(key: _kPaymentsCacheKey, value: '$newCount'),
-      );
-      if (!mounted) return;
-      setState(() {
-        _newPaymentReports = newCount;
-        _paymentsLoaded = true;
-      });
-    } catch (e) {
-      _markStatsFailed('payments', e);
-    }
-  }
+  List<Map<String, dynamic>> get _dashFactories =>
+      ((_dashOverview?['factories'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => e.cast<String, dynamic>())
+          .toList();
+
+  List<Map<String, dynamic>> get _dashProductions =>
+      ((_dashOverview?['productions'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => e.cast<String, dynamic>())
+          .toList();
+
+  int get _dashTotalEmployees =>
+      (_dashOverview?['total_employees'] as num?)?.toInt() ?? 0;
+
+  int get _dashInTerritory => _dashFactories.fold<int>(
+    0,
+    (sum, f) => sum + ((f['in_territory'] as num?)?.toInt() ?? 0),
+  );
+
+  double get _dashProducedYesterday =>
+      _dashFactories.fold<double>(
+        0,
+        (sum, f) => sum + ((f['sewing_yesterday'] as num?)?.toDouble() ?? 0),
+      ) /
+      1000;
+
+  String get _dashYesterdayDate =>
+      (_dashOverview?['yesterday_date'] as String?) ?? '—';
 
   void _onLocaleChanged() => setState(() {});
 
@@ -541,6 +493,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   Widget _buildHeader(S s) {
+    final showRates = _ratesLoaded && (_usdRate != null || _rubRate != null);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
@@ -569,14 +522,21 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     letterSpacing: 0.2,
                   ),
                 ),
-                Text(
-                  s.paymentSystem,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.65),
-                    fontSize: 11,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 2),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 350),
+                  child: showRates
+                      ? _headerRateStrip(key: const ValueKey('rates'))
+                      : Text(
+                          s.paymentSystem,
+                          key: const ValueKey('subtitle'),
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.65),
+                            fontSize: 11,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                 ),
               ],
             ),
@@ -585,6 +545,52 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           _buildLogoutButton(),
         ],
       ),
+    );
+  }
+
+  // Compact currency strip that swaps in for the header subtitle once rates
+  // land — kept small enough to sit in the app bar row instead of taking a
+  // full section in the scrolling body.
+  Widget _headerRateStrip({Key? key}) {
+    return Row(
+      key: key,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_usdRate != null) _headerRateChip('\$', _usdRate!, _usdUp),
+        if (_usdRate != null && _rubRate != null) const SizedBox(width: 10),
+        if (_rubRate != null) _headerRateChip('₽', _rubRate!, _rubUp),
+      ],
+    );
+  }
+
+  Widget _headerRateChip(String symbol, String rate, bool isUp) {
+    final trendColor = isUp ? const Color(0xFF69F0AE) : const Color(0xFFFF8A80);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          symbol,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.55),
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(width: 2),
+        Text(
+          rate,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        Icon(
+          isUp ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded,
+          size: 14,
+          color: trendColor,
+        ),
+      ],
     );
   }
 
@@ -630,256 +636,565 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             s.paymentSystem,
             style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 13),
           ),
-          if (_usdRate != null || _rubRate != null) ...[
-            const SizedBox(height: 28),
-            _sectionLabel(s.exchangeRates),
-            const SizedBox(height: 10),
-            AnimatedOpacity(
-              opacity: _ratesLoaded ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 600),
-              child: Row(
-                children: [
-                  if (_usdRate != null)
-                    Expanded(child: _rateCard('\$', _usdRate!, _usdUp)),
-                  if (_usdRate != null && _rubRate != null)
-                    const SizedBox(width: 12),
-                  if (_rubRate != null)
-                    Expanded(child: _rateCard('₽', _rubRate!, _rubUp)),
-                ],
-              ),
-            ),
-          ],
-          if (_hasFullAccess) ...[
-            if (_statsError && !_statsLoading) ...[
-              const SizedBox(height: 20),
-              _buildStatsErrorBanner(s),
-            ],
-            const SizedBox(height: 28),
-            _sectionLabel(s.reportsSection),
-            const SizedBox(height: 10),
-            _buildReportsRow(s),
+          if (_hasFullAccess &&
+              !_dashOverviewUnavailable &&
+              (_dashOverviewLoading || _dashOverviewLoaded)) ...[
+            const SizedBox(height: 26),
+            _dashSectionHeader(Icons.dashboard_customize_rounded, s.dashboardOverview),
+            const SizedBox(height: 12),
+            _dashOverviewLoaded ? _buildDashOverview(s) : _dashSkeletonBlock(),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildStatsErrorBanner(S s) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.13),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.22), width: 1),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              s.connectionError,
-              style: const TextStyle(color: Colors.white, fontSize: 12.5),
-            ),
-          ),
-          GestureDetector(
-            onTap: _retryDashboardStats,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(
-                Icons.refresh_rounded,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // ── "Wow" production dashboard ──────────────────────────────────────
+  //
+  // Hero attendance ring + compact KPI tiles + horizontally-scrolling
+  // production/factory cards, all on an elevated glass treatment (layered
+  // gradient fill instead of flat opacity, soft accent glows, count-up
+  // numbers, staggered entrance). Reduced-motion is honored throughout via
+  // `_StaggerIn`/`_CountUpText`, which both check the platform accessibility
+  // flag and skip straight to the end state.
 
-  Widget _sectionLabel(String text) {
-    return Text(
-      text.toUpperCase(),
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 1.2,
-        color: Colors.white.withOpacity(0.55),
-      ),
-    );
-  }
-
-  Widget _statSkeleton({double height = 104}) {
-    return Container(
-      height: height,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.15)),
-      ),
-      child: const Center(
-        child: SizedBox(
-          width: 18,
-          height: 18,
-          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReportsRow(S s) {
-    if (_statsLoading) {
-      return Row(
-        children: List.generate(2, (i) {
-          return Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(right: i < 1 ? 10 : 0),
-              child: _statSkeleton(),
-            ),
-          );
-        }),
-      );
-    }
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: _reportStatTile(
-              icon: Icons.draw_rounded,
-              accent: const Color(0xFF3B82F6),
-              value: '$_pendingSignRequests',
-              label: s.dashboardSignPending,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _reportStatTile(
-              icon: Icons.receipt_long_rounded,
-              accent: const Color(0xFF43A047),
-              value: '$_newPaymentReports',
-              label: s.dashboardNewReports,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _reportStatTile({
-    required IconData icon,
-    required Color accent,
-    required String value,
-    required String label,
-    String? caption,
+  BoxDecoration _glassDecoration({
+    double radius = 16,
+    double borderOpacity = 0.22,
+    List<BoxShadow>? shadow,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.13),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.22), width: 1),
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Colors.white.withOpacity(0.19), Colors.white.withOpacity(0.08)],
       ),
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(color: Colors.white.withOpacity(borderOpacity), width: 1),
+      boxShadow: shadow,
+    );
+  }
+
+  Widget _dashSectionHeader(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 13, color: Colors.white.withOpacity(0.55)),
+        const SizedBox(width: 6),
+        Text(
+          text.toUpperCase(),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+            color: Colors.white.withOpacity(0.55),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _dashSkeletonBlock() {
+    final base = Colors.white.withOpacity(0.10);
+    final hi = Colors.white.withOpacity(0.24);
+    Widget block({double height = 92, double? width}) => Container(
+      height: height,
+      width: width,
+      decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(18)),
+    );
+    return Shimmer.fromColors(
+      baseColor: base,
+      highlightColor: hi,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: accent.withOpacity(0.22),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Icon(icon, color: accent, size: 17),
+          block(height: 110),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: block(height: 78)),
+              const SizedBox(width: 10),
+              Expanded(child: block(height: 78)),
+            ],
           ),
           const SizedBox(height: 10),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
-              fontSize: 10.5,
-              height: 1.2,
-            ),
-          ),
-          if (caption != null) ...[
-            const SizedBox(height: 3),
-            Text(
-              caption,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: accent,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const NeverScrollableScrollPhysics(),
+            child: Row(
+              children: List.generate(
+                3,
+                (i) => Padding(
+                  padding: EdgeInsets.only(right: i < 2 ? 10 : 0),
+                  child: block(height: 118, width: 118),
+                ),
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _rateCard(String symbol, String rate, bool isUp) {
-    final trendColor = isUp ? const Color(0xFF69F0AE) : const Color(0xFFFF6B6B);
+  Widget _buildDashOverview(S s) {
+    final productions = _dashProductions;
+    final factories = _dashFactories;
+    final total = _dashTotalEmployees;
+    final onSite = _dashInTerritory;
+    final attendance = total > 0 ? onSite / total : 0.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _StaggerIn(
+          child: _dashHeroCard(s, total: total, onSite: onSite, attendance: attendance),
+        ),
+        if (productions.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _StaggerIn(
+            delay: const Duration(milliseconds: 140),
+            child: _dashSectionHeader(Icons.insights_rounded, s.dashboardProductionIndicators),
+          ),
+          const SizedBox(height: 10),
+          _StaggerIn(
+            delay: const Duration(milliseconds: 160),
+            child: SizedBox(
+              height: 118,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: productions.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 10),
+                itemBuilder: (_, i) => _dashProductionCard(productions[i], s),
+              ),
+            ),
+          ),
+        ],
+        if (factories.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _StaggerIn(
+            delay: const Duration(milliseconds: 200),
+            child: _dashSectionHeader(Icons.factory_rounded, s.dashboardFactoriesDetail),
+          ),
+          const SizedBox(height: 10),
+          _StaggerIn(
+            delay: const Duration(milliseconds: 220),
+            child: SizedBox(
+              height: 118,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: factories.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 10),
+                itemBuilder: (_, i) => _dashFactoryCard(factories[i], s),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _dashHeroCard(
+    S s, {
+    required int total,
+    required int onSite,
+    required double attendance,
+  }) {
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
     return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.13),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.22), width: 1),
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: _glassDecoration(
+        radius: 22,
+        shadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.14), blurRadius: 22, offset: const Offset(0, 10)),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Text(
-                symbol,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
+              SizedBox(
+                width: 84,
+                height: 84,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: attendance.clamp(0.0, 1.0)),
+                  duration: reduceMotion ? Duration.zero : const Duration(milliseconds: 1100),
+                  curve: Curves.easeOutCubic,
+                  builder: (_, value, _) => Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CustomPaint(
+                        size: const Size(84, 84),
+                        painter: _RingPainter(
+                          progress: value,
+                          trackColor: Colors.white.withOpacity(0.16),
+                          colors: const [Color(0xFFFFE08A), Color(0xFFFF8C42)],
+                        ),
+                      ),
+                      Text(
+                        '${(value * 100).round()}%',
+                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: BoxDecoration(
-                  color: trendColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Icon(
-                  isUp ? Icons.north_rounded : Icons.south_rounded,
-                  size: 12,
-                  color: trendColor,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      s.dashboardInTerritory.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.1,
+                        color: Colors.white.withOpacity(0.6),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        _CountUpText(
+                          target: onSite.toDouble(),
+                          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800, height: 1),
+                        ),
+                        Text(
+                          ' / $total',
+                          style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 13.5, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.14),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        s.dashboardOutOf(total),
+                        style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 9.5, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            rate,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
+          const SizedBox(height: 14),
+          Container(height: 1, color: Colors.white.withOpacity(0.14)),
+          const SizedBox(height: 12),
+          // Two secondary metrics tucked into the hero card itself instead
+          // of a card of their own — keeps the section to three visual
+          // blocks (hero, productions, factories) rather than four.
+          IntrinsicHeight(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _dashCompactStat(
+                    icon: Icons.local_shipping_rounded,
+                    accent: const Color(0xFF34D399),
+                    numericValue: _dashProducedYesterday.roundToDouble(),
+                    suffix: 'K',
+                    label: s.dashboardProductionYesterday,
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  margin: const EdgeInsets.symmetric(horizontal: 13),
+                  color: Colors.white.withOpacity(0.16),
+                ),
+                Expanded(
+                  child: _dashCompactStat(
+                    icon: Icons.event_rounded,
+                    accent: const Color(0xFF60A5FA),
+                    textValue: _dashYesterdayDate,
+                    label: s.dashboardReportDate,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dashCompactStat({
+    required IconData icon,
+    required Color accent,
+    required String label,
+    double? numericValue,
+    String? textValue,
+    String suffix = '',
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(colors: [accent, accent.withOpacity(0.75)]),
+            boxShadow: [BoxShadow(color: accent.withOpacity(0.4), blurRadius: 9, spreadRadius: 0.5)],
+          ),
+          child: Icon(icon, color: Colors.white, size: 14),
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (numericValue != null)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    _CountUpText(
+                      target: numericValue,
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                    ),
+                    if (suffix.isNotEmpty)
+                      Text(
+                        suffix,
+                        style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.w700),
+                      ),
+                  ],
+                )
+              else
+                Text(
+                  textValue ?? '—',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w800),
+                ),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.55),
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _dashProductionCard(Map<String, dynamic> prod, S s) {
+    final planned = (prod['planned'] as num?)?.toDouble() ?? 0;
+    final actual = (prod['actual'] as num?)?.toDouble() ?? 0;
+    final planPercent = (prod['plan_percent'] as num?)?.toDouble() ?? 0;
+    final unit = prod['unit']?.toString() ?? '';
+    final code = prod['code']?.toString() ?? prod['name']?.toString() ?? '';
+    final pct = planned > 0 ? (actual / planned * 100).clamp(0, 100).round() : 0;
+    final over = actual >= planned;
+    final trendColor = over ? const Color(0xFF34D399) : const Color(0xFFFB7185);
+
+    String fmt(double v) => NumberFormat(v == v.roundToDouble() ? '#,##0' : '#,##0.0', 'ru').format(v);
+
+    return Container(
+      width: 118,
+      clipBehavior: Clip.antiAlias,
+      decoration: _glassDecoration(radius: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(width: 3, color: trendColor),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(9, 10, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              code,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w800),
+                            ),
+                            if (unit.isNotEmpty)
+                              Text(
+                                unit,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 8.5, fontWeight: FontWeight.w600),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        over ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                        size: 12,
+                        color: trendColor,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  _dashStatLine(s.dashboardPlan, fmt(planned), emphasize: false),
+                  const SizedBox(height: 2),
+                  _dashStatLine(s.dashboardFact, fmt(actual), emphasize: true),
+                  const Spacer(),
+                  Row(
+                    children: [
+                      Text('$pct%', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 9.5)),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: trendColor.withOpacity(0.22),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${planPercent.round()}%',
+                          style: TextStyle(color: trendColor, fontSize: 9.5, fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  _dashProgressBar(pct / 100, trendColor),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dashFactoryCard(Map<String, dynamic> f, S s) {
+    final name = f['name']?.toString() ?? '';
+    final employeeCount = (f['employee_count'] as num?)?.toInt() ?? 0;
+    final entered = (f['today_total_enter'] as num?)?.toInt() ?? 0;
+    final inTerritory = (f['in_territory'] as num?)?.toInt() ?? 0;
+    final producedYesterday = (f['sewing_yesterday'] as num?)?.toDouble() ?? 0;
+    final pct = employeeCount > 0 ? (inTerritory / employeeCount * 100).clamp(0, 100).round() : 0;
+    final good = pct > 70;
+    final color = good ? const Color(0xFF34D399) : const Color(0xFFFB7185);
+
+    return Container(
+      width: 122,
+      clipBehavior: Clip.antiAlias,
+      decoration: _glassDecoration(radius: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(width: 3, color: color),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(9, 11, 11, 11),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      Icon(
+                        good ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                        size: 12,
+                        color: color,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  _dashStatLine(s.dashboardFactoryTotal, NumberFormat('#,##0', 'ru').format(employeeCount), emphasize: false),
+                  const SizedBox(height: 2),
+                  _dashStatLine(s.dashboardEntered, NumberFormat('#,##0', 'ru').format(entered), emphasize: true),
+                  const SizedBox(height: 2),
+                  _dashStatLine(
+                    s.dashboardProductionShort,
+                    '${NumberFormat('#,##0', 'ru').format(producedYesterday / 1000)}K',
+                    emphasize: false,
+                  ),
+                  const Spacer(),
+                  Text('$pct%', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 9.5)),
+                  const SizedBox(height: 3),
+                  _dashProgressBar(pct / 100, color),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dashStatLine(String label, String value, {required bool emphasize}) {
+    return RichText(
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: '$label ',
+            style: TextStyle(
+              fontSize: 9.5,
+              color: Colors.white.withOpacity(0.55),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          TextSpan(
+            text: value,
+            style: TextStyle(
+              fontSize: 10.5,
+              color: Colors.white.withOpacity(emphasize ? 1 : 0.85),
+              fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dashProgressBar(double fraction, Color color) {
+    final clamped = fraction.clamp(0.0, 1.0);
+    return LayoutBuilder(
+      builder: (context, constraints) => Stack(
+        children: [
+          Container(
+            height: 5,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 700),
+            curve: Curves.easeOut,
+            height: 5,
+            width: constraints.maxWidth * clamped,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [color.withOpacity(0.7), color]),
+              borderRadius: BorderRadius.circular(3),
+              boxShadow: [BoxShadow(color: color.withOpacity(0.55), blurRadius: 5)],
             ),
           ),
         ],
@@ -1071,6 +1386,111 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       color: Colors.white.withOpacity(opacity),
     ),
   );
+}
+
+/// Fades + slides a child in once, after [delay]. Skips straight to the
+/// visible end state when the OS accessibility setting for reduced motion
+/// is on, instead of running the animation anyway.
+class _StaggerIn extends StatefulWidget {
+  final Widget child;
+  final Duration delay;
+  const _StaggerIn({required this.child, this.delay = Duration.zero});
+
+  @override
+  State<_StaggerIn> createState() => _StaggerInState();
+}
+
+class _StaggerInState extends State<_StaggerIn> {
+  bool _visible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (WidgetsBinding.instance.platformDispatcher.accessibilityFeatures.disableAnimations) {
+      _visible = true;
+      return;
+    }
+    Future.delayed(widget.delay, () {
+      if (mounted) setState(() => _visible = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSlide(
+      offset: _visible ? Offset.zero : const Offset(0, 0.06),
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutCubic,
+      child: AnimatedOpacity(
+        opacity: _visible ? 1 : 0,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOut,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+/// Animates from 0 up to [target] once on mount, formatted with thousands
+/// separators. Renders [target] immediately when reduced motion is on.
+class _CountUpText extends StatelessWidget {
+  final double target;
+  final TextStyle style;
+  const _CountUpText({required this.target, required this.style});
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: target),
+      duration: reduceMotion ? Duration.zero : const Duration(milliseconds: 900),
+      curve: Curves.easeOutCubic,
+      builder: (_, value, _) => Text(NumberFormat('#,##0', 'ru').format(value), style: style),
+    );
+  }
+}
+
+/// Sweep-gradient attendance ring for the dashboard hero card.
+class _RingPainter extends CustomPainter {
+  final double progress;
+  final Color trackColor;
+  final List<Color> colors;
+  static const double strokeWidth = 9;
+  const _RingPainter({
+    required this.progress,
+    required this.trackColor,
+    required this.colors,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final radius = (size.shortestSide - strokeWidth) / 2;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    final track = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawCircle(center, radius, track);
+
+    final sweep = 2 * math.pi * progress.clamp(0.0, 1.0);
+    if (sweep <= 0) return;
+    final arcPaint = Paint()
+      ..shader = SweepGradient(
+        colors: [...colors, colors.first],
+        transform: const GradientRotation(-math.pi / 2),
+      ).createShader(rect)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(rect, -math.pi / 2, sweep, false, arcPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingPainter oldDelegate) =>
+      oldDelegate.progress != progress || oldDelegate.colors != colors;
 }
 
 class _NavItemData {

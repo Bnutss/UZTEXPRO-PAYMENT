@@ -1051,7 +1051,9 @@ class _ProductModelCard extends StatelessWidget {
     final confirmed = item['price_confirmed'] == true;
     final confirmedBy = item['price_confirmed_by_name']?.toString() ?? '';
     final confirmedAt = item['price_confirmed_at']?.toString() ?? '';
-    final confirmedAtDisplay = confirmedAt.isEmpty ? '' : _fmtDateTime(confirmedAt);
+    final confirmedAtDisplay = confirmedAt.isEmpty
+        ? ''
+        : _fmtDateTime(confirmedAt);
     final busy = item['_busy'] == true;
 
     final statusColor = confirmed
@@ -1431,6 +1433,11 @@ class _SearchBar extends StatelessWidget {
                     onPressed: controller.clear,
                   ),
           ),
+          // Without this the field inherits filled+fillColor from the
+          // app's global InputDecorationTheme and paints its own
+          // sharp-cornered fill on top of this widget's rounded outer
+          // Container.
+          filled: false,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 14),
         ),
@@ -1778,7 +1785,9 @@ class _PickerTile extends StatelessWidget {
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: selected ? accentColor.withOpacity(0.4) : Colors.transparent,
+              color: selected
+                  ? accentColor.withOpacity(0.4)
+                  : Colors.transparent,
             ),
           ),
           child: Row(

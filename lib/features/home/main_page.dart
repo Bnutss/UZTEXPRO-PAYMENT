@@ -1512,7 +1512,6 @@ class _PayCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: cardBg,
             borderRadius: BorderRadius.circular(14),
-            border: Border(left: BorderSide(color: cfg.color, width: 4)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(isDark ? 0.18 : 0.05),
@@ -1521,190 +1520,218 @@ class _PayCard extends StatelessWidget {
               ),
             ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Header: ID + company + status badge ────────────────────
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
+          // A single-side Border (just `left`) can't be rounded together
+          // with the container's borderRadius — Flutter falls back to a
+          // sharp rectangular stroke for non-uniform borders, so the accent
+          // bar used to poke past the card's rounded corners. Clipping a
+          // real colored strip instead keeps it flush with the curve.
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(width: 4, color: cfg.color),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // ── Header: ID + company + status badge ────────────────────
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // ID badge
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: cfg.color.withOpacity(
-                                    isDark ? 0.2 : 0.1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: cfg.color.withOpacity(0.35),
-                                  ),
-                                ),
-                                child: Text(
-                                  '#$id',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: cfg.color,
-                                  ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        // ID badge
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 7,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: cfg.color.withOpacity(
+                                              isDark ? 0.2 : 0.1,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                            border: Border.all(
+                                              color: cfg.color.withOpacity(
+                                                0.35,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '#$id',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: cfg.color,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            bizName,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: onSurf,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (hasChange)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.edit_rounded,
+                                              size: 11,
+                                              color: cfg.color,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              s.available,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: cfg.color,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  bizName,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: onSurf,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
+                              // Status badge
+                              _PayStatusBadge(cfg: cfg, label: statusName),
                             ],
                           ),
-                          if (hasChange)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Row(
-                                children: [
+                          const SizedBox(height: 10),
+                          Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: isDark
+                                ? Colors.white10
+                                : Colors.grey.shade100,
+                          ),
+                          const SizedBox(height: 8),
+                          // ── Info rows ──────────────────────────────────────────────
+                          _PayInfoLine(
+                            icon: Icons.description_outlined,
+                            label: s.contract,
+                            text: contract,
+                            onSurface: onSurf,
+                          ),
+                          const SizedBox(height: 5),
+                          _PayInfoLine(
+                            icon: Icons.subject_outlined,
+                            label: s.subject,
+                            text: subContract,
+                            onSurface: onSurf,
+                          ),
+                          const SizedBox(height: 5),
+                          _PayInfoLine(
+                            icon: Icons.person_outline_rounded,
+                            label: s.applicant,
+                            text: applicant,
+                            onSurface: onSurf,
+                          ),
+                          if (payType.isNotEmpty) ...[
+                            const SizedBox(height: 5),
+                            _PayInfoLine(
+                              icon: Icons.credit_card_outlined,
+                              label: s.paymentType,
+                              text: payType,
+                              onSurface: onSurf,
+                              valueColor: payTypeColor,
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          // ── Amount row ─────────────────────────────────────────────
+                          _PayAmountRow(
+                            contractAmt: contractAmt,
+                            paid: paid,
+                            currency: currency,
+                            isDark: isDark,
+                            onSurface: onSurf,
+                            s: s,
+                          ),
+                          // ── Notes ──────────────────────────────────────────────────
+                          if (notes.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            _PayNoteRow(text: notes, isDark: isDark),
+                          ],
+                          // ── Bottom bar: hint left, icon buttons right ──────────────
+                          if (onOpenFile != null ||
+                              onCopyUrl != null ||
+                              hasChange) ...[
+                            const SizedBox(height: 8),
+                            Divider(
+                              height: 1,
+                              thickness: 1,
+                              color: isDark
+                                  ? Colors.white10
+                                  : Colors.grey.shade100,
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                if (hasChange) ...[
                                   Icon(
-                                    Icons.edit_rounded,
-                                    size: 11,
+                                    Icons.touch_app_rounded,
+                                    size: 13,
                                     color: cfg.color,
                                   ),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    s.available,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: cfg.color,
-                                      fontWeight: FontWeight.w600,
+                                  Expanded(
+                                    child: Text(
+                                      s.tapToChangeStatus,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: cfg.color,
+                                      ),
                                     ),
                                   ),
+                                ] else
+                                  const Spacer(),
+                                if (onOpenFile != null)
+                                  _PayIconBtn(
+                                    icon: Icons.open_in_new_rounded,
+                                    tooltip: 'Открыть',
+                                    onTap: onOpenFile!,
+                                  ),
+                                if (onCopyUrl != null) ...[
+                                  const SizedBox(width: 6),
+                                  _PayIconBtn(
+                                    icon: Icons.copy_rounded,
+                                    tooltip: 'Копировать',
+                                    onTap: onCopyUrl!,
+                                  ),
                                 ],
-                              ),
+                              ],
                             ),
+                          ],
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    // Status badge
-                    _PayStatusBadge(cfg: cfg, label: statusName),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: isDark ? Colors.white10 : Colors.grey.shade100,
-                ),
-                const SizedBox(height: 8),
-                // ── Info rows ──────────────────────────────────────────────
-                _PayInfoLine(
-                  icon: Icons.description_outlined,
-                  label: s.contract,
-                  text: contract,
-                  onSurface: onSurf,
-                ),
-                const SizedBox(height: 5),
-                _PayInfoLine(
-                  icon: Icons.subject_outlined,
-                  label: s.subject,
-                  text: subContract,
-                  onSurface: onSurf,
-                ),
-                const SizedBox(height: 5),
-                _PayInfoLine(
-                  icon: Icons.person_outline_rounded,
-                  label: s.applicant,
-                  text: applicant,
-                  onSurface: onSurf,
-                ),
-                if (payType.isNotEmpty) ...[
-                  const SizedBox(height: 5),
-                  _PayInfoLine(
-                    icon: Icons.credit_card_outlined,
-                    label: s.paymentType,
-                    text: payType,
-                    onSurface: onSurf,
-                    valueColor: payTypeColor,
                   ),
                 ],
-                const SizedBox(height: 8),
-                // ── Amount row ─────────────────────────────────────────────
-                _PayAmountRow(
-                  contractAmt: contractAmt,
-                  paid: paid,
-                  currency: currency,
-                  isDark: isDark,
-                  onSurface: onSurf,
-                  s: s,
-                ),
-                // ── Notes ──────────────────────────────────────────────────
-                if (notes.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  _PayNoteRow(text: notes, isDark: isDark),
-                ],
-                // ── Bottom bar: hint left, icon buttons right ──────────────
-                if (onOpenFile != null || onCopyUrl != null || hasChange) ...[
-                  const SizedBox(height: 8),
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: isDark ? Colors.white10 : Colors.grey.shade100,
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      if (hasChange) ...[
-                        Icon(
-                          Icons.touch_app_rounded,
-                          size: 13,
-                          color: cfg.color,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            s.tapToChangeStatus,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: cfg.color,
-                            ),
-                          ),
-                        ),
-                      ] else
-                        const Spacer(),
-                      if (onOpenFile != null)
-                        _PayIconBtn(
-                          icon: Icons.open_in_new_rounded,
-                          tooltip: 'Открыть',
-                          onTap: onOpenFile!,
-                        ),
-                      if (onCopyUrl != null) ...[
-                        const SizedBox(width: 6),
-                        _PayIconBtn(
-                          icon: Icons.copy_rounded,
-                          tooltip: 'Копировать',
-                          onTap: onCopyUrl!,
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ],
+              ),
             ),
           ),
         ),
@@ -1774,6 +1801,13 @@ class _PaySearchBar extends StatelessWidget {
                     onPressed: controller.clear,
                   ),
           ),
+          // Without this the TextField inherits `filled: true` +
+          // `fillColor` from the app's global InputDecorationTheme and
+          // paints its own sharp-cornered fill rectangle on top of this
+          // widget's already-rounded outer Container — that mismatched
+          // rectangle is exactly the "sharp corners" poking out at the
+          // edges of an otherwise rounded search bar.
+          filled: false,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 14),
         ),

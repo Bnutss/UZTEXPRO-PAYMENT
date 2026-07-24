@@ -53,15 +53,17 @@ class _SignRequestsPageState extends State<SignRequestsPage>
   }
 
   Map<String, String> get _headers => {
-        'Authorization': 'Bearer $_token',
-        'Content-Type': 'application/json',
-      };
+    'Authorization': 'Bearer $_token',
+    'Content-Type': 'application/json',
+  };
 
   @override
   void initState() {
     super.initState();
     _animCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 400));
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
     _searchCtrl.addListener(() => _filter(_searchCtrl.text));
     _load();
@@ -85,13 +87,22 @@ class _SignRequestsPageState extends State<SignRequestsPage>
       if (age < _kCacheTTL) {
         _all = List.from(_memCache!);
         _filter(_searchCtrl.text);
-        if (mounted) setState(() { _isLoading = false; _refreshing = false; });
+        if (mounted)
+          setState(() {
+            _isLoading = false;
+            _refreshing = false;
+          });
         _animCtrl.forward(from: 0);
         return;
       }
       _all = List.from(_memCache!);
       _filter(_searchCtrl.text);
-      if (mounted) setState(() { _isLoading = false; _refreshing = true; _error = null; });
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+          _refreshing = true;
+          _error = null;
+        });
       _animCtrl.forward(from: 0);
       await _fetchFromNetwork(silent: true);
       return;
@@ -102,10 +113,18 @@ class _SignRequestsPageState extends State<SignRequestsPage>
         final cached = await storage.read(key: _kCacheKey);
         if (cached != null && mounted) {
           final body = json.decode(cached);
-          final List raw = body is List ? body : (body['results'] ?? body['data'] ?? []);
-          _all = raw.where((a) => a['status'] == 0 || a['status'] == 1).toList();
+          final List raw = body is List
+              ? body
+              : (body['results'] ?? body['data'] ?? []);
+          _all = raw
+              .where((a) => a['status'] == 0 || a['status'] == 1)
+              .toList();
           _filter(_searchCtrl.text);
-          setState(() { _isLoading = false; _refreshing = true; _error = null; });
+          setState(() {
+            _isLoading = false;
+            _refreshing = true;
+            _error = null;
+          });
           _animCtrl.forward(from: 0);
           await _fetchFromNetwork(silent: true);
           return;
@@ -113,7 +132,11 @@ class _SignRequestsPageState extends State<SignRequestsPage>
       } catch (_) {}
     }
 
-    setState(() { _isLoading = true; _error = null; _refreshing = false; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _refreshing = false;
+    });
     await _fetchFromNetwork(silent: false);
   }
 
@@ -126,13 +149,20 @@ class _SignRequestsPageState extends State<SignRequestsPage>
       if (resp.statusCode == 200) {
         storage.write(key: _kCacheKey, value: utf8.decode(resp.bodyBytes));
         final body = json.decode(utf8.decode(resp.bodyBytes));
-        final List raw = body is List ? body : (body['results'] ?? body['data'] ?? []);
-        final filtered = raw.where((a) => a['status'] == 0 || a['status'] == 1).toList();
+        final List raw = body is List
+            ? body
+            : (body['results'] ?? body['data'] ?? []);
+        final filtered = raw
+            .where((a) => a['status'] == 0 || a['status'] == 1)
+            .toList();
         _memCache = filtered;
         _memCacheTime = DateTime.now();
         _all = filtered;
         _filter(_searchCtrl.text);
-        setState(() { _isLoading = false; _refreshing = false; });
+        setState(() {
+          _isLoading = false;
+          _refreshing = false;
+        });
         if (!silent) _animCtrl.forward(from: 0);
       } else {
         if (!silent) {
@@ -162,16 +192,25 @@ class _SignRequestsPageState extends State<SignRequestsPage>
     final byStatus = _statusFilter == 'all'
         ? _all
         : _all
-            .where((a) => a['status'] == (_statusFilter == 'pending' ? 0 : 1))
-            .toList();
+              .where((a) => a['status'] == (_statusFilter == 'pending' ? 0 : 1))
+              .toList();
     setState(() {
       _shown = trimmed.isEmpty
           ? byStatus
           : byStatus.where((a) {
               return a['id'].toString().contains(trimmed) ||
-                  (a['applicant_name']?.toString().toLowerCase().contains(trimmed) ?? false) ||
-                  (a['department_name']?.toString().toLowerCase().contains(trimmed) ?? false) ||
-                  (a['factory_name']?.toString().toLowerCase().contains(trimmed) ?? false);
+                  (a['applicant_name']?.toString().toLowerCase().contains(
+                        trimmed,
+                      ) ??
+                      false) ||
+                  (a['department_name']?.toString().toLowerCase().contains(
+                        trimmed,
+                      ) ??
+                      false) ||
+                  (a['factory_name']?.toString().toLowerCase().contains(
+                        trimmed,
+                      ) ??
+                      false);
             }).toList();
     });
   }
@@ -240,7 +279,11 @@ class _SignRequestsPageState extends State<SignRequestsPage>
           ? Uri.parse('$API/$_kPath/$id/reject/')
           : Uri.parse('$API/$_kPath/$id/');
       final patchResp = await http
-          .patch(patchUri, headers: _headers, body: json.encode({'signed_details': ids}))
+          .patch(
+            patchUri,
+            headers: _headers,
+            body: json.encode({'signed_details': ids}),
+          )
           .timeout(const Duration(seconds: 15));
       if (!mounted) return;
       if (patchResp.statusCode == 200 || patchResp.statusCode == 201) {
@@ -283,17 +326,29 @@ class _SignRequestsPageState extends State<SignRequestsPage>
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.1), shape: BoxShape.circle),
+                  color: iconColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
                 child: Icon(icon, color: iconColor, size: 30),
               ),
               const SizedBox(height: 16),
-              Text(title,
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold, color: onSurface)),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: onSurface,
+                ),
+              ),
               const SizedBox(height: 8),
-              Text(message,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.6))),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: onSurface.withOpacity(0.6),
+                ),
+              ),
               const SizedBox(height: 24),
               Row(
                 children: [
@@ -303,13 +358,17 @@ class _SignRequestsPageState extends State<SignRequestsPage>
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         side: BorderSide(color: onSurface.withOpacity(0.2)),
                       ),
-                      child: Text(s.cancel,
-                          style: TextStyle(
-                              color: onSurface.withOpacity(0.7),
-                              fontWeight: FontWeight.w600)),
+                      child: Text(
+                        s.cancel,
+                        style: TextStyle(
+                          color: onSurface.withOpacity(0.7),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -322,10 +381,13 @@ class _SignRequestsPageState extends State<SignRequestsPage>
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                      child: Text(confirmLabel,
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      child: Text(
+                        confirmLabel,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ],
@@ -339,20 +401,30 @@ class _SignRequestsPageState extends State<SignRequestsPage>
   }
 
   void _snack(String msg, bool ok) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(
-        children: [
-          Icon(ok ? Icons.check_circle : Icons.error, color: Colors.white, size: 16),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Text(msg, style: const TextStyle(fontWeight: FontWeight.w500))),
-        ],
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              ok ? Icons.check_circle : Icons.error,
+              color: Colors.white,
+              size: 16,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                msg,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: ok ? const Color(0xFF43A047) : const Color(0xFFD32F2F),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       ),
-      backgroundColor: ok ? const Color(0xFF43A047) : const Color(0xFFD32F2F),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    ));
+    );
   }
 
   int get _pendingCount => _all.where((a) => a['status'] == 0).length;
@@ -375,9 +447,14 @@ class _SignRequestsPageState extends State<SignRequestsPage>
       child: Scaffold(
         extendBodyBehindAppBar: true,
         appBar: AppBar(
-          title: Text(s.signRequestsTitle,
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+          title: Text(
+            s.signRequestsTitle,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
           centerTitle: true,
           systemOverlayStyle: const SystemUiOverlayStyle(
             statusBarColor: Colors.transparent,
@@ -396,8 +473,9 @@ class _SignRequestsPageState extends State<SignRequestsPage>
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(Colors.white70)),
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(Colors.white70),
+                    ),
                   ),
                 ),
               )
@@ -410,11 +488,13 @@ class _SignRequestsPageState extends State<SignRequestsPage>
           flexibleSpace: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                  colors: gradientColors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight),
-              borderRadius:
-                  const BorderRadius.vertical(bottom: Radius.circular(20)),
+                colors: gradientColors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(20),
+              ),
             ),
           ),
           shape: const RoundedRectangleBorder(
@@ -427,9 +507,10 @@ class _SignRequestsPageState extends State<SignRequestsPage>
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                    colors: gradientColors,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight),
+                  colors: gradientColors,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
               child: SafeArea(
                 bottom: false,
@@ -441,18 +522,24 @@ class _SignRequestsPageState extends State<SignRequestsPage>
                       if (!_isLoading && _error == null)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                                color: Colors.white.withOpacity(0.35)),
+                              color: Colors.white.withOpacity(0.35),
+                            ),
                           ),
-                          child: Text('${_shown.length}',
-                              style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white)),
+                          child: Text(
+                            '${_shown.length}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                     ],
                   ),
@@ -463,10 +550,7 @@ class _SignRequestsPageState extends State<SignRequestsPage>
             Container(
               color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-              child: _SearchBar(
-                controller: _searchCtrl,
-                isDark: isDark,
-              ),
+              child: _SearchBar(controller: _searchCtrl, isDark: isDark),
             ),
             // Filter chips
             if (!_isLoading && _error == null)
@@ -509,15 +593,20 @@ class _SignRequestsPageState extends State<SignRequestsPage>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.wifi_off_rounded,
-                  size: 56,
-                  color: isDark ? Colors.white54 : Colors.grey.shade400),
+              Icon(
+                Icons.wifi_off_rounded,
+                size: 56,
+                color: isDark ? Colors.white54 : Colors.grey.shade400,
+              ),
               const SizedBox(height: 16),
-              Text(_error!,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: isDark ? Colors.white70 : Colors.grey.shade600,
-                      fontSize: 14)),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isDark ? Colors.white70 : Colors.grey.shade600,
+                  fontSize: 14,
+                ),
+              ),
               const SizedBox(height: 20),
               ElevatedButton.icon(
                 onPressed: () => _load(forceRefresh: true),
@@ -527,7 +616,8 @@ class _SignRequestsPageState extends State<SignRequestsPage>
                   backgroundColor: _g1,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ],
@@ -548,21 +638,29 @@ class _SignRequestsPageState extends State<SignRequestsPage>
                 color: isDark ? Colors.white12 : Colors.grey.shade100,
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.inbox_rounded,
-                  size: 40,
-                  color: isDark ? Colors.white54 : Colors.grey.shade400),
+              child: Icon(
+                Icons.inbox_rounded,
+                size: 40,
+                color: isDark ? Colors.white54 : Colors.grey.shade400,
+              ),
             ),
             const SizedBox(height: 16),
-            Text(s.signRequestsEmpty,
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.grey.shade700)),
+            Text(
+              s.signRequestsEmpty,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.grey.shade700,
+              ),
+            ),
             const SizedBox(height: 6),
-            Text(s.signRequestsEmptyDesc,
-                style: TextStyle(
-                    fontSize: 13,
-                    color: isDark ? Colors.white54 : Colors.grey.shade500)),
+            Text(
+              s.signRequestsEmptyDesc,
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.white54 : Colors.grey.shade500,
+              ),
+            ),
           ],
         ),
       );
@@ -610,7 +708,9 @@ class _SignRequestsPageState extends State<SignRequestsPage>
           child: Container(
             height: 150,
             decoration: BoxDecoration(
-                color: base, borderRadius: BorderRadius.circular(14)),
+              color: base,
+              borderRadius: BorderRadius.circular(14),
+            ),
           ),
         ),
       ),
@@ -634,14 +734,16 @@ class _SearchBar extends StatelessWidget {
         color: isDark ? Colors.white.withOpacity(0.07) : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-            color: isDark ? Colors.white12 : Colors.grey.shade200),
+          color: isDark ? Colors.white12 : Colors.grey.shade200,
+        ),
         boxShadow: isDark
             ? []
             : [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2))
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
               ],
       ),
       child: TextField(
@@ -649,20 +751,33 @@ class _SearchBar extends StatelessWidget {
         style: TextStyle(color: onSurface, fontSize: 14),
         decoration: InputDecoration(
           hintText: S.of(context).searchHintSignRequests,
-          hintStyle:
-              TextStyle(color: onSurface.withOpacity(0.38), fontSize: 14),
-          prefixIcon: Icon(Icons.search_rounded,
-              color: onSurface.withOpacity(0.38), size: 20),
+          hintStyle: TextStyle(
+            color: onSurface.withOpacity(0.38),
+            fontSize: 14,
+          ),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            color: onSurface.withOpacity(0.38),
+            size: 20,
+          ),
           suffixIcon: ValueListenableBuilder<TextEditingValue>(
             valueListenable: controller,
             builder: (_, v, __) => v.text.isEmpty
                 ? const SizedBox.shrink()
                 : IconButton(
-                    icon: Icon(Icons.clear_rounded,
-                        size: 18, color: onSurface.withOpacity(0.4)),
+                    icon: Icon(
+                      Icons.clear_rounded,
+                      size: 18,
+                      color: onSurface.withOpacity(0.4),
+                    ),
                     onPressed: controller.clear,
                   ),
           ),
+          // Without this the field inherits filled+fillColor from the
+          // app's global InputDecorationTheme and paints its own
+          // sharp-cornered fill on top of this widget's rounded outer
+          // Container.
+          filled: false,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 14),
         ),
@@ -699,18 +814,33 @@ class _FilterBar extends StatelessWidget {
         children: [
           _chip(context, 'all', S.of(context).filterAll, allCount),
           const SizedBox(width: 6),
-          _chip(context, 'pending', S.of(context).pending, pendingCount,
-              color: const Color(0xFFF59E0B)),
+          _chip(
+            context,
+            'pending',
+            S.of(context).pending,
+            pendingCount,
+            color: const Color(0xFFF59E0B),
+          ),
           const SizedBox(width: 6),
-          _chip(context, 'signing', S.of(context).filterForSigning, signingCount,
-              color: const Color(0xFF3B82F6)),
+          _chip(
+            context,
+            'signing',
+            S.of(context).filterForSigning,
+            signingCount,
+            color: const Color(0xFF3B82F6),
+          ),
         ],
       ),
     );
   }
 
-  Widget _chip(BuildContext context, String value, String label, int count,
-      {Color? color}) {
+  Widget _chip(
+    BuildContext context,
+    String value,
+    String label,
+    int count, {
+    Color? color,
+  }) {
     final isSelected = selected == value;
     final chipColor = color ?? const Color(0xFFFF8C00);
     return GestureDetector(
@@ -737,8 +867,7 @@ class _FilterBar extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight:
-                    isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 color: isSelected
                     ? chipColor
                     : (isDark ? Colors.white60 : Colors.grey.shade600),
@@ -747,8 +876,7 @@ class _FilterBar extends StatelessWidget {
             if (count > 0) ...[
               const SizedBox(width: 5),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? chipColor.withOpacity(isDark ? 0.3 : 0.15)
@@ -762,9 +890,7 @@ class _FilterBar extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     color: isSelected
                         ? chipColor
-                        : (isDark
-                            ? Colors.white54
-                            : Colors.grey.shade500),
+                        : (isDark ? Colors.white54 : Colors.grey.shade500),
                   ),
                 ),
               ),
@@ -810,18 +936,24 @@ class _Row2 extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 10,
-                      color: onSurface.withOpacity(0.45),
-                      letterSpacing: 0.2)),
-              Text(value,
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: onSurface),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: onSurface.withOpacity(0.45),
+                  letterSpacing: 0.2,
+                ),
+              ),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: onSurface,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),
@@ -876,8 +1008,9 @@ class _AppCard extends StatelessWidget {
     final statusTitle = app['status_title'] ?? '—';
     final status = app['status'] as int? ?? 0;
 
-    final statusColor =
-        status == 1 ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B);
+    final statusColor = status == 1
+        ? const Color(0xFF3B82F6)
+        : const Color(0xFFF59E0B);
     final statusIcon = status == 1
         ? Icons.pending_rounded
         : Icons.hourglass_empty_rounded;
@@ -915,8 +1048,11 @@ class _AppCard extends StatelessWidget {
                         color: _g1.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(9),
                       ),
-                      child: const Icon(Icons.assignment_rounded,
-                          color: _g1, size: 15),
+                      child: const Icon(
+                        Icons.assignment_rounded,
+                        color: _g1,
+                        size: 15,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -931,23 +1067,27 @@ class _AppCard extends StatelessWidget {
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: statusColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: statusColor.withOpacity(0.4)),
+                        border: Border.all(color: statusColor.withOpacity(0.4)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(statusIcon, size: 10, color: statusColor),
                           const SizedBox(width: 3),
-                          Text(statusTitle,
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: statusColor)),
+                          Text(
+                            statusTitle,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: statusColor,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -990,22 +1130,28 @@ class _AppCard extends StatelessWidget {
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 7),
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
                     decoration: BoxDecoration(
                       color: isDark
                           ? Colors.amber.withOpacity(0.1)
                           : Colors.amber.shade50,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                          color: isDark
-                              ? Colors.amber.withOpacity(0.25)
-                              : Colors.amber.shade200),
+                        color: isDark
+                            ? Colors.amber.withOpacity(0.25)
+                            : Colors.amber.shade200,
+                      ),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.notes_rounded,
-                            size: 13, color: Colors.amber.shade700),
+                        Icon(
+                          Icons.notes_rounded,
+                          size: 13,
+                          color: Colors.amber.shade700,
+                        ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
@@ -1027,8 +1173,9 @@ class _AppCard extends StatelessWidget {
                 ],
                 const SizedBox(height: 10),
                 Divider(
-                    height: 1,
-                    color: theme.colorScheme.outline.withOpacity(0.4)),
+                  height: 1,
+                  color: theme.colorScheme.outline.withOpacity(0.4),
+                ),
                 const SizedBox(height: 8),
                 if (_busy)
                   const Center(
@@ -1038,9 +1185,9 @@ class _AppCard extends StatelessWidget {
                         width: 24,
                         height: 24,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            valueColor: AlwaysStoppedAnimation(
-                                Color(0xFFFF8C00))),
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation(Color(0xFFFF8C00)),
+                        ),
                       ),
                     ),
                   )
@@ -1075,20 +1222,25 @@ class _AppCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.list_alt_rounded,
-                          size: 11,
-                          color: onSurface.withOpacity(0.28)),
+                      Icon(
+                        Icons.list_alt_rounded,
+                        size: 11,
+                        color: onSurface.withOpacity(0.28),
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         S.of(context).tapToViewMaterials,
                         style: TextStyle(
-                            fontSize: 10,
-                            color: onSurface.withOpacity(0.32)),
+                          fontSize: 10,
+                          color: onSurface.withOpacity(0.32),
+                        ),
                       ),
                       const SizedBox(width: 2),
-                      Icon(Icons.chevron_right_rounded,
-                          size: 13,
-                          color: onSurface.withOpacity(0.28)),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 13,
+                        color: onSurface.withOpacity(0.28),
+                      ),
                     ],
                   ),
                 ),
@@ -1132,19 +1284,21 @@ class _ActionBtn extends StatelessWidget {
           decoration: BoxDecoration(
             color: isDark ? color.withOpacity(0.15) : bgColor,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-                color: color.withOpacity(isDark ? 0.4 : 0.3)),
+            border: Border.all(color: color.withOpacity(isDark ? 0.4 : 0.3)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, color: color, size: 15),
               const SizedBox(width: 5),
-              Text(label,
-                  style: TextStyle(
-                      color: color,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold)),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
         ),

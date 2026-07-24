@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import '../../core/storage/app_storage.dart';
-import '../../notifiers/theme_notifier.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/localization/app_strings.dart';
 
@@ -140,10 +139,6 @@ class _SettingsScreenState extends State<SettingsScreen>
                             _buildSectionHeader(s.generalSettings),
                             const SizedBox(height: 10),
                             _buildLanguageSelector(s),
-                            const SizedBox(height: 28),
-                            _buildSectionHeader(s.appearance),
-                            const SizedBox(height: 10),
-                            _buildThemeButton(s),
                             const SizedBox(height: 36),
                             _buildVersionInfo(s),
                           ],
@@ -432,78 +427,6 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildThemeButton(S s) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeNotifier,
-      builder: (context, themeMode, _) {
-        final isDark = themeMode == ThemeMode.dark;
-        return _GlassCard(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        s.theme,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        isDark ? s.darkTheme : s.lightTheme,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                AdaptiveSwitch(
-                  value: isDark,
-                  // A pure-white "on" track blends into the light theme's
-                  // translucent white glass card, leaving almost no visible
-                  // contrast — use the brand accent instead, which reads
-                  // clearly against both the light and dark gradients.
-                  activeColor: _gradientStart,
-                  thumbColor: Colors.white,
-                  onChanged: (value) async {
-                    themeNotifier.value = value
-                        ? ThemeMode.dark
-                        : ThemeMode.light;
-                    await _storage.write(
-                      key: 'isDarkTheme',
-                      value: value.toString(),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 
   Widget _buildVersionInfo(S s) {
     return Center(

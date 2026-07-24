@@ -705,9 +705,7 @@ class _BonusesPageState extends State<BonusesPage>
             ),
             const SizedBox(height: 4),
             Text(
-              _viewMode == _kStage
-                  ? s.noRecordsForSigning
-                  : s.bonusListEmpty,
+              _viewMode == _kStage ? s.noRecordsForSigning : s.bonusListEmpty,
               style: TextStyle(
                 fontSize: 13,
                 color: isDark ? Colors.white38 : Colors.grey.shade500,
@@ -1073,9 +1071,7 @@ class _BonusStatusProgress extends StatelessWidget {
                     height: 2,
                     margin: const EdgeInsets.symmetric(horizontal: 2),
                     decoration: BoxDecoration(
-                      color: (idx >= 0 && i < idx)
-                          ? steps[i].$3
-                          : inactiveLine,
+                      color: (idx >= 0 && i < idx) ? steps[i].$3 : inactiveLine,
                       borderRadius: BorderRadius.circular(1),
                     ),
                   ),
@@ -1402,6 +1398,11 @@ class _SearchBar extends StatelessWidget {
                     onPressed: controller.clear,
                   ),
           ),
+          // Without this the field inherits filled+fillColor from the
+          // app's global InputDecorationTheme and paints its own
+          // sharp-cornered fill on top of this widget's rounded outer
+          // Container.
+          filled: false,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 14),
         ),
