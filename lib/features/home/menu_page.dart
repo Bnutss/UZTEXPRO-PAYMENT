@@ -1470,8 +1470,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           const SizedBox(height: 20),
           _MenuCard(
             icon: Icons.storefront_rounded,
-            label: 'Выдача заказов',
-            description: 'Найти заказ и подтвердить выдачу покупателю на ПВЗ',
+            label: s.shopPickupTitle,
+            description: s.shopPickupDesc,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => ShopPickupPage(jwtToken: widget.jwtToken)),

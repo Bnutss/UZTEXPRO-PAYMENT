@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/localization/app_strings.dart';
+import '../../core/localization/locale_notifier.dart';
 import 'order_photo_capture_page.dart';
 import 'shop_api.dart';
 
@@ -39,12 +41,16 @@ class _ShopPickupPageState extends State<ShopPickupPage> {
       _debounce?.cancel();
       _debounce = Timer(const Duration(milliseconds: 350), _load);
     });
+    localeNotifier.addListener(_onLocaleChanged);
   }
+
+  void _onLocaleChanged() => setState(() {});
 
   @override
   void dispose() {
     _searchController.dispose();
     _debounce?.cancel();
+    localeNotifier.removeListener(_onLocaleChanged);
     super.dispose();
   }
 
@@ -98,14 +104,15 @@ class _ShopPickupPageState extends State<ShopPickupPage> {
         numberFormat: _numberFormat,
       ),
     );
-    if (issued == true) {
-      _snack('Заказ №${order.id} выдан', true);
+    if (issued == true && mounted) {
+      _snack(S.of(context).shopPickupIssuedSnack(order.id), true);
       _load();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final gradColors = isDark ? [const Color(0xFF3D1800), const Color(0xFF1F0000)] : [_g1, _g2];
     final listBg = isDark ? Theme.of(context).colorScheme.surface : const Color(0xFFF4F4F4);
@@ -118,7 +125,7 @@ class _ShopPickupPageState extends State<ShopPickupPage> {
       ),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Выдача заказов', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+          title: Text(s.shopPickupTitle, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
           centerTitle: false,
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -142,16 +149,16 @@ class _ShopPickupPageState extends State<ShopPickupPage> {
             Container(
               color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-              child: _SearchBar(controller: _searchController, isDark: isDark),
+              child: _SearchBar(controller: _searchController, isDark: isDark, hintText: s.shopPickupSearchHint),
             ),
-            Expanded(child: Container(color: listBg, child: _buildBody(isDark))),
+            Expanded(child: Container(color: listBg, child: _buildBody(isDark, s))),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBody(bool isDark) {
+  Widget _buildBody(bool isDark, S s) {
     if (_loading) return const Center(child: CircularProgressIndicator(color: _g1));
 
     if (_error != null) {
@@ -177,7 +184,7 @@ class _ShopPickupPageState extends State<ShopPickupPage> {
               FilledButton.icon(
                 onPressed: _load,
                 icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('Обновить'),
+                label: Text(s.refresh),
                 style: FilledButton.styleFrom(backgroundColor: _g1, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
               ),
             ],
@@ -203,7 +210,7 @@ class _ShopPickupPageState extends State<ShopPickupPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Нет заказов, ожидающих выдачи',
+              s.shopPickupEmpty,
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.grey.shade700),
             ),
           ],
@@ -221,6 +228,7 @@ class _ShopPickupPageState extends State<ShopPickupPage> {
           order: _orders[i],
           isDark: isDark,
           numberFormat: _numberFormat,
+          s: s,
           onTap: () => _openDetail(_orders[i]),
         ),
       ),
@@ -234,9 +242,10 @@ class _OrderCard extends StatelessWidget {
   final PvzOrder order;
   final bool isDark;
   final NumberFormat numberFormat;
+  final S s;
   final VoidCallback onTap;
 
-  const _OrderCard({required this.order, required this.isDark, required this.numberFormat, required this.onTap});
+  const _OrderCard({required this.order, required this.isDark, required this.numberFormat, required this.s, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -289,7 +298,7 @@ class _OrderCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '${order.items.length} поз. · Продавец: ${order.sellerName}',
+                        '${order.items.length} ${s.shopPickupPositions} · ${s.shopPickupSeller}: ${order.sellerName}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.55)),
@@ -358,6 +367,7 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final surface = Theme.of(context).colorScheme.surface;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final order = widget.order;
@@ -382,13 +392,13 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                   decoration: BoxDecoration(color: onSurface.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
                 ),
               ),
-              Text('Заказ №${order.id}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: onSurface)),
+              Text(s.shopPickupOrderTitle(order.id), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: onSurface)),
               const SizedBox(height: 4),
-              Text('Покупатель: ${order.buyerName}', style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.6))),
-              Text('Продавец: ${order.sellerName}', style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.6))),
+              Text('${s.shopPickupBuyer}: ${order.buyerName}', style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.6))),
+              Text('${s.shopPickupSeller}: ${order.sellerName}', style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.6))),
               Text(_formatDateTime(order.createAt), style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.6))),
               const SizedBox(height: 18),
-              Text('Товары', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: onSurface)),
+              Text(s.shopPickupItemsHeader, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: onSurface)),
               const SizedBox(height: 10),
               ...order.items.map(
                 (item) => Container(
@@ -425,7 +435,7 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Итого', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    Text(s.totalLabel, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                     Text('${widget.numberFormat.format(order.totalValue)} сум', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
                   ],
                 ),
@@ -438,7 +448,7 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                   icon: _issuing
                       ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                       : const Icon(Icons.camera_alt_rounded, size: 20),
-                  label: Text(_issuing ? 'Выдаём…' : 'Выдать заказ', style: const TextStyle(fontWeight: FontWeight.w700)),
+                  label: Text(_issuing ? s.shopPickupIssuing : s.shopPickupIssueButton, style: const TextStyle(fontWeight: FontWeight.w700)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2E7D32),
                     foregroundColor: Colors.white,
@@ -479,8 +489,9 @@ class _CountBadge extends StatelessWidget {
 class _SearchBar extends StatelessWidget {
   final TextEditingController controller;
   final bool isDark;
+  final String hintText;
 
-  const _SearchBar({required this.controller, required this.isDark});
+  const _SearchBar({required this.controller, required this.isDark, required this.hintText});
 
   @override
   Widget build(BuildContext context) {
@@ -497,7 +508,7 @@ class _SearchBar extends StatelessWidget {
         controller: controller,
         style: TextStyle(color: onSurface, fontSize: 14),
         decoration: InputDecoration(
-          hintText: 'Поиск по № заказа или покупателю...',
+          hintText: '$hintText...',
           hintStyle: TextStyle(color: onSurface.withOpacity(0.38), fontSize: 14),
           prefixIcon: Icon(Icons.search_rounded, color: onSurface.withOpacity(0.38), size: 20),
           suffixIcon: ValueListenableBuilder<TextEditingValue>(

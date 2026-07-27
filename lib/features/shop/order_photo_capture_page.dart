@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/localization/app_strings.dart';
+
 /// Captures a confirmation photo of the buyer with the rear camera at
 /// pickup time. Pops with a base64-encoded JPEG string, or null if
 /// cancelled.
@@ -34,7 +36,7 @@ class _OrderPhotoCapturePageState extends State<OrderPhotoCapturePage> {
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
-        setState(() => _error = 'Камера не найдена на устройстве');
+        if (mounted) setState(() => _error = S.of(context).shopPhotoNoCamera);
         return;
       }
       final back = cameras.firstWhere(
@@ -46,7 +48,7 @@ class _OrderPhotoCapturePageState extends State<OrderPhotoCapturePage> {
       if (!mounted) return;
       setState(() => _controller = controller);
     } catch (_) {
-      setState(() => _error = 'Не удалось получить доступ к камере');
+      if (mounted) setState(() => _error = S.of(context).shopPhotoNoAccess);
     }
   }
 
@@ -66,7 +68,7 @@ class _OrderPhotoCapturePageState extends State<OrderPhotoCapturePage> {
       setState(() => _captured = file);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _error = 'Не удалось сделать фото');
+      setState(() => _error = S.of(context).shopPhotoFailed);
     } finally {
       if (mounted) setState(() => _capturing = false);
     }
@@ -84,10 +86,11 @@ class _OrderPhotoCapturePageState extends State<OrderPhotoCapturePage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Фото покупателя'),
+        title: Text(s.shopPhotoTitle),
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -116,9 +119,9 @@ class _OrderPhotoCapturePageState extends State<OrderPhotoCapturePage> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _ActionButton(label: 'Переснять', icon: Icons.replay_rounded, onTap: _retake, filled: false),
+                      _ActionButton(label: s.shopPhotoRetake, icon: Icons.replay_rounded, onTap: _retake, filled: false),
                       const SizedBox(width: 16),
-                      _ActionButton(label: 'Подтвердить', icon: Icons.check_rounded, onTap: _confirm, filled: true),
+                      _ActionButton(label: s.shopPhotoConfirm, icon: Icons.check_rounded, onTap: _confirm, filled: true),
                     ],
                   ),
                 ),
@@ -145,7 +148,7 @@ class _OrderPhotoCapturePageState extends State<OrderPhotoCapturePage> {
                 right: 0,
                 bottom: 100,
                 child: Text(
-                  'Сфотографируйте покупателя для подтверждения выдачи',
+                  s.shopPhotoHint,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 14),
                 ),
