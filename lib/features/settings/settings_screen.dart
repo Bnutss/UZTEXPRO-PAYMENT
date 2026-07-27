@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import '../../core/storage/app_storage.dart';
@@ -94,63 +93,41 @@ class _SettingsScreenState extends State<SettingsScreen>
     super.dispose();
   }
 
+  // No own Scaffold/gradient/AnnotatedRegion here: this screen is only ever
+  // mounted as a tab body inside MenuPage's IndexedStack, which already
+  // paints the shared background gradient + glow circles + status bar style
+  // for every tab. A second full-bleed gradient Container nested inside its
+  // own Scaffold used to duplicate that background starting partway down the
+  // screen — since each gradient positions itself relative to its own
+  // (different-sized) box, the colors didn't line up at the seam and showed
+  // as a visible hard-edged rectangle cutting through the header's glow
+  // circle. Just build the tab content directly, like the other tabs do.
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final List<Color> gradientColors = isDark
-        ? [const Color(0xFF3D1800), const Color(0xFF1F0000)]
-        : [_gradientStart, _gradientEnd];
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
-      ),
-      child: Scaffold(
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: gradientColors,
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    return FadeTransition(
+      opacity: _animation,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHeader(s),
+          const SizedBox(height: 16),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
+              children: [
+                _buildProfileCard(s),
+                const SizedBox(height: 28),
+                _buildSectionHeader(s.generalSettings),
+                const SizedBox(height: 10),
+                _buildLanguageSelector(s),
+                const SizedBox(height: 36),
+                _buildVersionInfo(s),
+              ],
             ),
           ),
-          child: Stack(
-            children: [
-              Positioned(top: -60, right: -40, child: _circle(200, 0.06)),
-              Positioned(bottom: 60, left: -70, child: _circle(220, 0.05)),
-              Positioned(top: 240, right: 20, child: _circle(60, 0.04)),
-              SafeArea(
-                child: FadeTransition(
-                  opacity: _animation,
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 16),
-                      _buildHeader(s),
-                      const SizedBox(height: 16),
-                      Expanded(
-                        child: ListView(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
-                          children: [
-                            _buildProfileCard(s),
-                            const SizedBox(height: 28),
-                            _buildSectionHeader(s.generalSettings),
-                            const SizedBox(height: 10),
-                            _buildLanguageSelector(s),
-                            const SizedBox(height: 36),
-                            _buildVersionInfo(s),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        ],
       ),
     );
   }
@@ -168,15 +145,6 @@ class _SettingsScreenState extends State<SettingsScreen>
       ),
     );
   }
-
-  Widget _circle(double size, double opacity) => Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      color: Colors.white.withOpacity(opacity),
-    ),
-  );
 
   Widget _buildProfileCard(S s) {
     final initials = _displayName.isNotEmpty
@@ -427,43 +395,38 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-
   Widget _buildVersionInfo(S s) {
     return Center(
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _showAboutDialog(s),
-          borderRadius: BorderRadius.circular(30),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 18),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.2),
-                width: 0.8,
+      child: AdaptiveButton.child(
+        onPressed: () => _showAboutDialog(s),
+        style: AdaptiveButtonStyle.glass,
+        size: AdaptiveButtonSize.small,
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 18),
+        // useNative:false keeps this a plain Flutter-drawn button instead of
+        // a real native UIButton — the native iOS 26 path was picking up an
+        // unwanted underline under the label (iOS accessibility auto-styling
+        // real UIButtons), which a Flutter-drawn button can't be affected by.
+        useNative: false,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.info_outline,
+              size: 14,
+              color: Colors.white.withOpacity(0.7),
+            ),
+            const SizedBox(width: 7),
+            Text(
+              s.appVersionLabel(_version),
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.75),
+                fontSize: 12,
+                decoration: TextDecoration.none,
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  size: 14,
-                  color: Colors.white.withOpacity(0.7),
-                ),
-                const SizedBox(width: 7),
-                Text(
-                  s.appVersionLabel(_version),
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.75),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          ],
         ),
       ),
     );
@@ -474,22 +437,183 @@ class _SettingsScreenState extends State<SettingsScreen>
         ? '© 2026–${DateTime.now().year} UztexPro.'
         : '© 2026 UztexPro.';
 
-    AdaptiveAlertDialog.show(
+    showGeneralDialog(
       context: context,
-      title: s.versionLabel(_version),
-      message: '$copyright\n${s.allRightsReserved}',
-      icon: PlatformInfo.isIOS26OrHigher()
-          ? 'info.circle.fill'
-          : Icons.info_outline_rounded,
-      iconColor: _gradientStart,
-      iconSize: 40,
-      actions: [
-        AlertAction(
-          title: s.close,
-          onPressed: () {},
-          style: AlertActionStyle.cancel,
+      barrierDismissible: true,
+      barrierLabel: s.close,
+      barrierColor: Colors.black.withOpacity(0.55),
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (context, _, _) => const SizedBox.shrink(),
+      transitionBuilder: (context, animation, _, _) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutBack,
+          reverseCurve: Curves.easeIn,
+        );
+        return FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.9, end: 1).animate(curved),
+            child: _AboutDialogCard(
+              version: s.versionLabel(_version),
+              copyright: copyright,
+              allRightsReserved: s.allRightsReserved,
+              closeLabel: s.close,
+              accentStart: _gradientStart,
+              accentEnd: _gradientEnd,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── About / version dialog ──────────────────────────────────────────────────
+//
+// Built as an app-styled glass card instead of AdaptiveAlertDialog. The
+// native iOS 26 alert renders its labels with the system's real light/dark
+// UITraitCollection regardless of the app's forced-dark Flutter theme, which
+// on a device actually set to Light Mode produced barely-readable black/gray
+// text over our dark blur. A fully in-Flutter dialog sidesteps that mismatch
+// and matches the rest of the app's frosted-glass look.
+
+class _AboutDialogCard extends StatelessWidget {
+  final String version;
+  final String copyright;
+  final String allRightsReserved;
+  final String closeLabel;
+  final Color accentStart;
+  final Color accentEnd;
+
+  const _AboutDialogCard({
+    required this.version,
+    required this.copyright,
+    required this.allRightsReserved,
+    required this.closeLabel,
+    required this.accentStart,
+    required this.accentEnd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF241208).withOpacity(0.92),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.16),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.4),
+                    blurRadius: 30,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
+              ),
+              // Text below has no Material ancestor otherwise (this dialog is
+              // shown via showGeneralDialog, which doesn't provide one like
+              // showDialog does) — without it, Flutter silently falls back to
+              // its debug "missing Material" text style: yellow with an
+              // underline, which is exactly the ugly text the version dialog
+              // was showing.
+              child: Material(
+                type: MaterialType.transparency,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [accentStart, accentEnd],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: accentStart.withOpacity(0.45),
+                            blurRadius: 18,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.info_outline_rounded,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      version,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      copyright,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.75),
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      allRightsReserved,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: AdaptiveButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        label: closeLabel,
+                        textColor: Colors.white,
+                        color: Colors.white,
+                        style: AdaptiveButtonStyle.glass,
+                        size: AdaptiveButtonSize.large,
+                        borderRadius: BorderRadius.circular(13),
+                        // The Cupertino fallback button (useNative: false)
+                        // defaults to a large horizontal-only padding meant
+                        // for full-size buttons, which doesn't fit the fixed
+                        // 44pt height here and clipped the label. Keep it
+                        // explicit and compact instead.
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        useNative: false,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -534,4 +658,3 @@ class _GlassCard extends StatelessWidget {
     );
   }
 }
-

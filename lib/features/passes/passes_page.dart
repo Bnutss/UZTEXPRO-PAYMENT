@@ -627,7 +627,7 @@ class _PassesPageState extends State<PassesPage>
               fontSize: 18,
             ),
           ),
-          centerTitle: true,
+          centerTitle: false,
           systemOverlayStyle: const SystemUiOverlayStyle(
             statusBarColor: Colors.transparent,
             statusBarIconBrightness: Brightness.light,

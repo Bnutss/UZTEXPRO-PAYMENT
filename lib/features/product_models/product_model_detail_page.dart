@@ -351,7 +351,7 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
               fontSize: 17,
             ),
           ),
-          centerTitle: true,
+          centerTitle: false,
           systemOverlayStyle: const SystemUiOverlayStyle(
             statusBarColor: Colors.transparent,
             statusBarIconBrightness: Brightness.light,

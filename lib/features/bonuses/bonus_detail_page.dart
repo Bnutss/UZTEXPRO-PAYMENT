@@ -250,7 +250,7 @@ class _BonusDetailPageState extends State<BonusDetailPage> {
             style: const TextStyle(
                 color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
           ),
-          centerTitle: true,
+          centerTitle: false,
           systemOverlayStyle: const SystemUiOverlayStyle(
             statusBarColor: Colors.transparent,
             statusBarIconBrightness: Brightness.light,

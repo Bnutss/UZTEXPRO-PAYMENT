@@ -169,11 +169,7 @@ class _LoginPageState extends State<LoginPage>
   }
 
   void _showSnackBar(String message) {
-    AdaptiveSnackBar.show(
-      context,
-      message: message,
-      type: AdaptiveSnackBarType.error,
-    );
+    _ErrorBanner.show(context, message: message);
   }
 
   void _navigateToMainPage(String jwt) {
@@ -630,5 +626,148 @@ class _LoginPageState extends State<LoginPage>
       setState(() => isLoading = false);
       _showSnackBar(s.connectionError);
     }
+  }
+}
+
+// ── Error banner ─────────────────────────────────────────────────────────
+//
+// Replaces AdaptiveSnackBar for login errors: the plugin's message text
+// picked up an unwanted underline decoration on iOS with no exposed way to
+// override it, so this is a small self-drawn banner instead — full control
+// over the TextStyle (decoration explicitly set to none) and matches the
+// app's own red/orange palette rather than the plugin's generic error color.
+
+class _ErrorBanner {
+  static void show(BuildContext context, {required String message}) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (context) =>
+          _ErrorBannerWidget(message: message, onDismiss: () => entry.remove()),
+    );
+    overlay.insert(entry);
+  }
+}
+
+class _ErrorBannerWidget extends StatefulWidget {
+  final String message;
+  final VoidCallback onDismiss;
+
+  const _ErrorBannerWidget({required this.message, required this.onDismiss});
+
+  @override
+  State<_ErrorBannerWidget> createState() => _ErrorBannerWidgetState();
+}
+
+class _ErrorBannerWidgetState extends State<_ErrorBannerWidget>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<Offset> _slide;
+  late final Animation<double> _fade;
+  Timer? _timer;
+  bool _dismissed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+    );
+    _slide = Tween<Offset>(
+      begin: const Offset(0, -1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _fade = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _controller.forward();
+    _timer = Timer(const Duration(seconds: 3), _dismiss);
+  }
+
+  Future<void> _dismiss() async {
+    if (_dismissed) return;
+    _dismissed = true;
+    _timer?.cancel();
+    if (mounted) await _controller.reverse();
+    widget.onDismiss();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: SlideTransition(
+        position: _slide,
+        child: FadeTransition(
+          opacity: _fade,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              // This overlay entry sits outside any Scaffold/Material
+              // ancestor, so Text here has none to inherit from — without
+              // this, Flutter silently falls back to its debug "missing
+              // Material" text style (yellow with an underline).
+              child: Material(
+                type: MaterialType.transparency,
+                child: GestureDetector(
+                  onTap: _dismiss,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFCC1500), Color(0xFF7A0E00)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.error_outline_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            widget.message,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -310,7 +310,7 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
                 fontWeight: FontWeight.bold,
                 fontSize: 18),
           ),
-          centerTitle: true,
+          centerTitle: false,
           systemOverlayStyle: const SystemUiOverlayStyle(
             statusBarColor: Colors.transparent,
             statusBarIconBrightness: Brightness.light,

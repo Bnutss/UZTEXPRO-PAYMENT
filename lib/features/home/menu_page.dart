@@ -441,6 +441,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                                   _buildHomeTab(s),
                                   _buildConfirmationsTab(s),
                                   _buildProductionTab(s),
+                                  _buildShopTab(s),
                                   const SettingsScreen(),
                                 ],
                               ),
@@ -455,20 +456,23 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             ),
           ),
           bottomNavigationBar: AdaptiveBottomNavigationBar(
-            items: [
-              AdaptiveNavigationDestination(
-                icon: 'house.fill',
-                label: s.navHome,
-              ),
+            // Labels intentionally empty: icons-only tab bar. adaptive_platform_ui's
+            // AdaptiveNavigationDestination.label is required and doubles as the
+            // native tab's accessibility label, so VoiceOver support is traded
+            // away here too — there's no separate visual/semantic label knob
+            // exposed by the plugin.
+            items: const [
+              AdaptiveNavigationDestination(icon: 'house.fill', label: ''),
               AdaptiveNavigationDestination(
                 icon: 'checkmark.seal.fill',
-                label: s.navConfirmations,
+                label: '',
               ),
               AdaptiveNavigationDestination(
                 icon: 'shippingbox.fill',
-                label: s.navProduction,
+                label: '',
               ),
-              AdaptiveNavigationDestination(icon: 'gear', label: s.navSettings),
+              AdaptiveNavigationDestination(icon: 'bag.fill', label: ''),
+              AdaptiveNavigationDestination(icon: 'gear', label: ''),
             ],
             selectedIndex: _currentIndex,
             onTap: _onTabTap,
@@ -614,6 +618,23 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
+  // ── Общий заголовок раздела ───────────────────────────
+  //
+  // Every tab gets the same left-aligned section title (matching the
+  // Settings tab's own header) so it's always clear which section is open —
+  // previously only Settings had one, and it was centered instead of sitting
+  // next to the edge like the rest of the app's content.
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 20,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+  }
+
   // ── Главная ──────────────────────────────────────────
 
   Widget _buildHomeTab(S s) {
@@ -623,24 +644,23 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            s.welcome,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+          _buildSectionTitle(s.navHome),
           const SizedBox(height: 4),
           Text(
             s.paymentSystem,
-            style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 13),
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.65),
+              fontSize: 13,
+            ),
           ),
           if (_hasFullAccess &&
               !_dashOverviewUnavailable &&
               (_dashOverviewLoading || _dashOverviewLoaded)) ...[
             const SizedBox(height: 26),
-            _dashSectionHeader(Icons.dashboard_customize_rounded, s.dashboardOverview),
+            _dashSectionHeader(
+              Icons.dashboard_customize_rounded,
+              s.dashboardOverview,
+            ),
             const SizedBox(height: 12),
             _dashOverviewLoaded ? _buildDashOverview(s) : _dashSkeletonBlock(),
           ],
@@ -667,10 +687,16 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       gradient: LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [Colors.white.withOpacity(0.19), Colors.white.withOpacity(0.08)],
+        colors: [
+          Colors.white.withOpacity(0.19),
+          Colors.white.withOpacity(0.08),
+        ],
       ),
       borderRadius: BorderRadius.circular(radius),
-      border: Border.all(color: Colors.white.withOpacity(borderOpacity), width: 1),
+      border: Border.all(
+        color: Colors.white.withOpacity(borderOpacity),
+        width: 1,
+      ),
       boxShadow: shadow,
     );
   }
@@ -699,7 +725,10 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     Widget block({double height = 92, double? width}) => Container(
       height: height,
       width: width,
-      decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(18)),
+      decoration: BoxDecoration(
+        color: base,
+        borderRadius: BorderRadius.circular(18),
+      ),
     );
     return Shimmer.fromColors(
       baseColor: base,
@@ -746,13 +775,21 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _StaggerIn(
-          child: _dashHeroCard(s, total: total, onSite: onSite, attendance: attendance),
+          child: _dashHeroCard(
+            s,
+            total: total,
+            onSite: onSite,
+            attendance: attendance,
+          ),
         ),
         if (productions.isNotEmpty) ...[
           const SizedBox(height: 24),
           _StaggerIn(
             delay: const Duration(milliseconds: 140),
-            child: _dashSectionHeader(Icons.insights_rounded, s.dashboardProductionIndicators),
+            child: _dashSectionHeader(
+              Icons.insights_rounded,
+              s.dashboardProductionIndicators,
+            ),
           ),
           const SizedBox(height: 10),
           _StaggerIn(
@@ -773,7 +810,10 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           const SizedBox(height: 24),
           _StaggerIn(
             delay: const Duration(milliseconds: 200),
-            child: _dashSectionHeader(Icons.factory_rounded, s.dashboardFactoriesDetail),
+            child: _dashSectionHeader(
+              Icons.factory_rounded,
+              s.dashboardFactoriesDetail,
+            ),
           ),
           const SizedBox(height: 10),
           _StaggerIn(
@@ -807,7 +847,11 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       decoration: _glassDecoration(
         radius: 22,
         shadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.14), blurRadius: 22, offset: const Offset(0, 10)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.14),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
         ],
       ),
       child: Column(
@@ -820,7 +864,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 height: 84,
                 child: TweenAnimationBuilder<double>(
                   tween: Tween(begin: 0, end: attendance.clamp(0.0, 1.0)),
-                  duration: reduceMotion ? Duration.zero : const Duration(milliseconds: 1100),
+                  duration: reduceMotion
+                      ? Duration.zero
+                      : const Duration(milliseconds: 1100),
                   curve: Curves.easeOutCubic,
                   builder: (_, value, _) => Stack(
                     alignment: Alignment.center,
@@ -835,7 +881,11 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                       ),
                       Text(
                         '${(value * 100).round()}%',
-                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ],
                   ),
@@ -862,24 +912,40 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                       children: [
                         _CountUpText(
                           target: onSite.toDouble(),
-                          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800, height: 1),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            height: 1,
+                          ),
                         ),
                         Text(
                           ' / $total',
-                          style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 13.5, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.55),
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3.5,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.14),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         s.dashboardOutOf(total),
-                        style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 9.5, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -941,8 +1007,16 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           height: 30,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: RadialGradient(colors: [accent, accent.withOpacity(0.75)]),
-            boxShadow: [BoxShadow(color: accent.withOpacity(0.4), blurRadius: 9, spreadRadius: 0.5)],
+            gradient: RadialGradient(
+              colors: [accent, accent.withOpacity(0.75)],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withOpacity(0.4),
+                blurRadius: 9,
+                spreadRadius: 0.5,
+              ),
+            ],
           ),
           child: Icon(icon, color: Colors.white, size: 14),
         ),
@@ -959,12 +1033,20 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   children: [
                     _CountUpText(
                       target: numericValue,
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     if (suffix.isNotEmpty)
                       Text(
                         suffix,
-                        style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                   ],
                 )
@@ -973,7 +1055,11 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   textValue ?? '—',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w800),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               Text(
                 label,
@@ -999,11 +1085,16 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     final planPercent = (prod['plan_percent'] as num?)?.toDouble() ?? 0;
     final unit = prod['unit']?.toString() ?? '';
     final code = prod['code']?.toString() ?? prod['name']?.toString() ?? '';
-    final pct = planned > 0 ? (actual / planned * 100).clamp(0, 100).round() : 0;
+    final pct = planned > 0
+        ? (actual / planned * 100).clamp(0, 100).round()
+        : 0;
     final over = actual >= planned;
     final trendColor = over ? const Color(0xFF34D399) : const Color(0xFFFB7185);
 
-    String fmt(double v) => NumberFormat(v == v.roundToDouble() ? '#,##0' : '#,##0.0', 'ru').format(v);
+    String fmt(double v) => NumberFormat(
+      v == v.roundToDouble() ? '#,##0' : '#,##0.0',
+      'ru',
+    ).format(v);
 
     return Container(
       width: 118,
@@ -1031,43 +1122,70 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                               code,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w800),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                             if (unit.isNotEmpty)
                               Text(
                                 unit,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 8.5, fontWeight: FontWeight.w600),
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                           ],
                         ),
                       ),
                       Icon(
-                        over ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                        over
+                            ? Icons.trending_up_rounded
+                            : Icons.trending_down_rounded,
                         size: 12,
                         color: trendColor,
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
-                  _dashStatLine(s.dashboardPlan, fmt(planned), emphasize: false),
+                  _dashStatLine(
+                    s.dashboardPlan,
+                    fmt(planned),
+                    emphasize: false,
+                  ),
                   const SizedBox(height: 2),
                   _dashStatLine(s.dashboardFact, fmt(actual), emphasize: true),
                   const Spacer(),
                   Row(
                     children: [
-                      Text('$pct%', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 9.5)),
+                      Text(
+                        '$pct%',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: 9.5,
+                        ),
+                      ),
                       const Spacer(),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1.5,
+                        ),
                         decoration: BoxDecoration(
                           color: trendColor.withOpacity(0.22),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           '${planPercent.round()}%',
-                          style: TextStyle(color: trendColor, fontSize: 9.5, fontWeight: FontWeight.w800),
+                          style: TextStyle(
+                            color: trendColor,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
                     ],
@@ -1089,7 +1207,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     final entered = (f['today_total_enter'] as num?)?.toInt() ?? 0;
     final inTerritory = (f['in_territory'] as num?)?.toInt() ?? 0;
     final producedYesterday = (f['sewing_yesterday'] as num?)?.toDouble() ?? 0;
-    final pct = employeeCount > 0 ? (inTerritory / employeeCount * 100).clamp(0, 100).round() : 0;
+    final pct = employeeCount > 0
+        ? (inTerritory / employeeCount * 100).clamp(0, 100).round()
+        : 0;
     final good = pct > 70;
     final color = good ? const Color(0xFF34D399) : const Color(0xFFFB7185);
 
@@ -1114,20 +1234,34 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                           name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w800),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
                       Icon(
-                        good ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                        good
+                            ? Icons.arrow_upward_rounded
+                            : Icons.arrow_downward_rounded,
                         size: 12,
                         color: color,
                       ),
                     ],
                   ),
                   const SizedBox(height: 7),
-                  _dashStatLine(s.dashboardFactoryTotal, NumberFormat('#,##0', 'ru').format(employeeCount), emphasize: false),
+                  _dashStatLine(
+                    s.dashboardFactoryTotal,
+                    NumberFormat('#,##0', 'ru').format(employeeCount),
+                    emphasize: false,
+                  ),
                   const SizedBox(height: 2),
-                  _dashStatLine(s.dashboardEntered, NumberFormat('#,##0', 'ru').format(entered), emphasize: true),
+                  _dashStatLine(
+                    s.dashboardEntered,
+                    NumberFormat('#,##0', 'ru').format(entered),
+                    emphasize: true,
+                  ),
                   const SizedBox(height: 2),
                   _dashStatLine(
                     s.dashboardProductionShort,
@@ -1135,7 +1269,13 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     emphasize: false,
                   ),
                   const Spacer(),
-                  Text('$pct%', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 9.5)),
+                  Text(
+                    '$pct%',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 9.5,
+                    ),
+                  ),
                   const SizedBox(height: 3),
                   _dashProgressBar(pct / 100, color),
                 ],
@@ -1194,7 +1334,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             decoration: BoxDecoration(
               gradient: LinearGradient(colors: [color.withOpacity(0.7), color]),
               borderRadius: BorderRadius.circular(3),
-              boxShadow: [BoxShadow(color: color.withOpacity(0.55), blurRadius: 5)],
+              boxShadow: [
+                BoxShadow(color: color.withOpacity(0.55), blurRadius: 5),
+              ],
             ),
           ),
         ],
@@ -1209,7 +1351,14 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-      child: cards.isEmpty ? _NoAccessCard() : Column(children: cards),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle(s.navConfirmations),
+          const SizedBox(height: 20),
+          if (cards.isEmpty) _NoAccessCard() else ...cards,
+        ],
+      ),
     );
   }
 
@@ -1283,19 +1432,48 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-      child: !_hasFullAccess
-          ? _NoAccessCard()
-          : _MenuCard(
-              icon: Icons.checkroom_rounded,
-              label: s.menuProductModels,
-              description: s.menuProductModelsDesc,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ProductModelsPage(jwtToken: widget.jwtToken),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle(s.navProduction),
+          const SizedBox(height: 20),
+          !_hasFullAccess
+              ? _NoAccessCard()
+              : _MenuCard(
+                  icon: Icons.checkroom_rounded,
+                  label: s.menuProductModels,
+                  description: s.menuProductModelsDesc,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          ProductModelsPage(jwtToken: widget.jwtToken),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+        ],
+      ),
+    );
+  }
+
+  // ── Магазин ───────────────────────────────────────────
+
+  Widget _buildShopTab(S s) {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle(s.navShop),
+          const SizedBox(height: 20),
+          _ComingSoonCard(
+            icon: Icons.storefront_rounded,
+            title: s.shopComingSoonTitle,
+            message: s.shopComingSoonMessage,
+          ),
+        ],
+      ),
     );
   }
 
@@ -1306,6 +1484,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       _NavItemData(Icons.home_rounded, s.navHome),
       _NavItemData(Icons.fact_check_rounded, s.navConfirmations),
       _NavItemData(Icons.precision_manufacturing_rounded, s.navProduction),
+      _NavItemData(Icons.storefront_rounded, s.navShop),
       _NavItemData(Icons.settings_rounded, s.navSettings),
     ];
 
@@ -1356,7 +1535,10 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   child: child,
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: List.generate(items.length, (i) {
                       return Expanded(
@@ -1394,6 +1576,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 class _StaggerIn extends StatefulWidget {
   final Widget child;
   final Duration delay;
+
   const _StaggerIn({required this.child, this.delay = Duration.zero});
 
   @override
@@ -1406,7 +1589,11 @@ class _StaggerInState extends State<_StaggerIn> {
   @override
   void initState() {
     super.initState();
-    if (WidgetsBinding.instance.platformDispatcher.accessibilityFeatures.disableAnimations) {
+    if (WidgetsBinding
+        .instance
+        .platformDispatcher
+        .accessibilityFeatures
+        .disableAnimations) {
       _visible = true;
       return;
     }
@@ -1436,6 +1623,7 @@ class _StaggerInState extends State<_StaggerIn> {
 class _CountUpText extends StatelessWidget {
   final double target;
   final TextStyle style;
+
   const _CountUpText({required this.target, required this.style});
 
   @override
@@ -1443,9 +1631,12 @@ class _CountUpText extends StatelessWidget {
     final reduceMotion = MediaQuery.of(context).disableAnimations;
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: target),
-      duration: reduceMotion ? Duration.zero : const Duration(milliseconds: 900),
+      duration: reduceMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 900),
       curve: Curves.easeOutCubic,
-      builder: (_, value, _) => Text(NumberFormat('#,##0', 'ru').format(value), style: style),
+      builder: (_, value, _) =>
+          Text(NumberFormat('#,##0', 'ru').format(value), style: style),
     );
   }
 }
@@ -1456,6 +1647,7 @@ class _RingPainter extends CustomPainter {
   final Color trackColor;
   final List<Color> colors;
   static const double strokeWidth = 9;
+
   const _RingPainter({
     required this.progress,
     required this.trackColor,
@@ -1496,6 +1688,7 @@ class _RingPainter extends CustomPainter {
 class _NavItemData {
   final IconData icon;
   final String label;
+
   const _NavItemData(this.icon, this.label);
 }
 
@@ -1504,6 +1697,7 @@ class _NavItemData {
 class _GlassSheenPainter extends CustomPainter {
   final double sweep;
   final double radius;
+
   const _GlassSheenPainter({required this.sweep, required this.radius});
 
   @override
@@ -1537,10 +1731,7 @@ class _GlassSheenPainter extends CustomPainter {
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [
-          Colors.white.withOpacity(0.9),
-          Colors.white.withOpacity(0),
-        ],
+        colors: [Colors.white.withOpacity(0.9), Colors.white.withOpacity(0)],
         stops: const [0.0, 0.5],
       ).createShader(Offset.zero & size);
     canvas.drawRRect(rrect.deflate(0.6), rimPaint);
@@ -1558,6 +1749,7 @@ class _NavBarButton extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
+
   const _NavBarButton({
     required this.icon,
     required this.label,
@@ -1567,45 +1759,35 @@ class _NavBarButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        padding: EdgeInsets.symmetric(horizontal: selected ? 14 : 0),
-        decoration: BoxDecoration(
-          color: selected ? Colors.white.withOpacity(0.92) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: selected
-                  ? const Color(0xFFFF8C00)
-                  : Colors.white.withOpacity(0.65),
-            ),
-            if (selected)
-              Flexible(
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 6),
-                  child: Text(
-                    label,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFFFF8C00),
-                    ),
-                  ),
-                ),
-              ),
-          ],
+    // Icons-only bar: the label is kept as a Semantics annotation so
+    // TalkBack/VoiceOver users still hear what each tab is, even though it's
+    // no longer drawn.
+    return Semantics(
+      label: label,
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          width: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected
+                ? Colors.white.withOpacity(0.92)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Icon(
+            icon,
+            size: 22,
+            color: selected
+                ? const Color(0xFFFF8C00)
+                : Colors.white.withOpacity(0.65),
+          ),
         ),
       ),
     );
@@ -1772,6 +1954,63 @@ class _NoAccessCard extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ComingSoonCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+
+  const _ComingSoonCard({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.20), width: 1.2),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Colors.white, size: 30),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.65),
+              fontSize: 13,
+              height: 1.5,
             ),
           ),
         ],

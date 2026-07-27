@@ -88,11 +88,8 @@ class S {
     'uz': "Ishlab chiqarish sharhi",
   });
 
-  String get dashboardInTerritory => _t({
-    'ru': 'На территории',
-    'en': 'On-site',
-    'uz': 'Hududda',
-  });
+  String get dashboardInTerritory =>
+      _t({'ru': 'На территории', 'en': 'On-site', 'uz': 'Hududda'});
 
   String dashboardOutOf(int total) => _t({
     'ru': 'из $total чел.',
@@ -118,11 +115,8 @@ class S {
     'uz': "Ishlab chiqarish ko'rsatkichlari",
   });
 
-  String get dashboardFactoriesDetail => _t({
-    'ru': 'Филиалы',
-    'en': 'Factories',
-    'uz': 'Filiallar',
-  });
+  String get dashboardFactoriesDetail =>
+      _t({'ru': 'Филиалы', 'en': 'Factories', 'uz': 'Filiallar'});
 
   String get dashboardPlan => _t({'ru': 'План', 'en': 'Plan', 'uz': 'Reja'});
 
@@ -143,8 +137,19 @@ class S {
   String get navProduction =>
       _t({'ru': 'Производство', 'en': 'Production', 'uz': "Ishlab chiqarish"});
 
+  String get navShop => _t({'ru': 'Магазин', 'en': 'Shop', 'uz': "Do'kon"});
+
   String get navSettings =>
       _t({'ru': 'Настройки', 'en': 'Settings', 'uz': 'Sozlamalar'});
+
+  String get shopComingSoonTitle =>
+      _t({'ru': 'Скоро', 'en': 'Coming soon', 'uz': "Tez orada"});
+
+  String get shopComingSoonMessage => _t({
+    'ru': 'Раздел магазина находится в разработке',
+    'en': 'The shop section is under development',
+    'uz': "Do'kon bo'limi ishlab chiqilmoqda",
+  });
 
   // Sign Requests Page
   String get signRequestsTitle => _t({
@@ -864,11 +869,8 @@ class S {
     'uz': 'Mijozni tanlang',
   });
 
-  String get selectStatusTitle => _t({
-    'ru': 'Статус цены',
-    'en': 'Price status',
-    'uz': 'Narx holati',
-  });
+  String get selectStatusTitle =>
+      _t({'ru': 'Статус цены', 'en': 'Price status', 'uz': 'Narx holati'});
 
   String get searchCustomerHint => _t({
     'ru': 'Поиск заказчика',
@@ -902,8 +904,11 @@ class S {
   String get categoryLabel =>
       _t({'ru': 'Категория', 'en': 'Category', 'uz': 'Kategoriya'});
 
-  String get pricingSection =>
-      _t({'ru': 'Ценообразование', 'en': 'Pricing', 'uz': "Narx shakllantirish"});
+  String get pricingSection => _t({
+    'ru': 'Ценообразование',
+    'en': 'Pricing',
+    'uz': "Narx shakllantirish",
+  });
 
   String get cuttingPriceLabel =>
       _t({'ru': 'Раскрой', 'en': 'Cutting', 'uz': 'Kesish'});
@@ -932,8 +937,11 @@ class S {
     'uz': 'Boshqa xarajatlar, %',
   });
 
-  String get profitabilityLabel =>
-      _t({'ru': 'Рентабельность, %', 'en': 'Profitability, %', 'uz': 'Rentabellik, %'});
+  String get profitabilityLabel => _t({
+    'ru': 'Рентабельность, %',
+    'en': 'Profitability, %',
+    'uz': 'Rentabellik, %',
+  });
 
   String get commissionLabel =>
       _t({'ru': 'Комиссия, %', 'en': 'Commission, %', 'uz': 'Komissiya, %'});
