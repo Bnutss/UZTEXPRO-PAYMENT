@@ -15,6 +15,7 @@ import '../passes/passes_page.dart';
 import '../sign_requests/sign_requests_page.dart';
 import '../bonuses/bonuses_page.dart';
 import '../product_models/product_models_page.dart';
+import '../shop/shop_pickup_page.dart';
 import '../settings/settings_screen.dart';
 import '../auth/login_page.dart';
 import '../../core/localization/app_strings.dart';
@@ -1467,10 +1468,14 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         children: [
           _buildSectionTitle(s.navShop),
           const SizedBox(height: 20),
-          _ComingSoonCard(
+          _MenuCard(
             icon: Icons.storefront_rounded,
-            title: s.shopComingSoonTitle,
-            message: s.shopComingSoonMessage,
+            label: 'Выдача заказов',
+            description: 'Найти заказ и подтвердить выдачу покупателю на ПВЗ',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => ShopPickupPage(jwtToken: widget.jwtToken)),
+            ),
           ),
         ],
       ),
@@ -1962,59 +1967,3 @@ class _NoAccessCard extends StatelessWidget {
   }
 }
 
-class _ComingSoonCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String message;
-
-  const _ComingSoonCard({
-    required this.icon,
-    required this.title,
-    required this.message,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.20), width: 1.2),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: Colors.white, size: 30),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.65),
-              fontSize: 13,
-              height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

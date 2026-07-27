@@ -142,15 +142,6 @@ class S {
   String get navSettings =>
       _t({'ru': 'Настройки', 'en': 'Settings', 'uz': 'Sozlamalar'});
 
-  String get shopComingSoonTitle =>
-      _t({'ru': 'Скоро', 'en': 'Coming soon', 'uz': "Tez orada"});
-
-  String get shopComingSoonMessage => _t({
-    'ru': 'Раздел магазина находится в разработке',
-    'en': 'The shop section is under development',
-    'uz': "Do'kon bo'limi ishlab chiqilmoqda",
-  });
-
   // Sign Requests Page
   String get signRequestsTitle => _t({
     'ru': 'Подпись заявок',

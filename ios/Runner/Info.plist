@@ -30,6 +30,8 @@
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Камера используется для фотоподтверждения при выдаче заказа на ПВЗ.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Используйте Face ID для быстрого входа в приложение.</string>
 	<key>UIApplicationSceneManifest</key>
