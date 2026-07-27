@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
@@ -21,13 +22,16 @@ class ShopPickupPage extends StatefulWidget {
   State<ShopPickupPage> createState() => _ShopPickupPageState();
 }
 
-class _ShopPickupPageState extends State<ShopPickupPage> {
+class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProviderStateMixin {
   static const Color _g1 = Color(0xFFFF8C00);
   static const Color _g2 = Color(0xFFCC1500);
 
   final NumberFormat _numberFormat = NumberFormat('#,##0', 'ru');
   final _searchController = TextEditingController();
   Timer? _debounce;
+
+  late final AnimationController _animCtrl;
+  late final Animation<double> _fadeAnim;
 
   List<PvzOrder> _orders = [];
   bool _loading = true;
@@ -36,6 +40,8 @@ class _ShopPickupPageState extends State<ShopPickupPage> {
   @override
   void initState() {
     super.initState();
+    _animCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
+    _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
     _load();
     _searchController.addListener(() {
       _debounce?.cancel();
@@ -48,6 +54,7 @@ class _ShopPickupPageState extends State<ShopPickupPage> {
 
   @override
   void dispose() {
+    _animCtrl.dispose();
     _searchController.dispose();
     _debounce?.cancel();
     localeNotifier.removeListener(_onLocaleChanged);
@@ -66,6 +73,7 @@ class _ShopPickupPageState extends State<ShopPickupPage> {
         _orders = orders;
         _loading = false;
       });
+      _animCtrl.forward(from: 0);
     } on PvzApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -159,7 +167,7 @@ class _ShopPickupPageState extends State<ShopPickupPage> {
   }
 
   Widget _buildBody(bool isDark, S s) {
-    if (_loading) return const Center(child: CircularProgressIndicator(color: _g1));
+    if (_loading) return _skeleton(isDark);
 
     if (_error != null) {
       return Center(
@@ -221,15 +229,35 @@ class _ShopPickupPageState extends State<ShopPickupPage> {
     return RefreshIndicator(
       onRefresh: _load,
       color: _g1,
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 32),
-        itemCount: _orders.length,
-        itemBuilder: (_, i) => _OrderCard(
-          order: _orders[i],
-          isDark: isDark,
-          numberFormat: _numberFormat,
-          s: s,
-          onTap: () => _openDetail(_orders[i]),
+      child: FadeTransition(
+        opacity: _fadeAnim,
+        child: ListView.builder(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 32),
+          itemCount: _orders.length,
+          itemBuilder: (_, i) => _OrderCard(
+            order: _orders[i],
+            isDark: isDark,
+            numberFormat: _numberFormat,
+            s: s,
+            onTap: () => _openDetail(_orders[i]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _skeleton(bool isDark) {
+    final base = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
+    final hi = isDark ? Colors.grey.shade700 : Colors.grey.shade100;
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 32),
+      itemCount: 5,
+      itemBuilder: (_, __) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Shimmer.fromColors(
+          baseColor: base,
+          highlightColor: hi,
+          child: Container(height: 108, decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(14))),
         ),
       ),
     );
@@ -263,65 +291,99 @@ class _OrderCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: cardBg,
             borderRadius: BorderRadius.circular(14),
-            border: const Border(left: BorderSide(color: accent, width: 4)),
             boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.18 : 0.05), blurRadius: 10, offset: const Offset(0, 2))],
           ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+          // A single-side Border can't be rounded together with the
+          // container's borderRadius — Flutter falls back to a sharp
+          // rectangular stroke, so the accent bar pokes past the rounded
+          // corners. Clipping a real colored strip keeps it flush instead.
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(width: 4, color: accent),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: accent.withOpacity(isDark ? 0.2 : 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: accent.withOpacity(0.35)),
-                            ),
-                            child: Text('№${order.id}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: accent)),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: accent.withOpacity(isDark ? 0.2 : 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: accent.withOpacity(0.35)),
+                                ),
+                                child: Text('№${order.id}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: accent)),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  order.buyerName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: onSurface),
+                                ),
+                              ),
+                              Text(
+                                '${numberFormat.format(order.totalValue)} сум',
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: accent),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              order.buyerName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: onSurface),
-                            ),
+                          const SizedBox(height: 8),
+                          _InfoLine(
+                            icon: Icons.inventory_2_outlined,
+                            text: '${order.items.length} ${s.shopPickupPositions} · ${s.shopPickupSeller}: ${order.sellerName}',
+                            onSurface: onSurface,
                           ),
+                          const SizedBox(height: 4),
+                          _InfoLine(icon: Icons.event_rounded, text: _formatDateTime(order.createAt), onSurface: onSurface),
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '${order.items.length} ${s.shopPickupPositions} · ${s.shopPickupSeller}: ${order.sellerName}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.55)),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(_formatDateTime(order.createAt), style: TextStyle(fontSize: 11, color: onSurface.withOpacity(0.4))),
-                    ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('${numberFormat.format(order.totalValue)} сум', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: accent)),
-                    const SizedBox(height: 6),
-                    Icon(Icons.chevron_right_rounded, color: onSurface.withOpacity(0.35)),
-                  ],
-                ),
-              ],
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: Center(child: Icon(Icons.chevron_right_rounded, color: onSurface.withOpacity(0.3))),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _InfoLine extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color onSurface;
+
+  const _InfoLine({required this.icon, required this.text, required this.onSurface});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 13, color: onSurface.withOpacity(0.4)),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.55)),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -370,6 +432,7 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
     final s = S.of(context);
     final surface = Theme.of(context).colorScheme.surface;
     final onSurface = Theme.of(context).colorScheme.onSurface;
+    final outline = Theme.of(context).colorScheme.outline;
     final order = widget.order;
 
     return DraggableScrollableSheet(
@@ -392,11 +455,40 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                   decoration: BoxDecoration(color: onSurface.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
                 ),
               ),
-              Text(s.shopPickupOrderTitle(order.id), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: onSurface)),
-              const SizedBox(height: 4),
-              Text('${s.shopPickupBuyer}: ${order.buyerName}', style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.6))),
-              Text('${s.shopPickupSeller}: ${order.sellerName}', style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.6))),
-              Text(_formatDateTime(order.createAt), style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.6))),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [_g1, _g2], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(s.shopPickupOrderTitle(order.id), style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: onSurface)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: onSurface.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: outline.withOpacity(0.5)),
+                ),
+                child: Column(
+                  children: [
+                    _DetailRow(icon: Icons.person_outline_rounded, label: s.shopPickupBuyer, value: order.buyerName, onSurface: onSurface),
+                    const SizedBox(height: 8),
+                    _DetailRow(icon: Icons.badge_outlined, label: s.shopPickupSeller, value: order.sellerName, onSurface: onSurface),
+                    const SizedBox(height: 8),
+                    _DetailRow(icon: Icons.event_rounded, label: '', value: _formatDateTime(order.createAt), onSurface: onSurface),
+                  ],
+                ),
+              ),
               const SizedBox(height: 18),
               Text(s.shopPickupItemsHeader, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: onSurface)),
               const SizedBox(height: 10),
@@ -431,6 +523,7 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(colors: [_g1, _g2]),
                   borderRadius: BorderRadius.circular(14),
+                  boxShadow: [BoxShadow(color: _g2.withOpacity(0.3), blurRadius: 14, offset: const Offset(0, 6))],
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -461,6 +554,38 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
           ),
         );
       },
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color onSurface;
+
+  const _DetailRow({required this.icon, required this.label, required this.value, required this.onSurface});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 15, color: onSurface.withOpacity(0.4)),
+        const SizedBox(width: 8),
+        if (label.isNotEmpty) ...[
+          Text(label, style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.55))),
+          const SizedBox(width: 4),
+        ],
+        Expanded(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: onSurface),
+          ),
+        ),
+      ],
     );
   }
 }

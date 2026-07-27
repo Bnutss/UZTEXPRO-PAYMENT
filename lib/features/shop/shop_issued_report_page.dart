@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
@@ -23,11 +24,14 @@ class ShopIssuedReportPage extends StatefulWidget {
   State<ShopIssuedReportPage> createState() => _ShopIssuedReportPageState();
 }
 
-class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> {
+class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with SingleTickerProviderStateMixin {
   static const Color _g1 = Color(0xFFFF8C00);
   static const Color _g2 = Color(0xFFCC1500);
 
   final NumberFormat _numberFormat = NumberFormat('#,##0', 'ru');
+
+  late final AnimationController _animCtrl;
+  late final Animation<double> _fadeAnim;
 
   _RangePreset _preset = _RangePreset.month;
   late DateTime _dateFrom;
@@ -43,6 +47,8 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> {
   @override
   void initState() {
     super.initState();
+    _animCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
+    _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
     final now = DateTime.now();
     _dateFrom = DateTime(now.year, now.month, 1);
     _dateTo = now;
@@ -55,6 +61,7 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> {
 
   @override
   void dispose() {
+    _animCtrl.dispose();
     localeNotifier.removeListener(_onLocaleChanged);
     super.dispose();
   }
@@ -84,6 +91,7 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> {
       );
       if (!mounted) return;
       setState(() => _report = report);
+      _animCtrl.forward(from: 0);
     } on PvzApiException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
@@ -198,31 +206,57 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> {
                 ],
                 const SizedBox(height: 18),
                 if (_loading)
-                  const Padding(padding: EdgeInsets.only(top: 60), child: Center(child: CircularProgressIndicator(color: _g1)))
+                  _skeleton(isDark)
                 else if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 60),
                     child: Center(child: Text(_error!, style: const TextStyle(color: Color(0xFFD32F2F)))),
                   )
                 else if (report != null) ...[
-                  _buildSummary(s, report),
+                  FadeTransition(opacity: _fadeAnim, child: _buildSummary(s, report)),
                   const SizedBox(height: 20),
                   if (report.sales.isEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 40),
                       child: Center(
-                        child: Text(s.shopIssuedEmpty, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.white10 : Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12)],
+                              ),
+                              child: Icon(Icons.checklist_rtl_rounded, size: 34, color: isDark ? Colors.white38 : Colors.grey.shade400),
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              s.shopIssuedEmpty,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55), fontSize: 13),
+                            ),
+                          ],
+                        ),
                       ),
                     )
                   else
-                    ...report.sales.map(
-                      (order) => _IssuedOrderTile(
-                        order: order,
-                        isDark: isDark,
-                        numberFormat: _numberFormat,
-                        s: s,
-                        showShop: _shopId == null,
-                        onTap: () => _openDetail(order),
+                    FadeTransition(
+                      opacity: _fadeAnim,
+                      child: Column(
+                        children: report.sales
+                            .map(
+                              (order) => _IssuedOrderTile(
+                                order: order,
+                                isDark: isDark,
+                                numberFormat: _numberFormat,
+                                s: s,
+                                showShop: _shopId == null,
+                                onTap: () => _openDetail(order),
+                              ),
+                            )
+                            .toList(),
                       ),
                     ),
                 ],
@@ -297,6 +331,37 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> {
       ],
     );
   }
+
+  Widget _skeleton(bool isDark) {
+    final base = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
+    final hi = isDark ? Colors.grey.shade700 : Colors.grey.shade100;
+    Widget block({double height = 88, double? width}) => Container(
+      height: height,
+      width: width,
+      decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(16)),
+    );
+    return Shimmer.fromColors(
+      baseColor: base,
+      highlightColor: hi,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: block(height: 72)),
+              const SizedBox(width: 10),
+              Expanded(child: block(height: 72)),
+              const SizedBox(width: 10),
+              Expanded(flex: 2, child: block(height: 72)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          for (int i = 0; i < 4; i++)
+            Padding(padding: const EdgeInsets.only(bottom: 8), child: block()),
+        ],
+      ),
+    );
+  }
 }
 
 // ─── Filter chips ──────────────────────────────────────────────────────────
@@ -326,6 +391,9 @@ class _FilterChip extends StatelessWidget {
             color: selected ? null : Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: selected ? Colors.transparent : onSurface.withOpacity(0.15)),
+            boxShadow: selected
+                ? [BoxShadow(color: _ShopIssuedReportPageColors.g2.withOpacity(0.28), blurRadius: 8, offset: const Offset(0, 2))]
+                : null,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -366,13 +434,25 @@ class _ShopChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: selected ? _ShopIssuedReportPageColors.g2 : (isDark ? Colors.white12 : Colors.grey.shade200)),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : (isDark ? Colors.white70 : Colors.grey.shade700),
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!selected)
+              Container(
+                width: 6,
+                height: 6,
+                margin: const EdgeInsets.only(right: 6),
+                decoration: const BoxDecoration(shape: BoxShape.circle, color: _ShopIssuedReportPageColors.g1),
+              ),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : (isDark ? Colors.white70 : Colors.grey.shade700),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -404,7 +484,13 @@ class _SummaryCard extends StatelessWidget {
         color: highlight ? null : Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: highlight ? Colors.transparent : onSurface.withOpacity(0.12)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: highlight ? _ShopIssuedReportPageColors.g2.withOpacity(0.28) : Colors.black.withOpacity(0.05),
+            blurRadius: highlight ? 14 : 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -458,67 +544,117 @@ class _IssuedOrderTile extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(14),
           child: Container(
-            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: cardBg,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: onSurface.withOpacity(0.08)),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.18 : 0.05), blurRadius: 10, offset: const Offset(0, 2))],
             ),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: order.buyerPhotoUrl != null
-                      ? Image.network(order.buyerPhotoUrl!, width: 44, height: 44, fit: BoxFit.cover)
-                      : Container(width: 44, height: 44, color: onSurface.withOpacity(0.06), child: Icon(Icons.person_rounded, color: onSurface.withOpacity(0.35))),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: accent.withOpacity(isDark ? 0.2 : 0.1),
-                              borderRadius: BorderRadius.circular(6),
+            // See _OrderCard in shop_pickup_page.dart: a single-side Border
+            // can't be rounded together with the container's borderRadius,
+            // so the accent strip is clipped instead of drawn as a border.
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(width: 4, color: accent),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 12, 12, 12),
+                        child: Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: order.buyerPhotoUrl != null
+                                  ? Image.network(order.buyerPhotoUrl!, width: 44, height: 44, fit: BoxFit.cover)
+                                  : Container(
+                                      width: 44,
+                                      height: 44,
+                                      color: onSurface.withOpacity(0.06),
+                                      child: Icon(Icons.person_rounded, color: onSurface.withOpacity(0.35)),
+                                    ),
                             ),
-                            child: Text('№${order.id}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: accent)),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              order.buyerName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: onSurface),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: accent.withOpacity(isDark ? 0.2 : 0.1),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text('№${order.id}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: accent)),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          order.buyerName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: onSurface),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  if (showShop)
+                                    _TileInfoLine(icon: Icons.storefront_rounded, text: order.shopName, onSurface: onSurface),
+                                  if (showShop) const SizedBox(height: 3),
+                                  _TileInfoLine(
+                                    icon: Icons.event_available_rounded,
+                                    text: order.issuedAt != null ? _formatDateTime(order.issuedAt!) : '—',
+                                    onSurface: onSurface,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 6),
+                            Text(
+                              '${numberFormat.format(order.totalValue)} сум',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: accent),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        showShop
-                            ? '${order.shopName} · ${order.issuedAt != null ? _formatDateTime(order.issuedAt!) : ''}'
-                            : (order.issuedAt != null ? _formatDateTime(order.issuedAt!) : ''),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.5)),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                Text(
-                  '${numberFormat.format(order.totalValue)} сум',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: accent),
-                ),
-              ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TileInfoLine extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color onSurface;
+
+  const _TileInfoLine({required this.icon, required this.text, required this.onSurface});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 12, color: onSurface.withOpacity(0.4)),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11.5, color: onSurface.withOpacity(0.55)),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -536,6 +672,7 @@ class _IssuedOrderDetailSheet extends StatelessWidget {
     final s = S.of(context);
     final surface = Theme.of(context).colorScheme.surface;
     final onSurface = Theme.of(context).colorScheme.onSurface;
+    final outline = Theme.of(context).colorScheme.outline;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
@@ -559,15 +696,48 @@ class _IssuedOrderDetailSheet extends StatelessWidget {
               ),
               if (order.buyerPhotoUrl != null) _PhotoPreview(photoUrl: order.buyerPhotoUrl!),
               const SizedBox(height: 16),
-              Text(s.shopPickupOrderTitle(order.id), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: onSurface)),
-              const SizedBox(height: 4),
-              Text('${s.shopPickupBuyer}: ${order.buyerName}', style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.6))),
-              Text('${s.shopPickupSeller}: ${order.sellerName}', style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.6))),
-              Text('${s.shopIssuedShopFilterTitle}: ${order.shopName}', style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.6))),
-              if (order.issuedByName != null)
-                Text('${s.shopIssuedIssuedBy}: ${order.issuedByName}', style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.6))),
-              if (order.issuedAt != null)
-                Text('${s.shopIssuedIssuedAt}: ${_formatDateTime(order.issuedAt!)}', style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.6))),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2E7D32).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.check_circle_rounded, color: Color(0xFF2E7D32), size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(s.shopPickupOrderTitle(order.id), style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: onSurface)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: onSurface.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: outline.withOpacity(0.5)),
+                ),
+                child: Column(
+                  children: [
+                    _DetailRow(icon: Icons.person_outline_rounded, label: s.shopPickupBuyer, value: order.buyerName, onSurface: onSurface),
+                    const SizedBox(height: 8),
+                    _DetailRow(icon: Icons.badge_outlined, label: s.shopPickupSeller, value: order.sellerName, onSurface: onSurface),
+                    const SizedBox(height: 8),
+                    _DetailRow(icon: Icons.storefront_outlined, label: s.shopIssuedShopFilterTitle, value: order.shopName, onSurface: onSurface),
+                    if (order.issuedByName != null) ...[
+                      const SizedBox(height: 8),
+                      _DetailRow(icon: Icons.how_to_reg_rounded, label: s.shopIssuedIssuedBy, value: order.issuedByName!, onSurface: onSurface),
+                    ],
+                    if (order.issuedAt != null) ...[
+                      const SizedBox(height: 8),
+                      _DetailRow(icon: Icons.event_available_rounded, label: s.shopIssuedIssuedAt, value: _formatDateTime(order.issuedAt!), onSurface: onSurface),
+                    ],
+                  ],
+                ),
+              ),
               const SizedBox(height: 18),
               Text(s.shopPickupItemsHeader, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: onSurface)),
               const SizedBox(height: 10),
@@ -605,6 +775,7 @@ class _IssuedOrderDetailSheet extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(colors: [_ShopIssuedReportPageColors.g1, _ShopIssuedReportPageColors.g2]),
                   borderRadius: BorderRadius.circular(14),
+                  boxShadow: [BoxShadow(color: _ShopIssuedReportPageColors.g2.withOpacity(0.3), blurRadius: 14, offset: const Offset(0, 6))],
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -621,6 +792,37 @@ class _IssuedOrderDetailSheet extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color onSurface;
+
+  const _DetailRow({required this.icon, required this.label, required this.value, required this.onSurface});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 15, color: onSurface.withOpacity(0.4)),
+        const SizedBox(width: 8),
+        Text(label, style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.55))),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: onSurface),
+          ),
+        ),
+      ],
     );
   }
 }

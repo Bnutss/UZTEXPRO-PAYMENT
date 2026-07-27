@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/localization/app_strings.dart';
 
@@ -45,6 +46,12 @@ class _OrderPhotoCapturePageState extends State<OrderPhotoCapturePage> {
       );
       final controller = CameraController(back, ResolutionPreset.medium, enableAudio: false);
       await controller.initialize();
+      // Without this, some Android devices save the sensor's native
+      // (sideways) pixel orientation and rely on an EXIF tag to display it
+      // upright — that tag doesn't survive the base64/WEBP round trip, so
+      // the photo comes out visibly rotated. Locking capture orientation
+      // makes the plugin bake the correct rotation into the saved file.
+      await controller.lockCaptureOrientation(DeviceOrientation.portraitUp);
       if (!mounted) return;
       setState(() => _controller = controller);
     } catch (_) {
