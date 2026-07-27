@@ -36,6 +36,7 @@ class PvzOrderItem {
 class PvzOrder {
   PvzOrder({
     required this.id,
+    required this.shopName,
     required this.buyerName,
     required this.sellerName,
     required this.items,
@@ -43,9 +44,13 @@ class PvzOrder {
     required this.totalValue,
     required this.createAt,
     required this.isIssued,
+    required this.issuedAt,
+    required this.issuedByName,
+    required this.buyerPhotoUrl,
   });
 
   final int id;
+  final String shopName;
   final String buyerName;
   final String sellerName;
   final List<PvzOrderItem> items;
@@ -53,9 +58,13 @@ class PvzOrder {
   final double totalValue;
   final DateTime createAt;
   final bool isIssued;
+  final DateTime? issuedAt;
+  final String? issuedByName;
+  final String? buyerPhotoUrl;
 
   factory PvzOrder.fromJson(Map<String, dynamic> json) => PvzOrder(
         id: json['id'] as int,
+        shopName: json['shop_name'] as String? ?? '',
         buyerName: json['buyer_name'] as String? ?? '',
         sellerName: json['seller_name'] as String? ?? '',
         items: (json['items'] as List? ?? [])
@@ -65,6 +74,44 @@ class PvzOrder {
         totalValue: (json['total_value'] as num?)?.toDouble() ?? 0,
         createAt: DateTime.parse(json['create_at'] as String),
         isIssued: json['is_issued'] as bool? ?? false,
+        issuedAt: json['issued_at'] != null ? DateTime.parse(json['issued_at'] as String) : null,
+        issuedByName: json['issued_by_name'] as String?,
+        buyerPhotoUrl: json['buyer_photo'] as String?,
+      );
+}
+
+class PvzShop {
+  PvzShop({required this.id, required this.name});
+
+  final int id;
+  final String name;
+
+  factory PvzShop.fromJson(Map<String, dynamic> json) => PvzShop(
+        id: json['id'] as int,
+        name: json['name'] as String? ?? '',
+      );
+}
+
+class PvzIssuedReport {
+  PvzIssuedReport({
+    required this.salesCount,
+    required this.totalAmount,
+    required this.totalValue,
+    required this.sales,
+  });
+
+  final int salesCount;
+  final double totalAmount;
+  final double totalValue;
+  final List<PvzOrder> sales;
+
+  factory PvzIssuedReport.fromJson(Map<String, dynamic> json) => PvzIssuedReport(
+        salesCount: json['sales_count'] as int? ?? 0,
+        totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0,
+        totalValue: (json['total_value'] as num?)?.toDouble() ?? 0,
+        sales: (json['sales'] as List? ?? [])
+            .map((e) => PvzOrder.fromJson(e as Map<String, dynamic>))
+            .toList(),
       );
 }
 
@@ -132,6 +179,50 @@ class PvzApi {
       throw PvzApiException('Не удалось подключиться к серверу');
     }
   }
+
+  static Future<List<PvzShop>> fetchShops(String jwtToken) async {
+    try {
+      final res = await http
+          .get(Uri.parse('$API/shop/shop/'), headers: _headers(jwtToken))
+          .timeout(const Duration(seconds: 20));
+      if (res.statusCode != 200) {
+        throw PvzApiException(_extractError(res.body, fallback: 'Не удалось загрузить магазины'));
+      }
+      final decoded = json.decode(utf8.decode(res.bodyBytes)) as List;
+      return decoded.map((e) => PvzShop.fromJson(e as Map<String, dynamic>)).toList();
+    } on PvzApiException {
+      rethrow;
+    } catch (_) {
+      throw PvzApiException('Не удалось подключиться к серверу');
+    }
+  }
+
+  static Future<PvzIssuedReport> fetchIssuedReport(
+    String jwtToken, {
+    int? shopId,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+  }) async {
+    try {
+      final params = <String, String>{};
+      if (shopId != null) params['shop'] = '$shopId';
+      if (dateFrom != null) params['date_from'] = _dateOnly(dateFrom);
+      if (dateTo != null) params['date_to'] = _dateOnly(dateTo);
+      final uri = Uri.parse('$API/shop/sale-issued-report/').replace(queryParameters: params.isNotEmpty ? params : null);
+      final res = await http.get(uri, headers: _headers(jwtToken)).timeout(const Duration(seconds: 20));
+      if (res.statusCode != 200) {
+        throw PvzApiException(_extractError(res.body, fallback: 'Не удалось загрузить отчёт'));
+      }
+      return PvzIssuedReport.fromJson(json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
+    } on PvzApiException {
+      rethrow;
+    } catch (_) {
+      throw PvzApiException('Не удалось подключиться к серверу');
+    }
+  }
+
+  static String _dateOnly(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
   static String _extractError(String body, {required String fallback}) {
     try {

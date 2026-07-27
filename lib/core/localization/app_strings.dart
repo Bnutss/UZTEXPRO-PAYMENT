@@ -233,6 +233,57 @@ class S {
     'uz': "Rasmga olib bo'lmadi",
   });
 
+  String get shopIssuedTitle => _t({
+    'ru': 'Выданные заказы',
+    'en': 'Issued orders',
+    'uz': 'Topshirilgan buyurtmalar',
+  });
+
+  String get shopIssuedDesc => _t({
+    'ru': 'Отчёт по выданным заказам за период',
+    'en': 'Report on orders issued over a period',
+    'uz': "Davr bo'yicha topshirilgan buyurtmalar hisoboti",
+  });
+
+  String get shopIssuedAllShops =>
+      _t({'ru': 'Все магазины', 'en': 'All shops', 'uz': "Barcha do'konlar"});
+
+  String get shopIssuedEmpty => _t({
+    'ru': 'Нет выданных заказов за этот период',
+    'en': 'No issued orders for this period',
+    'uz': "Ushbu davr uchun topshirilgan buyurtmalar yo'q",
+  });
+
+  String get shopIssuedCountLabel =>
+      _t({'ru': 'Заказов', 'en': 'Orders', 'uz': 'Buyurtmalar'});
+
+  String get shopIssuedAmountLabel =>
+      _t({'ru': 'Продано, шт', 'en': 'Sold, pcs', 'uz': 'Sotilgan, dona'});
+
+  String get shopIssuedValueLabel =>
+      _t({'ru': 'Сумма, сум', 'en': 'Amount, UZS', 'uz': "Summa, so'm"});
+
+  String get shopIssuedToday =>
+      _t({'ru': 'Сегодня', 'en': 'Today', 'uz': 'Bugun'});
+
+  String get shopIssuedWeek =>
+      _t({'ru': 'Неделя', 'en': 'Week', 'uz': 'Hafta'});
+
+  String get shopIssuedMonth =>
+      _t({'ru': 'Месяц', 'en': 'Month', 'uz': 'Oy'});
+
+  String get shopIssuedCustomPeriod =>
+      _t({'ru': 'Свой период', 'en': 'Custom period', 'uz': "O'zi tanlagan"});
+
+  String get shopIssuedShopFilterTitle =>
+      _t({'ru': 'Магазин', 'en': 'Shop', 'uz': "Do'kon"});
+
+  String get shopIssuedIssuedBy =>
+      _t({'ru': 'Выдал', 'en': 'Issued by', 'uz': 'Topshirdi'});
+
+  String get shopIssuedIssuedAt =>
+      _t({'ru': 'Дата выдачи', 'en': 'Issued at', 'uz': 'Topshirilgan sana'});
+
   // Sign Requests Page
   String get signRequestsTitle => _t({
     'ru': 'Подпись заявок',

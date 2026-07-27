@@ -15,6 +15,7 @@ import '../passes/passes_page.dart';
 import '../sign_requests/sign_requests_page.dart';
 import '../bonuses/bonuses_page.dart';
 import '../product_models/product_models_page.dart';
+import '../shop/shop_issued_report_page.dart';
 import '../shop/shop_pickup_page.dart';
 import '../settings/settings_screen.dart';
 import '../auth/login_page.dart';
@@ -1477,6 +1478,18 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               MaterialPageRoute(builder: (_) => ShopPickupPage(jwtToken: widget.jwtToken)),
             ),
           ),
+          if (_hasFullAccess) ...[
+            const SizedBox(height: 12),
+            _MenuCard(
+              icon: Icons.fact_check_rounded,
+              label: s.shopIssuedTitle,
+              description: s.shopIssuedDesc,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ShopIssuedReportPage(jwtToken: widget.jwtToken)),
+              ),
+            ),
+          ],
         ],
       ),
     );
