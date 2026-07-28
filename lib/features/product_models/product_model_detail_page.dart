@@ -1113,6 +1113,8 @@ class _MaterialsCard extends StatelessWidget {
       title: s.materialsCountLabel(materials.length),
       icon: Icons.layers_outlined,
       isDark: isDark,
+      collapsible: materials.isNotEmpty,
+      initiallyExpanded: false,
       child: materials.isEmpty
           ? Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
@@ -1149,6 +1151,12 @@ class _MaterialsCard extends StatelessWidget {
   }
 }
 
+double _toD(dynamic raw) {
+  if (raw == null) return 0;
+  if (raw is num) return raw.toDouble();
+  return double.tryParse(raw.toString()) ?? 0;
+}
+
 class _MaterialRow extends StatelessWidget {
   final Map<String, dynamic> material;
   final int index;
@@ -1164,9 +1172,34 @@ class _MaterialRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = material['fabric_name']?.toString() ?? '—';
-    final color = material['fabric_color_name']?.toString() ?? '';
-    final price = _fmtNum(material['fabric_price']);
+    final s = S.of(context);
+
+    // Dyeing-calculator materials carry no fabric_color, so fabric_name and
+    // fabric_color_name are always blank for them — the name to show is
+    // dyeing_fabric_type_name instead. Mirrors ModelDetailsSection.jsx.
+    final dyeingName = material['dyeing_fabric_type_name']?.toString() ?? '';
+    final isDyeing = dyeingName.isNotEmpty;
+    final fabricName = material['fabric_name']?.toString() ?? '';
+    final fabricTypeName = material['fabric_type_name']?.toString() ?? '';
+    final name = isDyeing
+        ? dyeingName
+        : (fabricName.isNotEmpty ? fabricName : fabricTypeName);
+
+    final color = isDyeing
+        ? ''
+        : (material['fabric_color_name']?.toString() ?? '');
+    final packingType = isDyeing
+        ? ''
+        : (material['packing_type_name']?.toString() ?? '');
+
+    final gramaj = _toD(material['gramaj']);
+    final weight = gramaj != 0 ? gramaj : _toD(material['weight']);
+    final pricePerKg = _toD(material['fabric_price']);
+    final pricePerPiece =
+        _toD(material['fabric_price_piece']) +
+        _toD(material['additional1']) +
+        _toD(material['additional2']) +
+        _toD(material['additional3']);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1198,7 +1231,7 @@ class _MaterialRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  name,
+                  name.isNotEmpty ? name : '—',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -1207,10 +1240,14 @@ class _MaterialRow extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (color.isNotEmpty) ...[
+                if (color.isNotEmpty || packingType.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
-                    color,
+                    [
+                      if (color.isNotEmpty) '${s.fabricColorLabel}: $color',
+                      if (packingType.isNotEmpty)
+                        '${s.packingTypeLabel}: $packingType',
+                    ].join(' · '),
                     style: TextStyle(
                       fontSize: 10,
                       color: onSurface.withOpacity(0.45),
@@ -1220,16 +1257,51 @@ class _MaterialRow extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 6),
-                _Pill(
-                  text: price,
-                  color: isDark ? Colors.blue.shade200 : Colors.blue.shade700,
-                  bgColor: isDark
-                      ? Colors.blue.withOpacity(0.18)
-                      : Colors.blue.shade50,
-                  borderColor: isDark
-                      ? Colors.blue.withOpacity(0.3)
-                      : Colors.blue.shade200,
-                  icon: Icons.payments_outlined,
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _Pill(
+                      text:
+                          '${s.materialWeightLabel}: ${weight.toStringAsFixed(3)}',
+                      color: isDark
+                          ? Colors.grey.shade300
+                          : Colors.grey.shade700,
+                      bgColor: isDark
+                          ? Colors.white.withOpacity(0.08)
+                          : Colors.grey.shade100,
+                      borderColor: isDark
+                          ? Colors.white.withOpacity(0.16)
+                          : Colors.grey.shade300,
+                      icon: Icons.scale_outlined,
+                    ),
+                    _Pill(
+                      text:
+                          '${s.pricePerKgLabel}: \$${pricePerKg.toStringAsFixed(4)}',
+                      color: isDark ? Colors.blue.shade200 : Colors.blue.shade700,
+                      bgColor: isDark
+                          ? Colors.blue.withOpacity(0.18)
+                          : Colors.blue.shade50,
+                      borderColor: isDark
+                          ? Colors.blue.withOpacity(0.3)
+                          : Colors.blue.shade200,
+                      icon: Icons.payments_outlined,
+                    ),
+                    _Pill(
+                      text:
+                          '${s.pricePerPieceLabel}: \$${pricePerPiece.toStringAsFixed(2)}',
+                      color: isDark
+                          ? Colors.orange.shade200
+                          : const Color(0xFFFF8C00),
+                      bgColor: isDark
+                          ? Colors.orange.withOpacity(0.18)
+                          : Colors.orange.shade50,
+                      borderColor: isDark
+                          ? Colors.orange.withOpacity(0.3)
+                          : Colors.orange.shade200,
+                      icon: Icons.checkroom_outlined,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1260,6 +1332,8 @@ class _AccessoriesCard extends StatelessWidget {
       title: s.accessoriesCountLabel(accessories.length),
       icon: Icons.category_outlined,
       isDark: isDark,
+      collapsible: accessories.isNotEmpty,
+      initiallyExpanded: false,
       child: accessories.isEmpty
           ? Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
@@ -1417,32 +1491,80 @@ class _Pill extends StatelessWidget {
 
 // ─── Section card shell ───────────────────────────────────────────────────────
 
-class _SectionCard extends StatelessWidget {
+class _SectionCard extends StatefulWidget {
   final String title;
   final IconData icon;
   final bool isDark;
   final Widget child;
+  final bool collapsible;
+  final bool initiallyExpanded;
 
   const _SectionCard({
     required this.title,
     required this.icon,
     required this.isDark,
     required this.child,
+    this.collapsible = false,
+    this.initiallyExpanded = true,
   });
+
+  @override
+  State<_SectionCard> createState() => _SectionCardState();
+}
+
+class _SectionCardState extends State<_SectionCard> {
+  late bool _expanded = widget.initiallyExpanded;
 
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final bg = isDark
+    final bg = widget.isDark
         ? Theme.of(context).colorScheme.surfaceContainerHighest
         : Colors.white;
+    final expanded = !widget.collapsible || _expanded;
+
+    final header = Row(
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFFFF8C00).withOpacity(widget.isDark ? 0.2 : 0.1),
+          ),
+          child: Icon(widget.icon, size: 13, color: const Color(0xFFFF8C00)),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            widget.title,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: onSurface.withOpacity(0.65),
+            ),
+          ),
+        ),
+        if (widget.collapsible)
+          AnimatedRotation(
+            turns: _expanded ? 0.5 : 0,
+            duration: const Duration(milliseconds: 200),
+            child: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 18,
+              color: onSurface.withOpacity(0.4),
+            ),
+          ),
+      ],
+    );
+
     return Container(
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.18 : 0.05),
+            color: Colors.black.withOpacity(widget.isDark ? 0.18 : 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1453,36 +1575,32 @@ class _SectionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(
-                      0xFFFF8C00,
-                    ).withOpacity(isDark ? 0.2 : 0.1),
+            widget.collapsible
+                ? InkWell(
+                    onTap: () => setState(() => _expanded = !_expanded),
+                    borderRadius: BorderRadius.circular(8),
+                    child: header,
+                  )
+                : header,
+            AnimatedCrossFade(
+              firstChild: const SizedBox(width: double.infinity),
+              secondChild: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Divider(
+                    height: 14,
+                    thickness: 0.5,
+                    color: widget.isDark ? Colors.white12 : Colors.grey.shade100,
                   ),
-                  child: Icon(icon, size: 13, color: const Color(0xFFFF8C00)),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: onSurface.withOpacity(0.65),
-                  ),
-                ),
-              ],
+                  widget.child,
+                ],
+              ),
+              crossFadeState: expanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 200),
+              sizeCurve: Curves.easeInOut,
             ),
-            Divider(
-              height: 14,
-              thickness: 0.5,
-              color: isDark ? Colors.white12 : Colors.grey.shade100,
-            ),
-            child,
           ],
         ),
       ),

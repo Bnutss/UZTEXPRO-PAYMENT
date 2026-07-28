@@ -1113,6 +1113,30 @@ class S {
     'uz': "Materiallar ko'rsatilmagan",
   });
 
+  String get fabricLabel =>
+      _t({'ru': 'Полотно', 'en': 'Fabric', 'uz': 'Mato'});
+
+  String get fabricColorLabel =>
+      _t({'ru': 'Цвет', 'en': 'Color', 'uz': 'Rang'});
+
+  String get packingTypeLabel =>
+      _t({'ru': 'Тип упаковки', 'en': 'Packing type', 'uz': "Qadoqlash turi"});
+
+  String get materialWeightLabel =>
+      _t({'ru': 'Вес', 'en': 'Weight', 'uz': "Og'irlik"});
+
+  String get pricePerKgLabel => _t({
+    'ru': 'Цена (за кг)',
+    'en': 'Price (per kg)',
+    'uz': 'Narx (kg uchun)',
+  });
+
+  String get pricePerPieceLabel => _t({
+    'ru': 'Цена (за шт)',
+    'en': 'Price (per piece)',
+    'uz': 'Narx (dona uchun)',
+  });
+
   String accessoriesCountLabel(int count) => _t({
     'ru': 'Аксессуары ($count)',
     'en': 'Accessories ($count)',
