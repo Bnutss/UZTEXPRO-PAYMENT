@@ -1155,6 +1155,136 @@ class S {
     'uz': "Narx shakllantirish ma'lumotlari kiritilmagan",
   });
 
+  // AI Assistant
+  String get aiAssistantTitle =>
+      _t({'ru': 'ИИ-ассистент', 'en': 'AI Assistant', 'uz': 'AI yordamchi'});
+
+  String get aiAssistantSubtitle => _t({
+    'ru': 'Помощник по складам',
+    'en': 'Warehouse assistant',
+    'uz': 'Ombor bo\'yicha yordamchi',
+  });
+
+  String get aiInputHint => _t({
+    'ru': 'Спросите об остатках на складе...',
+    'en': 'Ask about warehouse stock...',
+    'uz': "Ombordagi qoldiqlar haqida so'rang...",
+  });
+
+  String get aiEmptyStateTitle => _t({
+    'ru': 'Чем помочь со складом?',
+    'en': 'How can I help with the warehouse?',
+    'uz': "Ombor bo'yicha qanday yordam bera olaman?",
+  });
+
+  String get aiEmptyStateDesc => _t({
+    'ru':
+        'Спросите про остатки материала, где он лежит или что заканчивается на складе',
+    'en':
+        'Ask about material stock, where it is located, or what is running low',
+    'uz':
+        "Material qoldig'i, u qayerda yotgani yoki ombordagi tugab qolayotgan narsalar haqida so'rang",
+  });
+
+  String get aiThinking =>
+      _t({'ru': 'Думаю...', 'en': 'Thinking...', 'uz': "O'ylayapman..."});
+
+  String get aiSendError => _t({
+    'ru': 'Не удалось получить ответ. Попробуйте ещё раз.',
+    'en': 'Could not get a response. Please try again.',
+    'uz': "Javob olib bo'lmadi. Qaytadan urinib ko'ring.",
+  });
+
+  String get aiNoPermission => _t({
+    'ru': 'У вас нет доступа к ИИ-ассистенту',
+    'en': "You don't have access to the AI assistant",
+    'uz': "Sizda AI yordamchiga kirish huquqi yo'q",
+  });
+
+  String get aiChooseWarehouseTitle => _t({
+    'ru': 'Выберите склад',
+    'en': 'Choose a warehouse',
+    'uz': 'Omborni tanlang',
+  });
+
+  String get aiChooseWarehouseSubtitle => _t({
+    'ru': 'Чтобы ИИ точно знал, где искать',
+    'en': 'So the AI knows exactly where to look',
+    'uz': "AI aniq qayerdan qidirishni bilishi uchun",
+  });
+
+  String get aiSearchWarehouseHint => _t({
+    'ru': 'Поиск склада...',
+    'en': 'Search warehouse...',
+    'uz': 'Omborni qidirish...',
+  });
+
+  String get aiAllWarehouses =>
+      _t({'ru': 'Все склады', 'en': 'All warehouses', 'uz': 'Barcha omborlar'});
+
+  String get aiAllWarehousesDesc => _t({
+    'ru': 'Поиск сразу по всем складам',
+    'en': 'Search across every warehouse at once',
+    'uz': "Barcha omborlar bo'yicha bir vaqtda qidirish",
+  });
+
+  String get aiChangeWarehouse => _t({
+    'ru': 'Сменить склад',
+    'en': 'Change warehouse',
+    'uz': 'Omborni almashtirish',
+  });
+
+  String get aiWarehousesLoadError => _t({
+    'ru': 'Не удалось загрузить список складов',
+    'en': 'Could not load the warehouse list',
+    'uz': "Omborlar ro'yxatini yuklab bo'lmadi",
+  });
+
+  String get aiNoWarehousesFound => _t({
+    'ru': 'Склады не найдены',
+    'en': 'No warehouses found',
+    'uz': 'Omborlar topilmadi',
+  });
+
+  String get aiOtherFactory =>
+      _t({'ru': 'Без фабрики', 'en': 'No factory', 'uz': "Fabrikasiz"});
+
+  String get aiAllFactories =>
+      _t({'ru': 'Все фабрики', 'en': 'All factories', 'uz': 'Barcha fabrikalar'});
+
+  String get aiPickWarehouseLabel =>
+      _t({'ru': 'Выбрать склад', 'en': 'Pick warehouse', 'uz': 'Omborni tanlash'});
+
+  String get aiChooseFactoryTitle => _t({
+    'ru': 'Выберите фабрику',
+    'en': 'Choose a factory',
+    'uz': 'Fabrikani tanlang',
+  });
+
+  String get aiSearchFactoryHint => _t({
+    'ru': 'Поиск фабрики...',
+    'en': 'Search factory...',
+    'uz': 'Fabrikani qidirish...',
+  });
+
+  String get aiNoFactoriesFound => _t({
+    'ru': 'Фабрики не найдены',
+    'en': 'No factories found',
+    'uz': 'Fabrikalar topilmadi',
+  });
+
+  String aiWarehousesCountHint(int count) => _t({
+    'ru': 'Доступно складов: $count',
+    'en': 'Warehouses available: $count',
+    'uz': "Mavjud omborlar: $count",
+  });
+
+  String aiAskAboutWarehouse(String warehouse) => _t({
+    'ru': 'Спросите об остатках на складе «$warehouse»',
+    'en': 'Ask about stock at "$warehouse"',
+    'uz': "«$warehouse» ombordagi qoldiqlar haqida so'rang",
+  });
+
   // Passes Page
   String get passSearchHint => _t({
     'ru': 'Номер или клиент',

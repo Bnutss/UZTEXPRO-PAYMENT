@@ -15,6 +15,7 @@ import '../passes/passes_page.dart';
 import '../sign_requests/sign_requests_page.dart';
 import '../bonuses/bonuses_page.dart';
 import '../product_models/product_models_page.dart';
+import '../ai_assistant/ai_assistant_page.dart';
 import '../shop/shop_issued_report_page.dart';
 import '../shop/shop_pickup_page.dart';
 import '../settings/settings_screen.dart';
@@ -591,8 +592,65 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             ),
           ),
           const SizedBox(width: 10),
+          if (_hasFullAccess) ...[
+            _buildAiButton(),
+            const SizedBox(width: 8),
+          ],
           _buildLogoutButton(),
         ],
+      ),
+    );
+  }
+
+  void _openAiAssistant() {
+    HapticFeedback.lightImpact();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AiAssistantPage(jwtToken: widget.jwtToken),
+      ),
+    );
+  }
+
+  Widget _buildAiButton() {
+    if (Platform.isIOS) {
+      return SizedBox(
+        width: 36,
+        height: 36,
+        child: AdaptiveButton.icon(
+          onPressed: _openAiAssistant,
+          icon: Icons.auto_awesome_rounded,
+          iconColor: Colors.white,
+          color: Colors.white,
+          style: AdaptiveButtonStyle.glass,
+          size: AdaptiveButtonSize.medium,
+          borderRadius: BorderRadius.circular(10),
+          minSize: const Size(36, 36),
+        ),
+      );
+    }
+
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: _openAiAssistant,
+        child: Container(
+          width: 36,
+          height: 36,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.18),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white.withOpacity(0.3)),
+          ),
+          child: const Icon(
+            Icons.auto_awesome_rounded,
+            color: Colors.white,
+            size: 18,
+          ),
+        ),
       ),
     );
   }
