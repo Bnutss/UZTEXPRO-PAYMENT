@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import '../../core/storage/app_storage.dart';
@@ -377,21 +379,40 @@ class _SettingsScreenState extends State<SettingsScreen>
               ],
             ),
             const SizedBox(height: 14),
-            AdaptiveSegmentedControl(
-              labels: _languages
-                  .map((lang) => lang['code']!.toUpperCase())
-                  .toList(),
-              selectedIndex: selectedIndex,
-              color: _gradientStart,
-              onValueChanged: (index) {
-                final code = _languages[index]['code']!;
-                localeNotifier.value = Locale(code);
-                _storage.write(key: 'locale', value: code);
-              },
-            ),
+            _buildLanguageControl(selectedIndex),
           ],
         ),
       ),
+    );
+  }
+
+  void _selectLanguage(int index) {
+    HapticFeedback.selectionClick();
+    final code = _languages[index]['code']!;
+    localeNotifier.value = Locale(code);
+    _storage.write(key: 'locale', value: code);
+  }
+
+  Widget _buildLanguageControl(int selectedIndex) {
+    final labels = _languages.map((lang) => lang['code']!.toUpperCase()).toList();
+
+    // AdaptiveSegmentedControl renders a Material 3 SegmentedButton on
+    // Android, but the app theme has useMaterial3 disabled — that mismatch
+    // is what made it look off here. A plain custom pill track matches
+    // this card's own glass styling instead, same as the iOS control does
+    // natively.
+    if (Platform.isIOS) {
+      return AdaptiveSegmentedControl(
+        labels: labels,
+        selectedIndex: selectedIndex,
+        color: _gradientStart,
+        onValueChanged: _selectLanguage,
+      );
+    }
+    return _LanguageSegments(
+      labels: labels,
+      selectedIndex: selectedIndex,
+      onChanged: _selectLanguage,
     );
   }
 
@@ -654,6 +675,64 @@ class _GlassCard extends StatelessWidget {
             child: child,
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Android's stand-in for [AdaptiveSegmentedControl]: a plain pill-track
+/// selector matching this card's own white/glass language instead of a
+/// Material 3 widget rendered inside an app theme that has M3 disabled.
+class _LanguageSegments extends StatelessWidget {
+  final List<String> labels;
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
+
+  const _LanguageSegments({
+    required this.labels,
+    required this.selectedIndex,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: Row(
+        children: List.generate(labels.length, (i) {
+          final selected = i == selectedIndex;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(i),
+              behavior: HitTestBehavior.opaque,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: selected ? Colors.white.withOpacity(0.95) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(9),
+                  boxShadow: selected
+                      ? [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 6, offset: const Offset(0, 2))]
+                      : null,
+                ),
+                child: Text(
+                  labels[i],
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: selected ? const Color(0xFFCC1500) : Colors.white.withOpacity(0.7),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -10,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'main_page.dart';
 import '../passes/passes_page.dart';
 import '../sign_requests/sign_requests_page.dart';
@@ -22,6 +22,9 @@ import '../auth/login_page.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/storage/app_storage.dart';
+import '../../core/widgets/stagger_in.dart';
+import '../update/app_update_api.dart';
+import '../update/app_update_sheet.dart';
 import 'package:uztexpro_payment/main.dart';
 
 class MenuPage extends StatefulWidget {
@@ -40,9 +43,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-
-  late AnimationController _shimmerController;
-  late Animation<double> _shimmer;
 
   int _currentIndex = 0;
 
@@ -94,19 +94,26 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
         );
     _animationController.forward();
-    _shimmerController = AnimationController(
-      duration: const Duration(seconds: 3),
-      vsync: this,
-    );
-    // Only Android renders our hand-rolled glass bar (iOS uses the native
-    // Liquid Glass tab bar instead) — keep this animation idle elsewhere so
-    // we're not driving a CustomPaint repaint loop next to a platform view
-    // for a widget that never gets mounted.
-    if (!Platform.isIOS) _shimmerController.repeat();
-    _shimmer = Tween<double>(begin: 0.0, end: 1.0).animate(_shimmerController);
     localeNotifier.addListener(_onLocaleChanged);
     _fetchRates();
     _loadDashboardOverview();
+    // iOS ships through the App Store (handled by UpgradeAlert further up
+    // the widget tree) — this self-hosted check/download/install flow only
+    // applies to the sideloaded Android build.
+    if (Platform.isAndroid) _checkForAppUpdate();
+  }
+
+  Future<void> _checkForAppUpdate() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      final versionCode = int.tryParse(packageInfo.buildNumber) ?? 0;
+      final update = await AppUpdateApi.check(versionCode);
+      if (update == null || !mounted) return;
+      showAppUpdateSheet(context, update);
+    } catch (_) {
+      // Update check is a best-effort background convenience — never worth
+      // interrupting app startup over.
+    }
   }
 
   Future<void> _fetchRates() async {
@@ -230,7 +237,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   @override
   void dispose() {
     _animationController.dispose();
-    _shimmerController.dispose();
     localeNotifier.removeListener(_onLocaleChanged);
     super.dispose();
   }
@@ -284,6 +290,18 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   void _showLogoutDialog() {
     final s = S.of(context);
     final onSurface = Theme.of(context).colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    Future<void> confirmLogout() async {
+      final nav = Navigator.of(context);
+      try {
+        await storage.delete(key: "jwt");
+      } catch (_) {}
+      nav.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+        (route) => false,
+      );
+    }
 
     showDialog(
       context: context,
@@ -297,12 +315,12 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: Colors.red.withOpacity(isDark ? 0.18 : 0.08),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.logout_rounded,
-                  color: Colors.red.shade700,
+                  color: Colors.redAccent,
                   size: 28,
                 ),
               ),
@@ -325,49 +343,74 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 ),
               ),
               const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 44,
-                      child: AdaptiveButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        label: s.cancel,
-                        textColor: onSurface,
-                        style: AdaptiveButtonStyle.glass,
-                        size: AdaptiveButtonSize.large,
-                        borderRadius: BorderRadius.circular(11),
+              if (Platform.isIOS)
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: AdaptiveButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          label: s.cancel,
+                          textColor: onSurface,
+                          style: AdaptiveButtonStyle.glass,
+                          size: AdaptiveButtonSize.large,
+                          borderRadius: BorderRadius.circular(11),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: SizedBox(
-                      height: 44,
-                      child: AdaptiveButton(
-                        onPressed: () async {
-                          final nav = Navigator.of(context);
-                          try {
-                            await storage.delete(key: "jwt");
-                          } catch (_) {}
-                          nav.pushAndRemoveUntil(
-                            MaterialPageRoute(
-                              builder: (_) => const LoginPage(),
-                            ),
-                            (route) => false,
-                          );
-                        },
-                        label: s.logOutBtn,
-                        color: Colors.redAccent,
-                        textColor: Colors.redAccent,
-                        style: AdaptiveButtonStyle.glass,
-                        size: AdaptiveButtonSize.large,
-                        borderRadius: BorderRadius.circular(11),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: AdaptiveButton(
+                          onPressed: confirmLogout,
+                          label: s.logOutBtn,
+                          color: Colors.redAccent,
+                          textColor: Colors.redAccent,
+                          style: AdaptiveButtonStyle.glass,
+                          size: AdaptiveButtonSize.large,
+                          borderRadius: BorderRadius.circular(11),
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: onSurface,
+                            side: BorderSide(color: onSurface.withOpacity(0.2)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+                          ),
+                          child: Text(s.cancel, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: ElevatedButton(
+                          onPressed: confirmLogout,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+                          ),
+                          child: Text(s.logOutBtn, style: const TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
         ),
@@ -473,7 +516,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 icon: 'shippingbox.fill',
                 label: '',
               ),
-              AdaptiveNavigationDestination(icon: 'bag.fill', label: ''),
+              AdaptiveNavigationDestination(icon: 'cart.fill', label: ''),
               AdaptiveNavigationDestination(icon: 'gear', label: ''),
             ],
             selectedIndex: _currentIndex,
@@ -601,21 +644,49 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   Widget _buildLogoutButton() {
-    return SizedBox(
-      width: 36,
-      height: 36,
-      child: AdaptiveButton.icon(
-        onPressed: () {
-          HapticFeedback.lightImpact();
-          _showLogoutDialog();
-        },
-        icon: Icons.logout_rounded,
-        iconColor: Colors.redAccent,
-        color: Colors.redAccent,
-        style: AdaptiveButtonStyle.glass,
-        size: AdaptiveButtonSize.medium,
-        borderRadius: BorderRadius.circular(10),
-        minSize: const Size(36, 36),
+    void onPressed() {
+      HapticFeedback.lightImpact();
+      _showLogoutDialog();
+    }
+
+    if (Platform.isIOS) {
+      return SizedBox(
+        width: 36,
+        height: 36,
+        child: AdaptiveButton.icon(
+          onPressed: onPressed,
+          icon: Icons.logout_rounded,
+          iconColor: Colors.redAccent,
+          color: Colors.redAccent,
+          style: AdaptiveButtonStyle.glass,
+          size: AdaptiveButtonSize.medium,
+          borderRadius: BorderRadius.circular(10),
+          minSize: const Size(36, 36),
+        ),
+      );
+    }
+
+    // A translucent-red circle on the header's own orange-red gradient had
+    // almost no contrast (red on red). The header's other chips/badges are
+    // all white-tinted glass on that same gradient, so match that instead —
+    // it's legible and it's already this screen's established language.
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onPressed,
+        child: Container(
+          width: 36,
+          height: 36,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.18),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white.withOpacity(0.3)),
+          ),
+          child: const Icon(Icons.logout_rounded, color: Colors.white, size: 18),
+        ),
       ),
     );
   }
@@ -677,7 +748,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   // production/factory cards, all on an elevated glass treatment (layered
   // gradient fill instead of flat opacity, soft accent glows, count-up
   // numbers, staggered entrance). Reduced-motion is honored throughout via
-  // `_StaggerIn`/`_CountUpText`, which both check the platform accessibility
+  // `StaggerIn`/`_CountUpText`, which both check the platform accessibility
   // flag and skip straight to the end state.
 
   BoxDecoration _glassDecoration({
@@ -776,7 +847,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _StaggerIn(
+        StaggerIn(
           child: _dashHeroCard(
             s,
             total: total,
@@ -786,7 +857,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         ),
         if (productions.isNotEmpty) ...[
           const SizedBox(height: 24),
-          _StaggerIn(
+          StaggerIn(
             delay: const Duration(milliseconds: 140),
             child: _dashSectionHeader(
               Icons.insights_rounded,
@@ -794,7 +865,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             ),
           ),
           const SizedBox(height: 10),
-          _StaggerIn(
+          StaggerIn(
             delay: const Duration(milliseconds: 160),
             child: SizedBox(
               height: 118,
@@ -810,7 +881,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         ],
         if (factories.isNotEmpty) ...[
           const SizedBox(height: 24),
-          _StaggerIn(
+          StaggerIn(
             delay: const Duration(milliseconds: 200),
             child: _dashSectionHeader(
               Icons.factory_rounded,
@@ -818,7 +889,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             ),
           ),
           const SizedBox(height: 10),
-          _StaggerIn(
+          StaggerIn(
             delay: const Duration(milliseconds: 220),
             child: SizedBox(
               height: 118,
@@ -1501,78 +1572,47 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     final items = <_NavItemData>[
       _NavItemData(Icons.home_rounded, s.navHome),
       _NavItemData(Icons.fact_check_rounded, s.navConfirmations),
-      _NavItemData(Icons.precision_manufacturing_rounded, s.navProduction),
-      _NavItemData(Icons.storefront_rounded, s.navShop),
+      _NavItemData(Icons.factory_rounded, s.navProduction),
+      _NavItemData(Icons.shopping_cart_rounded, s.navShop),
       _NavItemData(Icons.settings_rounded, s.navSettings),
     ];
 
     const radius = 26.0;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // A translucent "glass" bar only reads well over colorful content —
+    // most tabs sit on a plain white/dark background underneath, where it
+    // just looked like a dull grey slab. A solid surface with real
+    // elevation reads intentional in both themes, on any content behind it.
+    final barColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+
     return SafeArea(
       top: false,
       minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: DecoratedBox(
+      child: Container(
+        height: 64,
         decoration: BoxDecoration(
+          color: barColor,
           borderRadius: BorderRadius.circular(radius),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.22),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
+              color: Colors.black.withOpacity(isDark ? 0.4 : 0.14),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(radius),
-          child: BackdropFilter(
-            // A light blur reads as "refractive glass"; a heavy one just
-            // reads as frosted paper and hides the sheen/rim-light detail.
-            filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-            child: Container(
-              height: 64,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.white.withOpacity(0.20),
-                    Colors.white.withOpacity(0.08),
-                  ],
-                ),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.35),
-                  width: 1,
-                ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Row(
+          children: List.generate(items.length, (i) {
+            return Expanded(
+              child: _NavBarButton(
+                icon: items[i].icon,
+                label: items[i].label,
+                selected: i == _currentIndex,
+                onTap: () => _onTabTap(i),
               ),
-              child: AnimatedBuilder(
-                animation: _shimmer,
-                builder: (_, child) => CustomPaint(
-                  painter: _GlassSheenPainter(
-                    sweep: _shimmer.value,
-                    radius: radius,
-                  ),
-                  child: child,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    children: List.generate(items.length, (i) {
-                      return Expanded(
-                        child: _NavBarButton(
-                          icon: items[i].icon,
-                          label: items[i].label,
-                          selected: i == _currentIndex,
-                          onTap: () => _onTabTap(i),
-                        ),
-                      );
-                    }),
-                  ),
-                ),
-              ),
-            ),
-          ),
+            );
+          }),
         ),
       ),
     );
@@ -1586,54 +1626,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       color: Colors.white.withOpacity(opacity),
     ),
   );
-}
-
-/// Fades + slides a child in once, after [delay]. Skips straight to the
-/// visible end state when the OS accessibility setting for reduced motion
-/// is on, instead of running the animation anyway.
-class _StaggerIn extends StatefulWidget {
-  final Widget child;
-  final Duration delay;
-
-  const _StaggerIn({required this.child, this.delay = Duration.zero});
-
-  @override
-  State<_StaggerIn> createState() => _StaggerInState();
-}
-
-class _StaggerInState extends State<_StaggerIn> {
-  bool _visible = false;
-
-  @override
-  void initState() {
-    super.initState();
-    if (WidgetsBinding
-        .instance
-        .platformDispatcher
-        .accessibilityFeatures
-        .disableAnimations) {
-      _visible = true;
-      return;
-    }
-    Future.delayed(widget.delay, () {
-      if (mounted) setState(() => _visible = true);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedSlide(
-      offset: _visible ? Offset.zero : const Offset(0, 0.06),
-      duration: const Duration(milliseconds: 420),
-      curve: Curves.easeOutCubic,
-      child: AnimatedOpacity(
-        opacity: _visible ? 1 : 0,
-        duration: const Duration(milliseconds: 420),
-        curve: Curves.easeOut,
-        child: widget.child,
-      ),
-    );
-  }
 }
 
 /// Animates from 0 up to [target] once on mount, formatted with thousands
@@ -1710,58 +1702,6 @@ class _NavItemData {
   const _NavItemData(this.icon, this.label);
 }
 
-/// Paints a slow-moving diagonal specular streak plus a soft top rim-light,
-/// the two cues that read as "glass" instead of "tinted blur".
-class _GlassSheenPainter extends CustomPainter {
-  final double sweep;
-  final double radius;
-
-  const _GlassSheenPainter({required this.sweep, required this.radius});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rrect = RRect.fromRectAndRadius(
-      Offset.zero & size,
-      Radius.circular(radius),
-    );
-    canvas.save();
-    canvas.clipRRect(rrect);
-
-    final x = -1.3 + sweep * 2.6;
-    final streakPaint = Paint()
-      ..blendMode = BlendMode.plus
-      ..shader = LinearGradient(
-        begin: Alignment(x, -1.2),
-        end: Alignment(x - 0.7, 1.2),
-        colors: [
-          Colors.transparent,
-          Colors.white.withOpacity(0.22),
-          Colors.transparent,
-        ],
-        stops: const [0.0, 0.5, 1.0],
-      ).createShader(Offset.zero & size);
-    canvas.drawRect(Offset.zero & size, streakPaint);
-
-    final rimPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 1.5)
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [Colors.white.withOpacity(0.9), Colors.white.withOpacity(0)],
-        stops: const [0.0, 0.5],
-      ).createShader(Offset.zero & size);
-    canvas.drawRRect(rrect.deflate(0.6), rimPaint);
-
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant _GlassSheenPainter oldDelegate) =>
-      oldDelegate.sweep != sweep || oldDelegate.radius != radius;
-}
-
 class _NavBarButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -1777,6 +1717,7 @@ class _NavBarButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     // Icons-only bar: the label is kept as a Semantics annotation so
     // TalkBack/VoiceOver users still hear what each tab is, even though it's
     // no longer drawn.
@@ -1791,20 +1732,30 @@ class _NavBarButton extends StatelessWidget {
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOut,
           margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          width: 44,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: selected
-                ? Colors.white.withOpacity(0.92)
-                : Colors.transparent,
+            gradient: selected
+                ? const LinearGradient(
+                    colors: [_MenuPageState._gradientStart, _MenuPageState._gradientEnd],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
             borderRadius: BorderRadius.circular(16),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: _MenuPageState._gradientEnd.withOpacity(0.35),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
           ),
           child: Icon(
             icon,
             size: 22,
-            color: selected
-                ? const Color(0xFFFF8C00)
-                : Colors.white.withOpacity(0.65),
+            color: selected ? Colors.white : onSurface.withOpacity(0.42),
           ),
         ),
       ),

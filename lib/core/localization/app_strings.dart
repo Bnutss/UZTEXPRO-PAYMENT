@@ -284,6 +284,13 @@ class S {
   String get shopIssuedIssuedAt =>
       _t({'ru': 'Дата выдачи', 'en': 'Issued at', 'uz': 'Topshirilgan sana'});
 
+  String get shopIssuedDateFrom => _t({'ru': 'От', 'en': 'From', 'uz': 'Dan'});
+
+  String get shopIssuedDateTo => _t({'ru': 'До', 'en': 'To', 'uz': 'Gacha'});
+
+  String get shopIssuedApply =>
+      _t({'ru': 'Применить', 'en': 'Apply', 'uz': "Qo'llash"});
+
   // Sign Requests Page
   String get signRequestsTitle => _t({
     'ru': 'Подпись заявок',
@@ -1549,5 +1556,45 @@ class S {
     'ru': 'Ошибка подключения:\n$e',
     'en': 'Connection error:\n$e',
     'uz': 'Ulanish xatosi:\n$e',
+  });
+
+  // App self-update (Android sideload, outside Google Play)
+  String get appUpdateAvailableTitle => _t({
+    'ru': 'Доступно обновление',
+    'en': 'Update available',
+    'uz': 'Yangilanish mavjud',
+  });
+
+  String appUpdateVersionLabel(String version) => _t({
+    'ru': 'Версия $version',
+    'en': 'Version $version',
+    'uz': 'Versiya $version',
+  });
+
+  String get appUpdateCriticalNotice => _t({
+    'ru': 'Это обновление обязательно — без него дальнейшая работа с приложением невозможна',
+    'en': 'This update is mandatory — the app cannot be used further without it',
+    'uz': "Bu yangilanish majburiy — usiz ilova bilan ishlashni davom ettirib bo'lmaydi",
+  });
+
+  String get appUpdateDownloadButton =>
+      _t({'ru': 'Скачать и установить', 'en': 'Download & install', 'uz': "Yuklab olish va o'rnatish"});
+
+  String get appUpdateDownloadFailed => _t({
+    'ru': 'Не удалось скачать обновление. Проверьте подключение к интернету',
+    'en': 'Failed to download the update. Check your internet connection',
+    'uz': "Yangilanishni yuklab bo'lmadi. Internet ulanishini tekshiring",
+  });
+
+  String get appUpdateInstallPermissionDenied => _t({
+    'ru': 'Разрешите установку из этого источника в настройках телефона и попробуйте снова',
+    'en': 'Allow installs from this source in your phone settings and try again',
+    'uz': "Telefon sozlamalarida ushbu manbadan o'rnatishga ruxsat bering va qayta urinib ko'ring",
+  });
+
+  String get appUpdateInstallFailed => _t({
+    'ru': 'Не удалось запустить установку',
+    'en': 'Failed to start the installation',
+    'uz': "O'rnatishni boshlab bo'lmadi",
   });
 }

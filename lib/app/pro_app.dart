@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dart:convert' show json, base64, ascii, jsonDecode;
 import 'package:upgrader/upgrader.dart';
 import 'package:uztexpro_payment/features/auth/login_page.dart';
@@ -47,6 +48,16 @@ class _ProMobile extends State<PROApp> {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
           locale: locale,
+          // Without these, Material widgets (date pickers, etc.) fall back
+          // to English regardless of `locale` above — MaterialApp can only
+          // resolve a non-default locale's built-in strings once the
+          // corresponding delegate is registered here.
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [Locale('ru'), Locale('en'), Locale('uz')],
           theme: _darkTheme(),
           // adaptive_platform_ui's native iOS 26 platform views (tab bar,
           // buttons) read MediaQuery.platformBrightness to sync their own

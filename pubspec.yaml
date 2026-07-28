@@ -11,6 +11,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   adaptive_platform_ui: ^0.1.107
   cupertino_icons: ^1.0.9
   flutter_secure_storage: ^10.3.1
@@ -24,6 +26,8 @@ dependencies:
   upgrader: ^11.4.0
   cached_network_image: ^3.4.1
   camera: ^0.11.1
+  open_filex: ^4.7.0
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:

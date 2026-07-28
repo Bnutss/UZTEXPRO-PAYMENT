@@ -7,6 +7,7 @@ import 'package:shimmer/shimmer.dart';
 
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
+import '../../core/widgets/stagger_in.dart';
 import 'order_photo_capture_page.dart';
 import 'shop_api.dart';
 
@@ -102,6 +103,7 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
   }
 
   Future<void> _openDetail(PvzOrder order) async {
+    HapticFeedback.selectionClick();
     final issued = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -234,12 +236,15 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 32),
           itemCount: _orders.length,
-          itemBuilder: (_, i) => _OrderCard(
-            order: _orders[i],
-            isDark: isDark,
-            numberFormat: _numberFormat,
-            s: s,
-            onTap: () => _openDetail(_orders[i]),
+          itemBuilder: (_, i) => StaggerIn(
+            delay: Duration(milliseconds: 40 * i.clamp(0, 8)),
+            child: _OrderCard(
+              order: _orders[i],
+              isDark: isDark,
+              numberFormat: _numberFormat,
+              s: s,
+              onTap: () => _openDetail(_orders[i]),
+            ),
           ),
         ),
       ),
@@ -417,6 +422,7 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
     try {
       await PvzApi.issueOrder(widget.jwtToken, widget.order.id, photoBase64);
       if (!mounted) return;
+      HapticFeedback.mediumImpact();
       Navigator.of(context).pop(true);
     } on PvzApiException catch (e) {
       if (!mounted) return;

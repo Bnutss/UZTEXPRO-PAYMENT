@@ -5,6 +5,7 @@ import 'package:shimmer/shimmer.dart';
 
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
+import '../../core/widgets/stagger_in.dart';
 import 'shop_api.dart';
 
 enum _RangePreset { today, week, month, custom }
@@ -101,6 +102,7 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
   }
 
   void _applyPreset(_RangePreset preset) {
+    HapticFeedback.selectionClick();
     final now = DateTime.now();
     DateTime from;
     switch (preset) {
@@ -125,15 +127,12 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
   }
 
   Future<void> _pickCustomRange() async {
-    final range = await showDateRangePicker(
+    HapticFeedback.selectionClick();
+    final range = await showModalBottomSheet<DateTimeRange>(
       context: context,
-      firstDate: DateTime(2024, 1, 1),
-      lastDate: DateTime.now(),
-      initialDateRange: DateTimeRange(start: _dateFrom, end: _dateTo),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(colorScheme: Theme.of(context).colorScheme.copyWith(primary: _g2)),
-        child: child!,
-      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CustomRangeSheet(initialRange: DateTimeRange(start: _dateFrom, end: _dateTo)),
     );
     if (range == null) return;
     setState(() {
@@ -146,11 +145,13 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
 
   void _selectShop(int? shopId) {
     if (_shopId == shopId) return;
+    HapticFeedback.selectionClick();
     setState(() => _shopId = shopId);
     _load();
   }
 
   void _openDetail(PvzOrder order) {
+    HapticFeedback.selectionClick();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -245,9 +246,11 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
                     FadeTransition(
                       opacity: _fadeAnim,
                       child: Column(
-                        children: report.sales
-                            .map(
-                              (order) => _IssuedOrderTile(
+                        children: [
+                          for (final (i, order) in report.sales.indexed)
+                            StaggerIn(
+                              delay: Duration(milliseconds: 40 * i.clamp(0, 8)),
+                              child: _IssuedOrderTile(
                                 order: order,
                                 isDark: isDark,
                                 numberFormat: _numberFormat,
@@ -255,8 +258,8 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
                                 showShop: _shopId == null,
                                 onTap: () => _openDetail(order),
                               ),
-                            )
-                            .toList(),
+                            ),
+                        ],
                       ),
                     ),
                 ],
@@ -359,6 +362,189 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
           for (int i = 0; i < 4; i++)
             Padding(padding: const EdgeInsets.only(bottom: 8), child: block()),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Custom range sheet ─────────────────────────────────────────────────
+//
+// showDateRangePicker's own calendar dialog is full-screen on phones in
+// portrait (Material has no compact variant of it) — a single-date picker
+// dialog is compact, so a from/to pair of those inside our own bottom
+// sheet gives the same result without taking over the whole screen.
+
+class _CustomRangeSheet extends StatefulWidget {
+  final DateTimeRange initialRange;
+
+  const _CustomRangeSheet({required this.initialRange});
+
+  @override
+  State<_CustomRangeSheet> createState() => _CustomRangeSheetState();
+}
+
+class _CustomRangeSheetState extends State<_CustomRangeSheet> {
+  late DateTime _from;
+  late DateTime _to;
+
+  @override
+  void initState() {
+    super.initState();
+    _from = widget.initialRange.start;
+    _to = widget.initialRange.end;
+  }
+
+  Future<void> _pickFrom() async {
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: DateTime(2024, 1, 1),
+      lastDate: _to,
+      initialDate: _from,
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: Theme.of(context).colorScheme.copyWith(primary: _ShopIssuedReportPageColors.g2),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _from = picked);
+  }
+
+  Future<void> _pickTo() async {
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: _from,
+      lastDate: DateTime.now(),
+      initialDate: _to,
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: Theme.of(context).colorScheme.copyWith(primary: _ShopIssuedReportPageColors.g2),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _to = picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    final surface = Theme.of(context).colorScheme.surface;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: BoxDecoration(color: surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 18),
+                decoration: BoxDecoration(color: onSurface.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+              ),
+            ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [_ShopIssuedReportPageColors.g1, _ShopIssuedReportPageColors.g2],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.date_range_rounded, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(s.shopIssuedCustomPeriod, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: onSurface)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: _DatePickerField(label: s.shopIssuedDateFrom, date: _from, onTap: _pickFrom),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _DatePickerField(label: s.shopIssuedDateTo, date: _to, onTap: _pickTo),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () {
+                  HapticFeedback.selectionClick();
+                  Navigator.of(context).pop(DateTimeRange(start: _from, end: _to));
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _ShopIssuedReportPageColors.g2,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: Text(s.shopIssuedApply, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DatePickerField extends StatelessWidget {
+  final String label;
+  final DateTime date;
+  final VoidCallback onTap;
+
+  const _DatePickerField({required this.label, required this.date, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final outline = Theme.of(context).colorScheme.outline;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: outline.withOpacity(0.5)),
+            color: onSurface.withOpacity(0.03),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.calendar_today_rounded, size: 13, color: onSurface.withOpacity(0.4)),
+                  const SizedBox(width: 6),
+                  Text(label, style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.55))),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(_formatDate(date), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: onSurface)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -495,7 +681,16 @@ class _SummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: highlight ? Colors.white : _ShopIssuedReportPageColors.g2),
+          Container(
+            width: 30,
+            height: 30,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: highlight ? Colors.white.withOpacity(0.18) : _ShopIssuedReportPageColors.g2.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 16, color: highlight ? Colors.white : _ShopIssuedReportPageColors.g2),
+          ),
           const SizedBox(height: 10),
           Text(
             value,
@@ -694,7 +889,7 @@ class _IssuedOrderDetailSheet extends StatelessWidget {
                   decoration: BoxDecoration(color: onSurface.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
                 ),
               ),
-              if (order.buyerPhotoUrl != null) _PhotoPreview(photoUrl: order.buyerPhotoUrl!),
+              if (order.buyerPhotoUrl != null) _PhotoPreview(photoUrl: order.buyerPhotoUrl!, heroTag: 'issued_order_photo_${order.id}'),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -830,16 +1025,17 @@ class _DetailRow extends StatelessWidget {
 // ─── Photo preview (tap to zoom) ───────────────────────────────────────
 
 class _PhotoPreview extends StatelessWidget {
-  const _PhotoPreview({required this.photoUrl});
+  const _PhotoPreview({required this.photoUrl, required this.heroTag});
 
   final String photoUrl;
+  final String heroTag;
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: GestureDetector(
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => _FullScreenPhotoView(photoUrl: photoUrl), fullscreenDialog: true),
+          MaterialPageRoute(builder: (_) => _FullScreenPhotoView(photoUrl: photoUrl, heroTag: heroTag), fullscreenDialog: true),
         ),
         child: Container(
           width: 128,
@@ -852,7 +1048,10 @@ class _PhotoPreview extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              ClipRRect(borderRadius: BorderRadius.circular(13), child: Image.network(photoUrl, fit: BoxFit.cover)),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(13),
+                child: Hero(tag: heroTag, child: Image.network(photoUrl, fit: BoxFit.cover)),
+              ),
               Positioned(
                 right: 6,
                 bottom: 6,
@@ -871,16 +1070,23 @@ class _PhotoPreview extends StatelessWidget {
 }
 
 class _FullScreenPhotoView extends StatelessWidget {
-  const _FullScreenPhotoView({required this.photoUrl});
+  const _FullScreenPhotoView({required this.photoUrl, required this.heroTag});
 
   final String photoUrl;
+  final String heroTag;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white, elevation: 0),
-      body: Center(child: InteractiveViewer(minScale: 0.8, maxScale: 4, child: Image.network(photoUrl))),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 0.8,
+          maxScale: 4,
+          child: Hero(tag: heroTag, child: Image.network(photoUrl)),
+        ),
+      ),
     );
   }
 }
