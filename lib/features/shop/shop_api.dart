@@ -126,7 +126,8 @@ class PvzApiException implements Exception {
 
 /// Talks to the same shop backend as uztexpro_store, but from the PVZ
 /// (pickup-point) side: lists orders placed by a seller that are still
-/// waiting to be handed over, and confirms the handover with a photo.
+/// waiting to be handed over. Handover itself happens on the dedicated
+/// ПВЗ web terminal, not in this app.
 class PvzApi {
   PvzApi._();
 
@@ -154,25 +155,6 @@ class PvzApi {
       }
       final decoded = json.decode(utf8.decode(res.bodyBytes)) as List;
       return decoded.map((e) => PvzOrder.fromJson(e as Map<String, dynamic>)).toList();
-    } on PvzApiException {
-      rethrow;
-    } catch (_) {
-      throw PvzApiException('Не удалось подключиться к серверу');
-    }
-  }
-
-  static Future<void> issueOrder(String jwtToken, int orderId, String photoBase64) async {
-    try {
-      final res = await http
-          .post(
-            Uri.parse('$API/shop/sale/$orderId/issue/'),
-            headers: _headers(jwtToken),
-            body: jsonEncode({'photo': photoBase64}),
-          )
-          .timeout(const Duration(seconds: 30));
-      if (res.statusCode != 200 && res.statusCode != 201) {
-        throw PvzApiException(_extractError(res.body, fallback: 'Не удалось выдать заказ'));
-      }
     } on PvzApiException {
       rethrow;
     } catch (_) {

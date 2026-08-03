@@ -142,17 +142,17 @@ class S {
   String get navSettings =>
       _t({'ru': 'Настройки', 'en': 'Settings', 'uz': 'Sozlamalar'});
 
-  // Shop (PVZ order pickup)
+  // Shop (PVZ order pickup — view only, handover happens on the ПВЗ terminal)
   String get shopPickupTitle => _t({
-    'ru': 'Выдача заказов',
-    'en': 'Order pickup',
-    'uz': 'Buyurtmalarni topshirish',
+    'ru': 'Заказы на выдачу',
+    'en': 'Orders awaiting pickup',
+    'uz': 'Topshirishni kutayotgan buyurtmalar',
   });
 
   String get shopPickupDesc => _t({
-    'ru': 'Найти заказ и подтвердить выдачу покупателю на ПВЗ',
-    'en': 'Find an order and confirm handover to the buyer at the pickup point',
-    'uz': "Buyurtmani toping va uni PVZda xaridorga topshirishni tasdiqlang",
+    'ru': 'Заказы, ожидающие выдачи в вашем магазине',
+    'en': 'Orders waiting for pickup at your shop',
+    'uz': "Do'koningizda topshirishni kutayotgan buyurtmalar",
   });
 
   String get shopPickupSearchHint => _t({
@@ -184,54 +184,6 @@ class S {
 
   String get shopPickupItemsHeader =>
       _t({'ru': 'Товары', 'en': 'Items', 'uz': 'Tovarlar'});
-
-  String get shopPickupIssueButton => _t({
-    'ru': 'Выдать заказ',
-    'en': 'Hand over order',
-    'uz': 'Buyurtmani topshirish',
-  });
-
-  String get shopPickupIssuing =>
-      _t({'ru': 'Выдаём…', 'en': 'Handing over…', 'uz': 'Topshirilmoqda…'});
-
-  String shopPickupIssuedSnack(int id) => _t({
-    'ru': 'Заказ №$id выдан',
-    'en': 'Order №$id handed over',
-    'uz': 'Buyurtma №$id topshirildi',
-  });
-
-  String get shopPhotoTitle =>
-      _t({'ru': 'Фото покупателя', 'en': 'Buyer photo', 'uz': 'Xaridor rasmi'});
-
-  String get shopPhotoHint => _t({
-    'ru': 'Сфотографируйте покупателя для подтверждения выдачи',
-    'en': 'Take a photo of the buyer to confirm the handover',
-    'uz': "Topshirishni tasdiqlash uchun xaridorni suratga oling",
-  });
-
-  String get shopPhotoRetake =>
-      _t({'ru': 'Переснять', 'en': 'Retake', 'uz': 'Qayta olish'});
-
-  String get shopPhotoConfirm =>
-      _t({'ru': 'Подтвердить', 'en': 'Confirm', 'uz': 'Tasdiqlash'});
-
-  String get shopPhotoNoCamera => _t({
-    'ru': 'Камера не найдена на устройстве',
-    'en': 'Camera not found on this device',
-    'uz': "Qurilmada kamera topilmadi",
-  });
-
-  String get shopPhotoNoAccess => _t({
-    'ru': 'Не удалось получить доступ к камере',
-    'en': "Couldn't access the camera",
-    'uz': "Kameraga kirish imkoni bo'lmadi",
-  });
-
-  String get shopPhotoFailed => _t({
-    'ru': 'Не удалось сделать фото',
-    'en': 'Failed to take photo',
-    'uz': "Rasmga olib bo'lmadi",
-  });
 
   String get shopIssuedTitle => _t({
     'ru': 'Выданные заказы',

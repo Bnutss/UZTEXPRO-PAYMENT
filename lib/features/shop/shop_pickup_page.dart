@@ -8,12 +8,12 @@ import 'package:shimmer/shimmer.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/widgets/stagger_in.dart';
-import 'order_photo_capture_page.dart';
 import 'shop_api.dart';
 
-/// PVZ (pickup-point) order issuance: lists orders placed via uztexpro_store
-/// that are still waiting to be handed over at this employee's own shop,
-/// and lets the PVZ staff confirm the handover with a buyer photo.
+/// PVZ (pickup-point) order view: lists orders placed via uztexpro_store
+/// that are still waiting to be handed over at this employee's own shop.
+/// Handover itself now happens on the dedicated ПВЗ web terminal
+/// (face-recognition driven) — this screen is read-only.
 class ShopPickupPage extends StatefulWidget {
   final String jwtToken;
 
@@ -84,40 +84,17 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
     }
   }
 
-  void _snack(String message, bool ok) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(ok ? Icons.check_circle : Icons.error, color: Colors.white, size: 16),
-            const SizedBox(width: 10),
-            Expanded(child: Text(message, style: const TextStyle(fontWeight: FontWeight.w500))),
-          ],
-        ),
-        backgroundColor: ok ? const Color(0xFF43A047) : const Color(0xFFD32F2F),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      ),
-    );
-  }
-
-  Future<void> _openDetail(PvzOrder order) async {
+  void _openDetail(PvzOrder order) {
     HapticFeedback.selectionClick();
-    final issued = await showModalBottomSheet<bool>(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _OrderDetailSheet(
         order: order,
-        jwtToken: widget.jwtToken,
         numberFormat: _numberFormat,
       ),
     );
-    if (issued == true && mounted) {
-      _snack(S.of(context).shopPickupIssuedSnack(order.id), true);
-      _load();
-    }
   }
 
   @override
@@ -395,43 +372,14 @@ class _InfoLine extends StatelessWidget {
 
 // ─── Order detail sheet ──────────────────────────────────────────────────
 
-class _OrderDetailSheet extends StatefulWidget {
+class _OrderDetailSheet extends StatelessWidget {
   final PvzOrder order;
-  final String jwtToken;
   final NumberFormat numberFormat;
 
-  const _OrderDetailSheet({required this.order, required this.jwtToken, required this.numberFormat});
+  const _OrderDetailSheet({required this.order, required this.numberFormat});
 
-  @override
-  State<_OrderDetailSheet> createState() => _OrderDetailSheetState();
-}
-
-class _OrderDetailSheetState extends State<_OrderDetailSheet> {
   static const Color _g1 = Color(0xFFFF8C00);
   static const Color _g2 = Color(0xFFCC1500);
-
-  bool _issuing = false;
-
-  Future<void> _issue() async {
-    final photoBase64 = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const OrderPhotoCapturePage()),
-    );
-    if (photoBase64 == null || !mounted) return;
-
-    setState(() => _issuing = true);
-    try {
-      await PvzApi.issueOrder(widget.jwtToken, widget.order.id, photoBase64);
-      if (!mounted) return;
-      HapticFeedback.mediumImpact();
-      Navigator.of(context).pop(true);
-    } on PvzApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _issuing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: const Color(0xFFD32F2F)),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -439,7 +387,6 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
     final surface = Theme.of(context).colorScheme.surface;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final outline = Theme.of(context).colorScheme.outline;
-    final order = widget.order;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
@@ -512,13 +459,13 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                             Text('${item.article} — ${item.productName}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: onSurface)),
                             const SizedBox(height: 2),
                             Text(
-                              '${item.color} · Размер ${item.sizeName} · ${widget.numberFormat.format(item.amount)} шт',
+                              '${item.color} · Размер ${item.sizeName} · ${numberFormat.format(item.amount)} шт',
                               style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.55)),
                             ),
                           ],
                         ),
                       ),
-                      Text('${widget.numberFormat.format(item.subtotal)} сум', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _g2)),
+                      Text('${numberFormat.format(item.subtotal)} сум', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _g2)),
                     ],
                   ),
                 ),
@@ -535,25 +482,8 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(s.totalLabel, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                    Text('${widget.numberFormat.format(order.totalValue)} сум', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+                    Text('${numberFormat.format(order.totalValue)} сум', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
                   ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: _issuing ? null : _issue,
-                  icon: _issuing
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.camera_alt_rounded, size: 20),
-                  label: Text(_issuing ? s.shopPickupIssuing : s.shopPickupIssueButton, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E7D32),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
                 ),
               ),
             ],
