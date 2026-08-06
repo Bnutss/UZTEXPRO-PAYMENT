@@ -388,9 +388,14 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                           style: OutlinedButton.styleFrom(
                             foregroundColor: onSurface,
                             side: BorderSide(color: onSurface.withOpacity(0.2)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(11),
+                            ),
                           ),
-                          child: Text(s.cancel, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          child: Text(
+                            s.cancel,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
                         ),
                       ),
                     ),
@@ -404,9 +409,14 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                             backgroundColor: Colors.redAccent,
                             foregroundColor: Colors.white,
                             elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(11),
+                            ),
                           ),
-                          child: Text(s.logOutBtn, style: const TextStyle(fontWeight: FontWeight.w700)),
+                          child: Text(
+                            s.logOutBtn,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
                         ),
                       ),
                     ),
@@ -446,96 +456,113 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         data: MediaQuery.of(
           context,
         ).copyWith(platformBrightness: Brightness.dark),
-        child: AdaptiveScaffold(
-          body: MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              platformBrightness: isDark ? Brightness.dark : Brightness.light,
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: gradientColors,
-                ),
+        // AdaptiveScaffold has no extendBody knob, so on Android the area
+        // behind its bottomNavigationBar slot falls back to the app's flat
+        // scaffoldBackgroundColor (#121212) instead of continuing the
+        // gradient — that mismatch is what made the floating nav bar look
+        // like it was sitting on a separate, unrelated dark box. Matching
+        // scaffoldBackgroundColor to the gradient's own dark end here
+        // (only for this screen) removes the seam without needing to touch
+        // the shared app theme.
+        child: Theme(
+          data: Theme.of(
+            context,
+          ).copyWith(scaffoldBackgroundColor: gradientColors.last),
+          child: AdaptiveScaffold(
+            body: MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                platformBrightness: isDark ? Brightness.dark : Brightness.light,
               ),
-              child: Stack(
-                children: [
-                  Positioned(top: -70, right: -50, child: _circle(200, 0.07)),
-                  Positioned(top: 80, left: -70, child: _circle(160, 0.05)),
-                  Positioned(
-                    bottom: 160,
-                    right: -40,
-                    child: _circle(130, 0.06),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: gradientColors,
                   ),
-                  Positioned(bottom: -50, left: -30, child: _circle(180, 0.05)),
-                  SafeArea(
-                    bottom: false,
-                    child: FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: SlideTransition(
-                        position: _slideAnimation,
-                        child: Column(
-                          children: [
-                            const SizedBox(height: 16),
-                            _buildHeader(s),
-                            const SizedBox(height: 16),
-                            Expanded(
-                              child: IndexedStack(
-                                index: _currentIndex,
-                                children: [
-                                  _buildHomeTab(s),
-                                  _buildConfirmationsTab(s),
-                                  _buildProductionTab(s),
-                                  _buildShopTab(s),
-                                  const SettingsScreen(),
-                                ],
+                ),
+                child: Stack(
+                  children: [
+                    Positioned(top: -70, right: -50, child: _circle(200, 0.07)),
+                    Positioned(top: 80, left: -70, child: _circle(160, 0.05)),
+                    Positioned(
+                      bottom: 160,
+                      right: -40,
+                      child: _circle(130, 0.06),
+                    ),
+                    Positioned(
+                      bottom: -50,
+                      left: -30,
+                      child: _circle(180, 0.05),
+                    ),
+                    SafeArea(
+                      bottom: false,
+                      child: FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: SlideTransition(
+                          position: _slideAnimation,
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 16),
+                              _buildHeader(s),
+                              const SizedBox(height: 16),
+                              Expanded(
+                                child: IndexedStack(
+                                  index: _currentIndex,
+                                  children: [
+                                    _buildHomeTab(s),
+                                    _buildConfirmationsTab(s),
+                                    _buildProductionTab(s),
+                                    _buildShopTab(s),
+                                    const SettingsScreen(),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          bottomNavigationBar: AdaptiveBottomNavigationBar(
-            // Labels intentionally empty: icons-only tab bar. adaptive_platform_ui's
-            // AdaptiveNavigationDestination.label is required and doubles as the
-            // native tab's accessibility label, so VoiceOver support is traded
-            // away here too — there's no separate visual/semantic label knob
-            // exposed by the plugin.
-            items: const [
-              AdaptiveNavigationDestination(icon: 'house.fill', label: ''),
-              AdaptiveNavigationDestination(
-                icon: 'checkmark.seal.fill',
-                label: '',
-              ),
-              AdaptiveNavigationDestination(
-                icon: 'shippingbox.fill',
-                label: '',
-              ),
-              AdaptiveNavigationDestination(icon: 'cart.fill', label: ''),
-              AdaptiveNavigationDestination(icon: 'gear', label: ''),
-            ],
-            selectedIndex: _currentIndex,
-            onTap: _onTabTap,
-            useNativeBottomBar: true,
-            selectedItemColor: _gradientStart,
-            // The tab bar always renders with the forced-dark native style
-            // (see the MediaQuery override above), so its unselected tint
-            // should match that dark chrome regardless of the app's actual
-            // theme — not flip with isDark like the rest of the screen.
-            unselectedItemColor: Colors.white.withOpacity(0.75),
-            // Android has no native Liquid Glass UITabBar to fall back to, so
-            // it keeps our own hand-rolled glass bar. On iOS this is ignored
-            // by the package anyway, so skip building it — an unused
-            // CustomPaint + AnimatedBuilder tree sitting next to the real
-            // native tab bar's platform view is exactly the kind of thing
-            // that can confuse the semantics tree.
-            bottomNavigationBar: Platform.isIOS ? null : _buildBottomNav(s),
+            bottomNavigationBar: AdaptiveBottomNavigationBar(
+              // Labels intentionally empty: icons-only tab bar. adaptive_platform_ui's
+              // AdaptiveNavigationDestination.label is required and doubles as the
+              // native tab's accessibility label, so VoiceOver support is traded
+              // away here too — there's no separate visual/semantic label knob
+              // exposed by the plugin.
+              items: const [
+                AdaptiveNavigationDestination(icon: 'house.fill', label: ''),
+                AdaptiveNavigationDestination(
+                  icon: 'checkmark.seal.fill',
+                  label: '',
+                ),
+                AdaptiveNavigationDestination(
+                  icon: 'shippingbox.fill',
+                  label: '',
+                ),
+                AdaptiveNavigationDestination(icon: 'cart.fill', label: ''),
+                AdaptiveNavigationDestination(icon: 'gear', label: ''),
+              ],
+              selectedIndex: _currentIndex,
+              onTap: _onTabTap,
+              useNativeBottomBar: true,
+              selectedItemColor: _gradientStart,
+              // The tab bar always renders with the forced-dark native style
+              // (see the MediaQuery override above), so its unselected tint
+              // should match that dark chrome regardless of the app's actual
+              // theme — not flip with isDark like the rest of the screen.
+              unselectedItemColor: Colors.white.withOpacity(0.75),
+              // Android has no native Liquid Glass UITabBar to fall back to, so
+              // it keeps our own hand-rolled glass bar. On iOS this is ignored
+              // by the package anyway, so skip building it — an unused
+              // CustomPaint + AnimatedBuilder tree sitting next to the real
+              // native tab bar's platform view is exactly the kind of thing
+              // that can confuse the semantics tree.
+              bottomNavigationBar: Platform.isIOS ? null : _buildBottomNav(s),
+            ),
           ),
         ),
       ),
@@ -592,10 +619,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             ),
           ),
           const SizedBox(width: 10),
-          if (_hasFullAccess) ...[
-            _buildAiButton(),
-            const SizedBox(width: 8),
-          ],
+          if (_hasFullAccess) ...[_buildAiButton(), const SizedBox(width: 8)],
           _buildLogoutButton(),
         ],
       ),
@@ -743,7 +767,11 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             shape: BoxShape.circle,
             border: Border.all(color: Colors.white.withOpacity(0.3)),
           ),
-          child: const Icon(Icons.logout_rounded, color: Colors.white, size: 18),
+          child: const Icon(
+            Icons.logout_rounded,
+            color: Colors.white,
+            size: 18,
+          ),
         ),
       ),
     );
@@ -1604,7 +1632,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             description: s.shopPickupDesc,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => ShopPickupPage(jwtToken: widget.jwtToken)),
+              MaterialPageRoute(
+                builder: (_) => ShopPickupPage(jwtToken: widget.jwtToken),
+              ),
             ),
           ),
           if (_hasFullAccess) ...[
@@ -1615,7 +1645,10 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               description: s.shopIssuedDesc,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => ShopIssuedReportPage(jwtToken: widget.jwtToken)),
+                MaterialPageRoute(
+                  builder: (_) =>
+                      ShopIssuedReportPage(jwtToken: widget.jwtToken),
+                ),
               ),
             ),
           ],
@@ -1627,35 +1660,50 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   // ── Нижняя навигация ─────────────────────────────────
 
   Widget _buildBottomNav(S s) {
+    // Icons chosen to mirror the iOS tab bar's SF Symbols 1:1 (house.fill,
+    // checkmark.seal.fill, shippingbox.fill, cart.fill, gear) so both
+    // platforms read as the same set rather than two unrelated icon packs.
     final items = <_NavItemData>[
       _NavItemData(Icons.home_rounded, s.navHome),
-      _NavItemData(Icons.fact_check_rounded, s.navConfirmations),
-      _NavItemData(Icons.factory_rounded, s.navProduction),
+      _NavItemData(Icons.verified_rounded, s.navConfirmations),
+      _NavItemData(Icons.inventory_2_rounded, s.navProduction),
       _NavItemData(Icons.shopping_cart_rounded, s.navShop),
       _NavItemData(Icons.settings_rounded, s.navSettings),
     ];
 
-    const radius = 26.0;
+    const radius = 28.0;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    // A translucent "glass" bar only reads well over colorful content —
-    // most tabs sit on a plain white/dark background underneath, where it
-    // just looked like a dull grey slab. A solid surface with real
-    // elevation reads intentional in both themes, on any content behind it.
-    final barColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
 
     return SafeArea(
       top: false,
       minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Container(
-        height: 64,
+        height: 66,
         decoration: BoxDecoration(
-          color: barColor,
+          // A flat neutral slab (#1E1E1E) read as a generic, unrelated box
+          // sitting on top of the brand gradient. A warm dark gradient tying
+          // back into the header's own tones, plus a hairline light border,
+          // reads as an intentional "glass" panel instead — closer to the
+          // native iOS tab bar's frosted look.
+          gradient: isDark
+              ? const LinearGradient(
+                  colors: [Color(0xFF321406), Color(0xFF1A0500)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: isDark ? null : Colors.white,
           borderRadius: BorderRadius.circular(radius),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withOpacity(0.09)
+                : Colors.black.withOpacity(0.05),
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.4 : 0.14),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
+              color: Colors.black.withOpacity(isDark ? 0.45 : 0.14),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
             ),
           ],
         ),
@@ -1794,7 +1842,10 @@ class _NavBarButton extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: selected
                 ? const LinearGradient(
-                    colors: [_MenuPageState._gradientStart, _MenuPageState._gradientEnd],
+                    colors: [
+                      _MenuPageState._gradientStart,
+                      _MenuPageState._gradientEnd,
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   )
@@ -1988,4 +2039,3 @@ class _NoAccessCard extends StatelessWidget {
     );
   }
 }
-
