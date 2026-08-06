@@ -144,10 +144,19 @@ class PvzApi {
         'Content-Type': 'application/json',
       };
 
-  static Future<List<PvzOrder>> fetchPending(String jwtToken, {String query = ''}) async {
+  static Future<List<PvzOrder>> fetchPending(
+    String jwtToken, {
+    String query = '',
+    DateTime? dateFrom,
+    DateTime? dateTo,
+  }) async {
     try {
+      final params = <String, String>{};
+      if (query.isNotEmpty) params['q'] = query;
+      if (dateFrom != null) params['date_from'] = _dateOnly(dateFrom);
+      if (dateTo != null) params['date_to'] = _dateOnly(dateTo);
       final uri = Uri.parse('$API/shop/sale-pending/').replace(
-        queryParameters: query.isNotEmpty ? {'q': query} : null,
+        queryParameters: params.isNotEmpty ? params : null,
       );
       final res = await http.get(uri, headers: _headers(jwtToken)).timeout(const Duration(seconds: 20));
       if (res.statusCode != 200) {

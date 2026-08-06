@@ -10,6 +10,13 @@ import '../../core/localization/locale_notifier.dart';
 import '../../core/widgets/stagger_in.dart';
 import 'shop_api.dart';
 
+enum _RangePreset { today, week, month, custom }
+
+class _ShopPickupColors {
+  static const Color g1 = Color(0xFFFF8C00);
+  static const Color g2 = Color(0xFFCC1500);
+}
+
 /// PVZ (pickup-point) order view: lists orders placed via uztexpro_store
 /// that are still waiting to be handed over at this employee's own shop.
 /// Handover itself now happens on the dedicated ПВЗ web terminal
@@ -38,11 +45,26 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
   bool _loading = true;
   String? _error;
 
+  _RangePreset _preset = _RangePreset.today;
+  late DateTime _dateFrom;
+  late DateTime _dateTo;
+
+  double get _totalSum => _orders.fold<double>(0, (sum, o) => sum + o.totalValue);
+
+  int get _salary {
+    if (_totalSum <= 0) return 0;
+    final raw = _totalSum * 0.05;
+    return (raw / 100).round() * 100;
+  }
+
   @override
   void initState() {
     super.initState();
     _animCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
+    final now = DateTime.now();
+    _dateFrom = DateTime(now.year, now.month, now.day);
+    _dateTo = now;
     _load();
     _searchController.addListener(() {
       _debounce?.cancel();
@@ -68,7 +90,12 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
       _error = null;
     });
     try {
-      final orders = await PvzApi.fetchPending(widget.jwtToken, query: _searchController.text.trim());
+      final orders = await PvzApi.fetchPending(
+        widget.jwtToken,
+        query: _searchController.text.trim(),
+        dateFrom: _dateFrom,
+        dateTo: _dateTo,
+      );
       if (!mounted) return;
       setState(() {
         _orders = orders;
@@ -82,6 +109,48 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
         _loading = false;
       });
     }
+  }
+
+  void _applyPreset(_RangePreset preset) {
+    HapticFeedback.selectionClick();
+    final now = DateTime.now();
+    DateTime from;
+    switch (preset) {
+      case _RangePreset.today:
+        from = DateTime(now.year, now.month, now.day);
+        break;
+      case _RangePreset.week:
+        from = now.subtract(const Duration(days: 6));
+        break;
+      case _RangePreset.month:
+        from = DateTime(now.year, now.month, 1);
+        break;
+      case _RangePreset.custom:
+        return;
+    }
+    setState(() {
+      _preset = preset;
+      _dateFrom = from;
+      _dateTo = now;
+    });
+    _load();
+  }
+
+  Future<void> _pickCustomRange() async {
+    HapticFeedback.selectionClick();
+    final range = await showModalBottomSheet<DateTimeRange>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PickupCustomRangeSheet(initialRange: DateTimeRange(start: _dateFrom, end: _dateTo)),
+    );
+    if (range == null) return;
+    setState(() {
+      _preset = _RangePreset.custom;
+      _dateFrom = range.start;
+      _dateTo = range.end;
+    });
+    _load();
   }
 
   void _openDetail(PvzOrder order) {
@@ -125,11 +194,40 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
           children: [
             Container(
               decoration: BoxDecoration(gradient: LinearGradient(colors: gradColors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Spacer(),
-                  if (!_loading && _error == null) _CountBadge(count: _orders.length),
+                  Row(
+                    children: [
+                      Expanded(child: _buildDateFilterRow(s)),
+                      const SizedBox(width: 8),
+                      if (!_loading && _error == null) _CountBadge(count: _orders.length),
+                    ],
+                  ),
+                  if (!_loading && _error == null) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _HeaderStatTile(
+                            icon: Icons.payments_rounded,
+                            label: s.shopPickupTotalLabel,
+                            value: '${_numberFormat.format(_totalSum)} сум',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _HeaderStatTile(
+                            icon: Icons.account_balance_wallet_rounded,
+                            label: s.shopPickupSalaryLabel,
+                            value: '${_numberFormat.format(_salary)} сум',
+                            highlight: true,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -141,6 +239,28 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
             Expanded(child: Container(color: listBg, child: _buildBody(isDark, s))),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDateFilterRow(S s) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _DateChip(label: s.shopIssuedToday, selected: _preset == _RangePreset.today, onTap: () => _applyPreset(_RangePreset.today)),
+          const SizedBox(width: 8),
+          _DateChip(label: s.shopIssuedWeek, selected: _preset == _RangePreset.week, onTap: () => _applyPreset(_RangePreset.week)),
+          const SizedBox(width: 8),
+          _DateChip(label: s.shopIssuedMonth, selected: _preset == _RangePreset.month, onTap: () => _applyPreset(_RangePreset.month)),
+          const SizedBox(width: 8),
+          _DateChip(
+            label: s.shopIssuedCustomPeriod,
+            icon: Icons.date_range_rounded,
+            selected: _preset == _RangePreset.custom,
+            onTap: _pickCustomRange,
+          ),
+        ],
       ),
     );
   }
@@ -545,6 +665,277 @@ class _CountBadge extends StatelessWidget {
       child: Text('$count', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
     );
   }
+}
+
+class _DateChip extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _DateChip({required this.label, this.icon, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+          decoration: BoxDecoration(
+            color: selected ? Colors.white : Colors.white.withOpacity(0.16),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withOpacity(selected ? 0 : 0.32)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 13, color: selected ? _ShopPickupColors.g2 : Colors.white),
+                const SizedBox(width: 5),
+              ],
+              Text(
+                label,
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: selected ? _ShopPickupColors.g2 : Colors.white),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderStatTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool highlight;
+
+  const _HeaderStatTile({required this.icon, required this.label, required this.value, this.highlight = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: highlight ? Colors.white : Colors.white.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(highlight ? 0 : 0.28)),
+        boxShadow: highlight ? [BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 10, offset: const Offset(0, 4))] : null,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: highlight ? _ShopPickupColors.g2.withOpacity(0.12) : Colors.white.withOpacity(0.18),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 15, color: highlight ? _ShopPickupColors.g2 : Colors.white),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 10.5, color: highlight ? _ShopPickupColors.g2.withOpacity(0.75) : Colors.white.withOpacity(0.85)),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: highlight ? _ShopPickupColors.g2 : Colors.white),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Custom range sheet ─────────────────────────────────────────────────
+
+class _PickupCustomRangeSheet extends StatefulWidget {
+  final DateTimeRange initialRange;
+
+  const _PickupCustomRangeSheet({required this.initialRange});
+
+  @override
+  State<_PickupCustomRangeSheet> createState() => _PickupCustomRangeSheetState();
+}
+
+class _PickupCustomRangeSheetState extends State<_PickupCustomRangeSheet> {
+  late DateTime _from;
+  late DateTime _to;
+
+  @override
+  void initState() {
+    super.initState();
+    _from = widget.initialRange.start;
+    _to = widget.initialRange.end;
+  }
+
+  Future<void> _pickFrom() async {
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: DateTime(2024, 1, 1),
+      lastDate: _to,
+      initialDate: _from,
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(colorScheme: Theme.of(context).colorScheme.copyWith(primary: _ShopPickupColors.g2)),
+        child: child!,
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _from = picked);
+  }
+
+  Future<void> _pickTo() async {
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: _from,
+      lastDate: DateTime.now(),
+      initialDate: _to,
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(colorScheme: Theme.of(context).colorScheme.copyWith(primary: _ShopPickupColors.g2)),
+        child: child!,
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _to = picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    final surface = Theme.of(context).colorScheme.surface;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: BoxDecoration(color: surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 18),
+                decoration: BoxDecoration(color: onSurface.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+              ),
+            ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [_ShopPickupColors.g1, _ShopPickupColors.g2], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.date_range_rounded, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(s.shopIssuedCustomPeriod, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: onSurface)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(child: _PickupDatePickerField(label: s.shopIssuedDateFrom, date: _from, onTap: _pickFrom)),
+                const SizedBox(width: 12),
+                Expanded(child: _PickupDatePickerField(label: s.shopIssuedDateTo, date: _to, onTap: _pickTo)),
+              ],
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () {
+                  HapticFeedback.selectionClick();
+                  Navigator.of(context).pop(DateTimeRange(start: _from, end: _to));
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _ShopPickupColors.g2,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: Text(s.shopIssuedApply, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PickupDatePickerField extends StatelessWidget {
+  final String label;
+  final DateTime date;
+  final VoidCallback onTap;
+
+  const _PickupDatePickerField({required this.label, required this.date, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final outline = Theme.of(context).colorScheme.outline;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: outline.withOpacity(0.5)),
+            color: onSurface.withOpacity(0.03),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.calendar_today_rounded, size: 13, color: onSurface.withOpacity(0.4)),
+                  const SizedBox(width: 6),
+                  Text(label, style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.55))),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(_pickupFormatDate(date), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: onSurface)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _pickupFormatDate(DateTime d) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(d.day)}.${two(d.month)}.${d.year}';
 }
 
 class _SearchBar extends StatelessWidget {

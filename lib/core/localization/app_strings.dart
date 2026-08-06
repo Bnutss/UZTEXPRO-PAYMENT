@@ -185,6 +185,18 @@ class S {
   String get shopPickupItemsHeader =>
       _t({'ru': 'Товары', 'en': 'Items', 'uz': 'Tovarlar'});
 
+  String get shopPickupTotalLabel => _t({
+    'ru': 'Общая сумма',
+    'en': 'Total amount',
+    'uz': 'Umumiy summa',
+  });
+
+  String get shopPickupSalaryLabel => _t({
+    'ru': 'Зарплата продавца',
+    'en': "Seller's salary",
+    'uz': 'Sotuvchi maoshi',
+  });
+
   String get shopIssuedTitle => _t({
     'ru': 'Выданные заказы',
     'en': 'Issued orders',
