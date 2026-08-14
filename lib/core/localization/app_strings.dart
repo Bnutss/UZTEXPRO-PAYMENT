@@ -255,6 +255,69 @@ class S {
   String get shopIssuedApply =>
       _t({'ru': 'Применить', 'en': 'Apply', 'uz': "Qo'llash"});
 
+  String get shopStockAllPeriod =>
+      _t({'ru': 'Весь период', 'en': 'All time', 'uz': 'Barcha davr'});
+
+  String get shopStockTitle => _t({
+    'ru': 'Остатки товаров ПВЗ',
+    'en': 'Pending pickup stock',
+    'uz': 'PVZ qoldiqlari',
+  });
+
+  String get shopStockDesc => _t({
+    'ru': 'Список неполученных заказов по клиентам',
+    'en': 'Unclaimed orders broken down by client',
+    'uz': "Xaridorlar bo'yicha olinmagan buyurtmalar",
+  });
+
+  String get shopStockEmpty => _t({
+    'ru': 'Нет товаров, ожидающих выдачи в ПВЗ',
+    'en': 'No goods waiting for pickup',
+    'uz': "PVZda topshirishni kutayotgan tovarlar yo'q",
+  });
+
+  String get shopStockOverdueOnly => _t({
+    'ru': 'Только просроченные',
+    'en': 'Overdue only',
+    'uz': 'Faqat muddati o\'tganlar',
+  });
+
+  String get shopStockOrdersLabel =>
+      _t({'ru': 'Заказов ожидает', 'en': 'Orders pending', 'uz': 'Kutilayotgan buyurtmalar'});
+
+  String get shopStockQtyLabel =>
+      _t({'ru': 'Товаров, шт', 'en': 'Items, pcs', 'uz': 'Tovarlar, dona'});
+
+  String get shopStockOverdueLabel =>
+      _t({'ru': 'Просрочено', 'en': 'Overdue', 'uz': "Muddati o'tgan"});
+
+  String get shopStockBuyersLabel =>
+      _t({'ru': 'Клиентов ожидает', 'en': 'Clients waiting', 'uz': 'Kutayotgan xaridorlar'});
+
+  String get shopStockWaitingSince =>
+      _t({'ru': 'Ожидает с', 'en': 'Waiting since', 'uz': 'Kutmoqda'});
+
+  String get shopStockDaysLabel =>
+      _t({'ru': 'Дней ожидания', 'en': 'Days waiting', 'uz': 'Kutish kunlari'});
+
+  String get shopStockStatusWaiting =>
+      _t({'ru': 'В ожидании', 'en': 'Waiting', 'uz': 'Kutilmoqda'});
+
+  String get shopStockStatusSoon =>
+      _t({'ru': 'Скоро просрочка', 'en': 'Due soon', 'uz': "Tez orada muddati o'tadi"});
+
+  String get shopStockStatusOverdue =>
+      _t({'ru': 'Просрочено', 'en': 'Overdue', 'uz': "Muddati o'tgan"});
+
+  String get shopStockGroupBadge =>
+      _t({'ru': 'Есть просрочка', 'en': 'Has overdue', 'uz': "Muddati o'tgan bor"});
+
+  String shopStockOrdersCount(int count) => _t({
+    'ru': '$count заказ(ов)',
+    'en': '$count order(s)',
+    'uz': '$count ta buyurtma',
+  });
+
   // Sign Requests Page
   String get signRequestsTitle => _t({
     'ru': 'Подпись заявок',

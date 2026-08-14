@@ -37,12 +37,14 @@ class PvzOrder {
   PvzOrder({
     required this.id,
     required this.shopName,
+    required this.buyerId,
     required this.buyerName,
     required this.sellerName,
     required this.items,
     required this.totalAmount,
     required this.totalValue,
     required this.createAt,
+    required this.confirmedAt,
     required this.isIssued,
     required this.issuedAt,
     required this.issuedByName,
@@ -51,12 +53,14 @@ class PvzOrder {
 
   final int id;
   final String shopName;
+  final int? buyerId;
   final String buyerName;
   final String sellerName;
   final List<PvzOrderItem> items;
   final double totalAmount;
   final double totalValue;
   final DateTime createAt;
+  final DateTime? confirmedAt;
   final bool isIssued;
   final DateTime? issuedAt;
   final String? issuedByName;
@@ -65,6 +69,7 @@ class PvzOrder {
   factory PvzOrder.fromJson(Map<String, dynamic> json) => PvzOrder(
         id: json['id'] as int,
         shopName: json['shop_name'] as String? ?? '',
+        buyerId: json['buyer'] as int?,
         buyerName: json['buyer_name'] as String? ?? '',
         sellerName: json['seller_name'] as String? ?? '',
         items: (json['items'] as List? ?? [])
@@ -73,6 +78,7 @@ class PvzOrder {
         totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0,
         totalValue: (json['total_value'] as num?)?.toDouble() ?? 0,
         createAt: DateTime.parse(json['create_at'] as String),
+        confirmedAt: json['confirmed_at'] != null ? DateTime.parse(json['confirmed_at'] as String) : null,
         isIssued: json['is_issued'] as bool? ?? false,
         issuedAt: json['issued_at'] != null ? DateTime.parse(json['issued_at'] as String) : null,
         issuedByName: json['issued_by_name'] as String?,
@@ -149,12 +155,14 @@ class PvzApi {
     String query = '',
     DateTime? dateFrom,
     DateTime? dateTo,
+    int? shopId,
   }) async {
     try {
       final params = <String, String>{};
       if (query.isNotEmpty) params['q'] = query;
       if (dateFrom != null) params['date_from'] = _dateOnly(dateFrom);
       if (dateTo != null) params['date_to'] = _dateOnly(dateTo);
+      if (shopId != null) params['shop'] = '$shopId';
       final uri = Uri.parse('$API/shop/sale-pending/').replace(
         queryParameters: params.isNotEmpty ? params : null,
       );

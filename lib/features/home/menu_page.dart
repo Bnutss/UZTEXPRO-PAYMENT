@@ -18,6 +18,7 @@ import '../product_models/product_models_page.dart';
 import '../ai_assistant/ai_assistant_page.dart';
 import '../shop/shop_issued_report_page.dart';
 import '../shop/shop_pickup_page.dart';
+import '../shop/shop_pvz_stock_page.dart';
 import '../settings/settings_screen.dart';
 import '../auth/login_page.dart';
 import '../../core/localization/app_strings.dart';
@@ -1634,6 +1635,18 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               context,
               MaterialPageRoute(
                 builder: (_) => ShopPickupPage(jwtToken: widget.jwtToken),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _MenuCard(
+            icon: Icons.inventory_2_rounded,
+            label: s.shopStockTitle,
+            description: s.shopStockDesc,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ShopPvzStockPage(jwtToken: widget.jwtToken),
               ),
             ),
           ),
