@@ -60,7 +60,7 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   adaptive_platform_ui: dcd588cb59eb4c5bd1a430158b00b98b0493b3f0
   device_info_plus: bf2e3232933866d73fe290f2942f2156cdd10342
-  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
   flutter_secure_storage_darwin: 557817588b80e60213cbecb573c45c76b788018d
   local_auth_darwin: 63c73d6d28cc3e239be2b6aa460ea6e317cd5100
   open_filex: 6e26e659846ec990262224a12ef1c528bb4edbe4
@@ -69,6 +69,6 @@ SPEC CHECKSUMS:
   sqflite_darwin: 5a7236e3b501866c1c9befc6771dfd73ffb8702d
   url_launcher_ios: bb13df5870e8c4234ca12609d04010a21be43dfa
 
-PODFILE CHECKSUM: 413031477f6d8341b9a28981724285017fe31078
+PODFILE CHECKSUM: ad95cb7abf351c34c0c08f20d78c3d13ab09cb8a
 
 COCOAPODS: 1.16.2

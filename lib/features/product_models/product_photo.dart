@@ -58,7 +58,12 @@ class ProductPhotoThumbnail extends StatelessWidget {
               borderRadius: BorderRadius.circular(radius),
               color: isDark ? Colors.white10 : Colors.grey.shade100,
               border: showRing
-                  ? Border.all(color: Colors.white.withOpacity(0.35), width: 1.2)
+                  ? Border.all(
+                      color: isDark
+                          ? Colors.white.withOpacity(0.35)
+                          : const Color(0xFFEDEDED),
+                      width: 1.2,
+                    )
                   : null,
               boxShadow: showRing
                   ? [

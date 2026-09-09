@@ -24,6 +24,7 @@ import '../auth/login_page.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/storage/app_storage.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/widgets/stagger_in.dart';
 import '../update/app_update_api.dart';
 import '../update/app_update_sheet.dart';
@@ -39,8 +40,8 @@ class MenuPage extends StatefulWidget {
 }
 
 class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
-  static const Color _gradientStart = Color(0xFFFF8C00);
-  static const Color _gradientEnd = Color(0xFFCC1500);
+  static const Color _gradientStart = AppColors.brandOrange;
+  static const Color _gradientEnd = AppColors.brandRed;
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -291,8 +292,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
   void _showLogoutDialog() {
     final s = S.of(context);
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     Future<void> confirmLogout() async {
       final nav = Navigator.of(context);
@@ -305,266 +304,99 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       );
     }
 
-    showDialog(
+    // Native platform alert (real Liquid Glass chrome on iOS 26+) instead of
+    // a hand-rolled Dialog stacking its own AdaptiveButtons on top of the
+    // header's own native glass button — that double platform-view overlap
+    // was what caused the flash when the sheet opened.
+    AdaptiveAlertDialog.show(
       context: context,
-      builder: (_) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(isDark ? 0.18 : 0.08),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.logout_rounded,
-                  color: Colors.redAccent,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                s.logOut,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: onSurface,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                s.logOutConfirm,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: onSurface.withOpacity(0.6),
-                ),
-              ),
-              const SizedBox(height: 20),
-              if (Platform.isIOS)
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 44,
-                        child: AdaptiveButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          label: s.cancel,
-                          textColor: onSurface,
-                          style: AdaptiveButtonStyle.glass,
-                          size: AdaptiveButtonSize.large,
-                          borderRadius: BorderRadius.circular(11),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: SizedBox(
-                        height: 44,
-                        child: AdaptiveButton(
-                          onPressed: confirmLogout,
-                          label: s.logOutBtn,
-                          color: Colors.redAccent,
-                          textColor: Colors.redAccent,
-                          style: AdaptiveButtonStyle.glass,
-                          size: AdaptiveButtonSize.large,
-                          borderRadius: BorderRadius.circular(11),
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              else
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 44,
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: onSurface,
-                            side: BorderSide(color: onSurface.withOpacity(0.2)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(11),
-                            ),
-                          ),
-                          child: Text(
-                            s.cancel,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: SizedBox(
-                        height: 44,
-                        child: ElevatedButton(
-                          onPressed: confirmLogout,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.redAccent,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(11),
-                            ),
-                          ),
-                          child: Text(
-                            s.logOutBtn,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
+      title: s.logOut,
+      message: s.logOutConfirm,
+      actions: [
+        AlertAction(
+          title: s.cancel,
+          onPressed: () {},
+          style: AlertActionStyle.cancel,
         ),
-      ),
+        AlertAction(
+          title: s.logOutBtn,
+          onPressed: confirmLogout,
+          style: AlertActionStyle.destructive,
+        ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gradientColors = isDark
-        ? [const Color(0xFF3D1800), const Color(0xFF1F0000)]
-        : [_gradientStart, _gradientEnd];
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
-      // adaptive_platform_ui's native iOS 26 tab bar reads its light/dark
-      // style purely from ambient platformBrightness. The system's real
-      // light-mode Liquid Glass renders pale/washed out on our colored
-      // gradient, while the dark variant reads as noticeably more contrasty
-      // glass on either background — so force the tab bar (built directly
-      // by AdaptiveScaffold, outside `body`) to always use the dark style,
-      // then restore the *real* app brightness just for `body` so every
-      // other native control (switch, dialogs, buttons) still follows the
-      // actual selected theme correctly.
-      child: MediaQuery(
-        data: MediaQuery.of(
-          context,
-        ).copyWith(platformBrightness: Brightness.dark),
-        // AdaptiveScaffold has no extendBody knob, so on Android the area
-        // behind its bottomNavigationBar slot falls back to the app's flat
-        // scaffoldBackgroundColor (#121212) instead of continuing the
-        // gradient — that mismatch is what made the floating nav bar look
-        // like it was sitting on a separate, unrelated dark box. Matching
-        // scaffoldBackgroundColor to the gradient's own dark end here
-        // (only for this screen) removes the seam without needing to touch
-        // the shared app theme.
-        child: Theme(
-          data: Theme.of(
-            context,
-          ).copyWith(scaffoldBackgroundColor: gradientColors.last),
-          child: AdaptiveScaffold(
-            body: MediaQuery(
-              data: MediaQuery.of(context).copyWith(
-                platformBrightness: isDark ? Brightness.dark : Brightness.light,
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: gradientColors,
+      child: AdaptiveScaffold(
+        body: SafeArea(
+          bottom: false,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: Column(
+                children: [
+                  const SizedBox(height: 16),
+                  _buildHeader(s),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: IndexedStack(
+                      index: _currentIndex,
+                      children: [
+                        _buildHomeTab(s),
+                        _buildConfirmationsTab(s),
+                        _buildProductionTab(s),
+                        _buildShopTab(s),
+                        const SettingsScreen(),
+                      ],
+                    ),
                   ),
-                ),
-                child: Stack(
-                  children: [
-                    Positioned(top: -70, right: -50, child: _circle(200, 0.07)),
-                    Positioned(top: 80, left: -70, child: _circle(160, 0.05)),
-                    Positioned(
-                      bottom: 160,
-                      right: -40,
-                      child: _circle(130, 0.06),
-                    ),
-                    Positioned(
-                      bottom: -50,
-                      left: -30,
-                      child: _circle(180, 0.05),
-                    ),
-                    SafeArea(
-                      bottom: false,
-                      child: FadeTransition(
-                        opacity: _fadeAnimation,
-                        child: SlideTransition(
-                          position: _slideAnimation,
-                          child: Column(
-                            children: [
-                              const SizedBox(height: 16),
-                              _buildHeader(s),
-                              const SizedBox(height: 16),
-                              Expanded(
-                                child: IndexedStack(
-                                  index: _currentIndex,
-                                  children: [
-                                    _buildHomeTab(s),
-                                    _buildConfirmationsTab(s),
-                                    _buildProductionTab(s),
-                                    _buildShopTab(s),
-                                    const SettingsScreen(),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                ],
               ),
-            ),
-            bottomNavigationBar: AdaptiveBottomNavigationBar(
-              // Labels intentionally empty: icons-only tab bar. adaptive_platform_ui's
-              // AdaptiveNavigationDestination.label is required and doubles as the
-              // native tab's accessibility label, so VoiceOver support is traded
-              // away here too — there's no separate visual/semantic label knob
-              // exposed by the plugin.
-              items: const [
-                AdaptiveNavigationDestination(icon: 'house.fill', label: ''),
-                AdaptiveNavigationDestination(
-                  icon: 'checkmark.seal.fill',
-                  label: '',
-                ),
-                AdaptiveNavigationDestination(
-                  icon: 'shippingbox.fill',
-                  label: '',
-                ),
-                AdaptiveNavigationDestination(icon: 'cart.fill', label: ''),
-                AdaptiveNavigationDestination(icon: 'gear', label: ''),
-              ],
-              selectedIndex: _currentIndex,
-              onTap: _onTabTap,
-              useNativeBottomBar: true,
-              selectedItemColor: _gradientStart,
-              // The tab bar always renders with the forced-dark native style
-              // (see the MediaQuery override above), so its unselected tint
-              // should match that dark chrome regardless of the app's actual
-              // theme — not flip with isDark like the rest of the screen.
-              unselectedItemColor: Colors.white.withOpacity(0.75),
-              // Android has no native Liquid Glass UITabBar to fall back to, so
-              // it keeps our own hand-rolled glass bar. On iOS this is ignored
-              // by the package anyway, so skip building it — an unused
-              // CustomPaint + AnimatedBuilder tree sitting next to the real
-              // native tab bar's platform view is exactly the kind of thing
-              // that can confuse the semantics tree.
-              bottomNavigationBar: Platform.isIOS ? null : _buildBottomNav(s),
             ),
           ),
+        ),
+        bottomNavigationBar: AdaptiveBottomNavigationBar(
+          // Labels intentionally empty: icons-only tab bar. adaptive_platform_ui's
+          // AdaptiveNavigationDestination.label is required and doubles as the
+          // native tab's accessibility label, so VoiceOver support is traded
+          // away here too — there's no separate visual/semantic label knob
+          // exposed by the plugin.
+          items: const [
+            AdaptiveNavigationDestination(icon: 'house.fill', label: ''),
+            AdaptiveNavigationDestination(
+              icon: 'checkmark.seal.fill',
+              label: '',
+            ),
+            AdaptiveNavigationDestination(icon: 'shippingbox.fill', label: ''),
+            AdaptiveNavigationDestination(icon: 'cart.fill', label: ''),
+            AdaptiveNavigationDestination(icon: 'gear', label: ''),
+          ],
+          selectedIndex: _currentIndex,
+          onTap: _onTabTap,
+          useNativeBottomBar: true,
+          selectedItemColor: _gradientStart,
+          // Native tab bar now follows the app's real (light) theme instead
+          // of being forced dark — leave the unselected tint unset so it
+          // picks up the platform's own light-mode default.
+          unselectedItemColor: null,
+          // Android has no native Liquid Glass UITabBar to fall back to, so
+          // it keeps our own hand-rolled bar. On iOS this is ignored by the
+          // package anyway, so skip building it — an unused CustomPaint +
+          // AnimatedBuilder tree sitting next to the real native tab bar's
+          // platform view is exactly the kind of thing that can confuse the
+          // semantics tree.
+          bottomNavigationBar: Platform.isIOS ? null : _buildBottomNav(s),
         ),
       ),
     );
@@ -579,7 +411,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: Image.asset(
-              'assets/icon/uztexpro.png',
+              'assets/icon/logo.png',
               width: 36,
               height: 36,
               fit: BoxFit.cover,
@@ -594,7 +426,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 const Text(
                   'UztexPro',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF1C1C1E),
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.2,
@@ -608,8 +440,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                       : Text(
                           s.paymentSystem,
                           key: const ValueKey('subtitle'),
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.65),
+                          style: const TextStyle(
+                            color: Color(0xFF8A8A8E),
                             fontSize: 11,
                           ),
                           maxLines: 1,
@@ -640,21 +472,24 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   Widget _buildAiButton() {
     if (Platform.isIOS) {
       return SizedBox(
-        width: 36,
-        height: 36,
+        width: 40,
+        height: 40,
         child: AdaptiveButton.icon(
           onPressed: _openAiAssistant,
           icon: Icons.auto_awesome_rounded,
-          iconColor: Colors.white,
-          color: Colors.white,
+          iconColor: const Color(0xFF1C1C1E),
+          color: const Color(0xFF1C1C1E),
           style: AdaptiveButtonStyle.glass,
           size: AdaptiveButtonSize.medium,
-          borderRadius: BorderRadius.circular(10),
-          minSize: const Size(36, 36),
+          useSmoothRectangleBorder: false,
+          minSize: const Size(40, 40),
         ),
       );
     }
 
+    // Android has no native Liquid Glass material, so this approximates it:
+    // a neutral frosted-looking circle with a standard dark glyph — same
+    // visual language as the real glass button (neutral material, no color).
     return Material(
       color: Colors.transparent,
       shape: const CircleBorder(),
@@ -662,18 +497,17 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       child: InkWell(
         onTap: _openAiAssistant,
         child: Container(
-          width: 36,
-          height: 36,
+          width: 40,
+          height: 40,
           alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.18),
+          decoration: const BoxDecoration(
+            color: Color(0xFFF2F2F2),
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withOpacity(0.3)),
           ),
           child: const Icon(
             Icons.auto_awesome_rounded,
-            color: Colors.white,
-            size: 18,
+            color: Color(0xFF1C1C1E),
+            size: 20,
           ),
         ),
       ),
@@ -696,14 +530,14 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   Widget _headerRateChip(String symbol, String rate, bool isUp) {
-    final trendColor = isUp ? const Color(0xFF69F0AE) : const Color(0xFFFF8A80);
+    final trendColor = isUp ? const Color(0xFF2E9E5B) : const Color(0xFFE0453C);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           symbol,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.55),
+          style: const TextStyle(
+            color: Color(0xFF8A8A8E),
             fontSize: 10,
             fontWeight: FontWeight.w700,
           ),
@@ -712,7 +546,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         Text(
           rate,
           style: const TextStyle(
-            color: Colors.white,
+            color: Color(0xFF1C1C1E),
             fontSize: 11,
             fontWeight: FontWeight.w700,
           ),
@@ -734,25 +568,21 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
     if (Platform.isIOS) {
       return SizedBox(
-        width: 36,
-        height: 36,
+        width: 40,
+        height: 40,
         child: AdaptiveButton.icon(
           onPressed: onPressed,
           icon: Icons.logout_rounded,
-          iconColor: Colors.redAccent,
-          color: Colors.redAccent,
+          iconColor: const Color(0xFF1C1C1E),
+          color: const Color(0xFF1C1C1E),
           style: AdaptiveButtonStyle.glass,
           size: AdaptiveButtonSize.medium,
-          borderRadius: BorderRadius.circular(10),
-          minSize: const Size(36, 36),
+          useSmoothRectangleBorder: false,
+          minSize: const Size(40, 40),
         ),
       );
     }
 
-    // A translucent-red circle on the header's own orange-red gradient had
-    // almost no contrast (red on red). The header's other chips/badges are
-    // all white-tinted glass on that same gradient, so match that instead —
-    // it's legible and it's already this screen's established language.
     return Material(
       color: Colors.transparent,
       shape: const CircleBorder(),
@@ -760,18 +590,17 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       child: InkWell(
         onTap: onPressed,
         child: Container(
-          width: 36,
-          height: 36,
+          width: 40,
+          height: 40,
           alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.18),
+          decoration: const BoxDecoration(
+            color: Color(0xFFF2F2F2),
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withOpacity(0.3)),
           ),
           child: const Icon(
             Icons.logout_rounded,
-            color: Colors.white,
-            size: 18,
+            color: Color(0xFF1C1C1E),
+            size: 20,
           ),
         ),
       ),
@@ -788,7 +617,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     return Text(
       title,
       style: const TextStyle(
-        color: Colors.white,
+        color: Color(0xFF1C1C1E),
         fontSize: 20,
         fontWeight: FontWeight.w800,
       ),
@@ -800,7 +629,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   Widget _buildHomeTab(S s) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -808,10 +637,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           const SizedBox(height: 4),
           Text(
             s.paymentSystem,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.65),
-              fontSize: 13,
-            ),
+            style: const TextStyle(color: Color(0xFF8A8A8E), fontSize: 13),
           ),
           if (_hasFullAccess &&
               !_dashOverviewUnavailable &&
@@ -838,41 +664,35 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   // `StaggerIn`/`_CountUpText`, which both check the platform accessibility
   // flag and skip straight to the end state.
 
-  BoxDecoration _glassDecoration({
-    double radius = 16,
-    double borderOpacity = 0.22,
-    List<BoxShadow>? shadow,
-  }) {
+  BoxDecoration _cardDecoration({double radius = 16, List<BoxShadow>? shadow}) {
     return BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Colors.white.withOpacity(0.19),
-          Colors.white.withOpacity(0.08),
-        ],
-      ),
+      color: Colors.white,
       borderRadius: BorderRadius.circular(radius),
-      border: Border.all(
-        color: Colors.white.withOpacity(borderOpacity),
-        width: 1,
-      ),
-      boxShadow: shadow,
+      border: Border.all(color: const Color(0xFFEDEDED), width: 1),
+      boxShadow:
+          shadow ??
+          [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
     );
   }
 
   Widget _dashSectionHeader(IconData icon, String text) {
     return Row(
       children: [
-        Icon(icon, size: 13, color: Colors.white.withOpacity(0.55)),
+        Icon(icon, size: 13, color: const Color(0xFF8A8A8E)),
         const SizedBox(width: 6),
         Text(
           text.toUpperCase(),
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.2,
-            color: Colors.white.withOpacity(0.55),
+            color: Color(0xFF8A8A8E),
           ),
         ),
       ],
@@ -880,8 +700,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   Widget _dashSkeletonBlock() {
-    final base = Colors.white.withOpacity(0.10);
-    final hi = Colors.white.withOpacity(0.24);
+    final base = const Color(0xFFEDEDED);
+    final hi = const Color(0xFFF8F8F8);
     Widget block({double height = 92, double? width}) => Container(
       height: height,
       width: width,
@@ -956,12 +776,18 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             delay: const Duration(milliseconds: 160),
             child: SizedBox(
               height: 118,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: productions.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 10),
-                itemBuilder: (_, i) => _dashProductionCard(productions[i], s),
+              child: LayoutBuilder(
+                builder: (_, constraints) {
+                  final cardWidth = _dashCardWidth(constraints.maxWidth);
+                  return ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: productions.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 10),
+                    itemBuilder: (_, i) =>
+                        _dashProductionCard(productions[i], s, cardWidth),
+                  );
+                },
               ),
             ),
           ),
@@ -980,12 +806,18 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             delay: const Duration(milliseconds: 220),
             child: SizedBox(
               height: 118,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: factories.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 10),
-                itemBuilder: (_, i) => _dashFactoryCard(factories[i], s),
+              child: LayoutBuilder(
+                builder: (_, constraints) {
+                  final cardWidth = _dashCardWidth(constraints.maxWidth);
+                  return ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: factories.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 10),
+                    itemBuilder: (_, i) =>
+                        _dashFactoryCard(factories[i], s, cardWidth),
+                  );
+                },
               ),
             ),
           ),
@@ -1004,11 +836,11 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      decoration: _glassDecoration(
+      decoration: _cardDecoration(
         radius: 22,
         shadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.14),
+            color: Colors.black.withOpacity(0.06),
             blurRadius: 22,
             offset: const Offset(0, 10),
           ),
@@ -1035,14 +867,14 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                         size: const Size(84, 84),
                         painter: _RingPainter(
                           progress: value,
-                          trackColor: Colors.white.withOpacity(0.16),
-                          colors: const [Color(0xFFFFE08A), Color(0xFFFF8C42)],
+                          trackColor: const Color(0xFFEDEDED),
+                          colors: const [_gradientStart, _gradientEnd],
                         ),
                       ),
                       Text(
                         '${(value * 100).round()}%',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: Color(0xFF1C1C1E),
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
                         ),
@@ -1058,11 +890,11 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   children: [
                     Text(
                       s.dashboardInTerritory.toUpperCase(),
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 1.1,
-                        color: Colors.white.withOpacity(0.6),
+                        color: Color(0xFF8A8A8E),
                       ),
                     ),
                     const SizedBox(height: 5),
@@ -1073,7 +905,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                         _CountUpText(
                           target: onSite.toDouble(),
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: Color(0xFF1C1C1E),
                             fontSize: 24,
                             fontWeight: FontWeight.w800,
                             height: 1,
@@ -1081,8 +913,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                         ),
                         Text(
                           ' / $total',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.55),
+                          style: const TextStyle(
+                            color: Color(0xFF8A8A8E),
                             fontSize: 13.5,
                             fontWeight: FontWeight.w600,
                           ),
@@ -1096,13 +928,13 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                         vertical: 3.5,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.14),
+                        color: _gradientStart.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         s.dashboardOutOf(total),
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
+                          color: _gradientEnd,
                           fontSize: 9.5,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1114,7 +946,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             ],
           ),
           const SizedBox(height: 14),
-          Container(height: 1, color: Colors.white.withOpacity(0.14)),
+          Container(height: 1, color: const Color(0xFFEDEDED)),
           const SizedBox(height: 12),
           // Two secondary metrics tucked into the hero card itself instead
           // of a card of their own — keeps the section to three visual
@@ -1134,7 +966,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 Container(
                   width: 1,
                   margin: const EdgeInsets.symmetric(horizontal: 13),
-                  color: Colors.white.withOpacity(0.16),
+                  color: const Color(0xFFEDEDED),
                 ),
                 Expanded(
                   child: _dashCompactStat(
@@ -1194,7 +1026,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     _CountUpText(
                       target: numericValue,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: Color(0xFF1C1C1E),
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
                       ),
@@ -1202,8 +1034,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     if (suffix.isNotEmpty)
                       Text(
                         suffix,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
+                        style: const TextStyle(
+                          color: Color(0xFF8A8A8E),
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                         ),
@@ -1216,7 +1048,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF1C1C1E),
                     fontSize: 13.5,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1225,8 +1057,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.55),
+                style: const TextStyle(
+                  color: Color(0xFF8A8A8E),
                   fontSize: 9.5,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.1,
@@ -1239,7 +1071,19 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _dashProductionCard(Map<String, dynamic> prod, S s) {
+  static const double _dashCardSpacing = 10;
+
+  // Sizes the horizontally-scrolling production/factory cards to exactly
+  // fill the section with 2 whole cards (plus the separator between them).
+  // A fractional divisor left a sliver of a third card poking out at the
+  // trailing edge at rest, which read as a half-cut, unfinished-looking
+  // block rather than an intentional "swipe for more" hint — sizing for an
+  // exact fit removes that leftover peek; scrolling still reveals further
+  // cards normally.
+  double _dashCardWidth(double availableWidth) =>
+      ((availableWidth - _dashCardSpacing) / 2).clamp(130.0, 200.0);
+
+  Widget _dashProductionCard(Map<String, dynamic> prod, S s, double width) {
     final planned = (prod['planned'] as num?)?.toDouble() ?? 0;
     final actual = (prod['actual'] as num?)?.toDouble() ?? 0;
     final planPercent = (prod['plan_percent'] as num?)?.toDouble() ?? 0;
@@ -1257,9 +1101,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     ).format(v);
 
     return Container(
-      width: 118,
+      width: width,
       clipBehavior: Clip.antiAlias,
-      decoration: _glassDecoration(radius: 14),
+      decoration: _cardDecoration(radius: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1283,7 +1127,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: Color(0xFF1C1C1E),
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -1293,8 +1137,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                                 unit,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.5),
+                                style: const TextStyle(
+                                  color: Color(0xFF8A8A8E),
                                   fontSize: 8.5,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -1324,8 +1168,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     children: [
                       Text(
                         '$pct%',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
+                        style: const TextStyle(
+                          color: Color(0xFF8A8A8E),
                           fontSize: 9.5,
                         ),
                       ),
@@ -1361,7 +1205,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _dashFactoryCard(Map<String, dynamic> f, S s) {
+  Widget _dashFactoryCard(Map<String, dynamic> f, S s, double width) {
     final name = f['name']?.toString() ?? '';
     final employeeCount = (f['employee_count'] as num?)?.toInt() ?? 0;
     final entered = (f['today_total_enter'] as num?)?.toInt() ?? 0;
@@ -1374,9 +1218,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     final color = good ? const Color(0xFF34D399) : const Color(0xFFFB7185);
 
     return Container(
-      width: 122,
+      width: width,
       clipBehavior: Clip.antiAlias,
-      decoration: _glassDecoration(radius: 14),
+      decoration: _cardDecoration(radius: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1395,7 +1239,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: Color(0xFF1C1C1E),
                             fontSize: 11.5,
                             fontWeight: FontWeight.w800,
                           ),
@@ -1431,8 +1275,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   const Spacer(),
                   Text(
                     '$pct%',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
+                    style: const TextStyle(
+                      color: Color(0xFF8A8A8E),
                       fontSize: 9.5,
                     ),
                   ),
@@ -1455,9 +1299,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         children: [
           TextSpan(
             text: '$label ',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 9.5,
-              color: Colors.white.withOpacity(0.55),
+              color: Color(0xFF8A8A8E),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1465,7 +1309,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             text: value,
             style: TextStyle(
               fontSize: 10.5,
-              color: Colors.white.withOpacity(emphasize ? 1 : 0.85),
+              color: emphasize
+                  ? const Color(0xFF1C1C1E)
+                  : const Color(0xFF636366),
               fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600,
             ),
           ),
@@ -1482,7 +1328,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           Container(
             height: 5,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
+              color: const Color(0xFFEDEDED),
               borderRadius: BorderRadius.circular(3),
             ),
           ),
@@ -1736,15 +1582,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       ),
     );
   }
-
-  Widget _circle(double size, double opacity) => Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      color: Colors.white.withOpacity(opacity),
-    ),
-  );
 }
 
 /// Animates from 0 up to [target] once on mount, formatted with thousands
@@ -1900,24 +1737,22 @@ class _MenuCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const brandOrange = AppColors.brandOrange;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        splashColor: Colors.white.withOpacity(0.1),
+        splashColor: brandOrange.withOpacity(0.08),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 18),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.13),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.22),
-              width: 1.2,
-            ),
+            border: Border.all(color: const Color(0xFFEDEDED), width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.08),
+                color: Colors.black.withOpacity(0.05),
                 blurRadius: 8,
                 offset: const Offset(0, 3),
               ),
@@ -1929,10 +1764,10 @@ class _MenuCard extends StatelessWidget {
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.18),
+                  color: brandOrange.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: Colors.white, size: 24),
+                child: Icon(icon, color: brandOrange, size: 24),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -1942,7 +1777,7 @@ class _MenuCard extends StatelessWidget {
                     Text(
                       label,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: Color(0xFF1C1C1E),
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1950,17 +1785,17 @@ class _MenuCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       description,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.65),
+                      style: const TextStyle(
+                        color: Color(0xFF8A8A8E),
                         fontSize: 12,
                       ),
                     ),
                   ],
                 ),
               ),
-              Icon(
+              const Icon(
                 Icons.arrow_forward_ios_rounded,
-                color: Colors.white.withOpacity(0.6),
+                color: Color(0xFFC7C7CC),
                 size: 14,
               ),
             ],
@@ -1980,22 +1815,22 @@ class _NoAccessCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.10),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.20), width: 1.2),
+        border: Border.all(color: const Color(0xFFEDEDED), width: 1.2),
       ),
       child: Column(
         children: [
           Container(
             width: 64,
             height: 64,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF2F2F2),
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.lock_outline_rounded,
-              color: Colors.white,
+              color: Color(0xFF8A8A8E),
               size: 30,
             ),
           ),
@@ -2003,7 +1838,7 @@ class _NoAccessCard extends StatelessWidget {
           Text(
             S.of(context).accessRestricted,
             style: const TextStyle(
-              color: Colors.white,
+              color: Color(0xFF1C1C1E),
               fontSize: 17,
               fontWeight: FontWeight.bold,
             ),
@@ -2012,8 +1847,8 @@ class _NoAccessCard extends StatelessWidget {
           Text(
             S.of(context).noAccessMessage,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.65),
+            style: const TextStyle(
+              color: Color(0xFF8A8A8E),
               fontSize: 13,
               height: 1.5,
             ),

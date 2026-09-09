@@ -475,6 +475,18 @@ class S {
     'uz': 'Iltimos, kuting...',
   });
 
+  String get loginSuccessTitle => _t({
+    'ru': 'Вход выполнен',
+    'en': 'Signed in',
+    'uz': 'Kirish bajarildi',
+  });
+
+  String get loginSuccessSubtitle => _t({
+    'ru': 'Загрузка рабочего пространства',
+    'en': 'Loading your workspace',
+    'uz': 'Ish maydoni yuklanmoqda',
+  });
+
   String get welcome =>
       _t({'ru': 'Добро пожаловать', 'en': 'Welcome', 'uz': 'Xush kelibsiz'});
 
@@ -501,6 +513,12 @@ class S {
     'ru': 'Использовать отпечаток пальца для входа',
     'en': 'Use fingerprint to sign in',
     'uz': 'Kirish uchun barmoq izidan foydalaning',
+  });
+
+  String get useFaceId => _t({
+    'ru': 'Использовать Face ID для входа',
+    'en': 'Use Face ID to sign in',
+    'uz': 'Kirish uchun Face ID dan foydalaning',
   });
 
   String get signInBiometric => _t({

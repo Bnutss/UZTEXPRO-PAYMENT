@@ -5,9 +5,12 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:uztexpro_payment/main.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/adaptive_back_button.dart';
 import 'pass_detail_page.dart';
 
 const _kPassPath = 'common/pass';
@@ -103,8 +106,7 @@ class PassesPage extends StatefulWidget {
 
 class _PassesPageState extends State<PassesPage>
     with SingleTickerProviderStateMixin {
-  static const Color _g1 = Color(0xFFFF8C00);
-  static const Color _g2 = Color(0xFFCC1500);
+  static const Color _g1 = AppColors.brandOrange;
 
   static const String _kStage = 'stage';
   static const String _kMy = 'my';
@@ -383,23 +385,54 @@ class _PassesPageState extends State<PassesPage>
 
   Future<void> _onApprove(Map<String, dynamic> pass) async {
     final number = pass['number']?.toString() ?? '';
-    final ok = await _confirmDialog(
-      icon: Icons.check_circle_outline_rounded,
-      iconColor: const Color(0xFF43A047),
+    await AdaptiveAlertDialog.show(
+      context: context,
       title: S.of(context).confirmPass,
       message: S.of(context).confirmPassNumber(number),
-      confirmLabel: S.of(context).confirm,
-      confirmColor: const Color(0xFF43A047),
+      icon: PlatformInfo.isIOS26OrHigher()
+          ? 'checkmark.circle.fill'
+          : Icons.check_circle_outline_rounded,
+      iconColor: const Color(0xFF43A047),
+      actions: [
+        AlertAction(
+          title: S.of(context).cancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+        AlertAction(
+          title: S.of(context).confirm,
+          style: AlertActionStyle.primary,
+          onPressed: () => _doSign(pass, 'approve'),
+        ),
+      ],
     );
-    if (!ok) return;
-    await _doSign(pass, 'approve');
   }
 
   Future<void> _onReject(Map<String, dynamic> pass) async {
     final number = pass['number']?.toString() ?? '';
-    final comment = await showDialog<String>(
+    final comment = await AdaptiveAlertDialog.inputShow(
       context: context,
-      builder: (_) => _RejectDialog(number: number),
+      title: S.of(context).rejectPass,
+      message: number,
+      icon: PlatformInfo.isIOS26OrHigher()
+          ? 'xmark.circle.fill'
+          : Icons.cancel_outlined,
+      iconColor: Colors.red,
+      input: AdaptiveAlertDialogInput(
+        placeholder: S.of(context).rejectionReasonHint,
+      ),
+      actions: [
+        AlertAction(
+          title: S.of(context).cancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+        AlertAction(
+          title: S.of(context).reject,
+          style: AlertActionStyle.destructive,
+          onPressed: () {},
+        ),
+      ],
     );
     if (comment == null) return;
     await _doSign(pass, 'reject', comment: comment);
@@ -407,16 +440,27 @@ class _PassesPageState extends State<PassesPage>
 
   Future<void> _onCancel(Map<String, dynamic> pass) async {
     final number = pass['number']?.toString() ?? '';
-    final ok = await _confirmDialog(
-      icon: Icons.cancel_outlined,
-      iconColor: Colors.grey.shade600,
+    await AdaptiveAlertDialog.show(
+      context: context,
       title: S.of(context).cancelPass,
       message: S.of(context).cancelPassMessage(number),
-      confirmLabel: S.of(context).cancelBtn,
-      confirmColor: Colors.grey.shade600,
+      icon: PlatformInfo.isIOS26OrHigher()
+          ? 'xmark.circle.fill'
+          : Icons.cancel_outlined,
+      iconColor: Colors.grey.shade600,
+      actions: [
+        AlertAction(
+          title: S.of(context).cancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+        AlertAction(
+          title: S.of(context).cancelBtn,
+          style: AlertActionStyle.destructive,
+          onPressed: () => _doSign(pass, 'cancel'),
+        ),
+      ],
     );
-    if (!ok) return;
-    await _doSign(pass, 'cancel');
   }
 
   Future<void> _doSign(
@@ -474,129 +518,11 @@ class _PassesPageState extends State<PassesPage>
     }
   }
 
-  // ── Dialogs ──────────────────────────────────────────────────────────────────
-
-  Future<bool> _confirmDialog({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String message,
-    required String confirmLabel,
-    required Color confirmColor,
-  }) async {
-    final surface = Theme.of(context).colorScheme.surface;
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: iconColor, size: 28),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: onSurface,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: onSurface.withOpacity(0.6),
-                ),
-              ),
-              const SizedBox(height: 22),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(ctx).pop(false),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        side: BorderSide(color: onSurface.withOpacity(0.2)),
-                      ),
-                      child: Text(
-                        S.of(context).cancel,
-                        style: TextStyle(
-                          color: onSurface.withOpacity(0.7),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.of(ctx).pop(true),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: confirmColor,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        confirmLabel,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    return result ?? false;
-  }
-
   void _snack(String msg, bool ok) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              ok ? Icons.check_circle : Icons.error,
-              color: Colors.white,
-              size: 16,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                msg,
-                style: const TextStyle(fontWeight: FontWeight.w500),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: ok ? const Color(0xFF43A047) : const Color(0xFFD32F2F),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      ),
+    AdaptiveSnackBar.show(
+      context,
+      message: msg,
+      type: ok ? AdaptiveSnackBarType.success : AdaptiveSnackBarType.error,
     );
   }
 
@@ -606,37 +532,32 @@ class _PassesPageState extends State<PassesPage>
   Widget build(BuildContext context) {
     final s = S.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gradColors = isDark
-        ? [const Color(0xFF3D1800), const Color(0xFF1F0000)]
-        : [_g1, _g2];
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
       child: Scaffold(
-        extendBodyBehindAppBar: true,
         appBar: AppBar(
+          leading: const Center(child: AdaptiveBackButton()),
           title: Text(
             s.menuPasses,
             style: const TextStyle(
-              color: Colors.white,
+              color: Color(0xFF1C1C1E),
               fontWeight: FontWeight.bold,
               fontSize: 18,
             ),
           ),
           centerTitle: false,
-          systemOverlayStyle: const SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-            statusBarIconBrightness: Brightness.light,
-            statusBarBrightness: Brightness.dark,
-          ),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          iconTheme: const IconThemeData(color: Colors.white),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF1C1C1E),
+          elevation: 0.5,
+          shadowColor: Colors.black12,
           actions: [
+            // Refreshing indicator only — the manual refresh button was
+            // redundant now that the list already supports pull-to-refresh.
             if (_refreshing)
               const Padding(
                 padding: EdgeInsets.only(right: 16),
@@ -646,39 +567,20 @@ class _PassesPageState extends State<PassesPage>
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(Colors.white70),
+                      valueColor: AlwaysStoppedAnimation(Color(0xFF8A8A8E)),
                     ),
                   ),
                 ),
-              )
-            else
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-                onPressed: _isLoading ? null : _invalidateAndLoad,
               ),
           ],
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: gradColors,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-          ),
         ),
         body: Column(
           children: [
             Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: gradColors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
+              color: Colors.white,
               child: SafeArea(
                 bottom: false,
+                top: false,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
                   child: Row(
@@ -704,7 +606,7 @@ class _PassesPageState extends State<PassesPage>
             Container(
               color: isDark
                   ? Theme.of(context).colorScheme.surface
-                  : const Color(0xFFF4F4F4),
+                  : AppColors.groupedBackground,
               padding: const EdgeInsets.only(top: 6, bottom: 8),
               child: _StatusFilterRow(
                 selected: _statusFilter,
@@ -722,7 +624,7 @@ class _PassesPageState extends State<PassesPage>
               child: Container(
                 color: isDark
                     ? Theme.of(context).colorScheme.surface
-                    : const Color(0xFFF4F4F4),
+                    : AppColors.groupedBackground,
                 child: _buildBody(isDark),
               ),
             ),
@@ -767,14 +669,34 @@ class _PassesPageState extends State<PassesPage>
                 ),
               ),
               const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: _invalidateAndLoad,
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: Text(s.refresh),
-                style: FilledButton.styleFrom(
-                  backgroundColor: _g1,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              // minSize is required here: the real native iOS 26 button (see
+              // `.child` mode) has no way to report its UIKit content size
+              // back to Flutter's layout, so without an explicit width it
+              // would stretch to fill this Column's full loose width instead
+              // of hugging the icon+label like a normal button.
+              SizedBox(
+                width: 160,
+                height: 46,
+                child: AdaptiveButton.child(
+                  onPressed: _invalidateAndLoad,
+                  style: AdaptiveButtonStyle.filled,
+                  color: _g1,
+                  borderRadius: BorderRadius.circular(12),
+                  minSize: const Size(160, 46),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.refresh_rounded,
+                        size: 18,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        s.refresh,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -896,145 +818,6 @@ class _PassesPageState extends State<PassesPage>
               borderRadius: BorderRadius.circular(16),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Reject dialog as StatefulWidget (fixes TextEditingController disposal) ───
-
-class _RejectDialog extends StatefulWidget {
-  final String number;
-  const _RejectDialog({required this.number});
-
-  @override
-  State<_RejectDialog> createState() => _RejectDialogState();
-}
-
-class _RejectDialogState extends State<_RejectDialog> {
-  final _ctrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final surface = Theme.of(context).colorScheme.surface;
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Dialog(
-      backgroundColor: surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.cancel_outlined,
-                color: Colors.red,
-                size: 28,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              S.of(context).rejectPass,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: onSurface,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              widget.number,
-              style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.5)),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _ctrl,
-              maxLines: 3,
-              autofocus: true,
-              style: TextStyle(fontSize: 14, color: onSurface),
-              decoration: InputDecoration(
-                hintText: S.of(context).rejectionReasonHint,
-                hintStyle: TextStyle(
-                  color: onSurface.withOpacity(0.4),
-                  fontSize: 13,
-                ),
-                filled: true,
-                fillColor: isDark ? Colors.white10 : Colors.grey.shade50,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: onSurface.withOpacity(0.15)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: onSurface.withOpacity(0.15)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.red, width: 1.5),
-                ),
-                contentPadding: const EdgeInsets.all(12),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(null),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      side: BorderSide(color: onSurface.withOpacity(0.2)),
-                    ),
-                    child: Text(
-                      S.of(context).cancel,
-                      style: TextStyle(
-                        color: onSurface.withOpacity(0.7),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () =>
-                        Navigator.of(context).pop(_ctrl.text.trim()),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text(
-                      S.of(context).reject,
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
         ),
       ),
     );
@@ -1287,7 +1070,6 @@ class _SignButtons extends StatelessWidget {
           label: _approveLabel(context),
           icon: Icons.check_rounded,
           color: const Color(0xFF43A047),
-          bgColor: const Color(0xFFE8F5E9),
           isDark: isDark,
           onTap: onApprove,
         ),
@@ -1296,7 +1078,6 @@ class _SignButtons extends StatelessWidget {
           label: S.of(context).reject,
           icon: Icons.close_rounded,
           color: const Color(0xFFE53935),
-          bgColor: const Color(0xFFFFEBEE),
           isDark: isDark,
           onTap: onReject,
         ),
@@ -1316,7 +1097,6 @@ class _CancelButton extends StatelessWidget {
       label: S.of(context).cancelPass,
       icon: Icons.cancel_outlined,
       color: Colors.grey.shade600,
-      bgColor: Colors.grey.shade100,
       isDark: isDark,
       onTap: onCancel,
     );
@@ -1327,7 +1107,6 @@ class _ActionBtn extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color color;
-  final Color bgColor;
   final bool isDark;
   final VoidCallback onTap;
 
@@ -1335,41 +1114,37 @@ class _ActionBtn extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.color,
-    required this.bgColor,
     required this.isDark,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
+    return SizedBox(
+      width: double.infinity,
+      child: AdaptiveButton.child(
+        onPressed: onTap,
+        style: AdaptiveButtonStyle.tinted,
+        color: color,
         borderRadius: BorderRadius.circular(10),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-          decoration: BoxDecoration(
-            color: isDark ? color.withOpacity(0.15) : bgColor,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: color.withOpacity(isDark ? 0.35 : 0.3)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: color, size: 15),
-              const SizedBox(width: 6),
-              Text(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 15),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
                 label,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: color,
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1559,9 +1334,8 @@ class _ViewToggle extends StatelessWidget {
     return Container(
       height: 34,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: const Color(0xFFF2F2F2),
         borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1603,15 +1377,22 @@ class _VTab extends StatelessWidget {
         decoration: BoxDecoration(
           color: active ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
+          boxShadow: active
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: active
-                ? const Color(0xFFCC1500)
-                : Colors.white.withOpacity(0.8),
+            color: active ? AppColors.brandRed : const Color(0xFF8A8A8E),
           ),
         ),
       ),
@@ -1821,16 +1602,15 @@ class _CountBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
+        color: AppColors.brandOrange.withOpacity(0.12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.35), width: 1),
       ),
       child: Text(
         '$count',
         style: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
-          color: Colors.white,
+          color: AppColors.brandRed,
         ),
       ),
     );

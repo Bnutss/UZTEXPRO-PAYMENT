@@ -9,6 +9,8 @@ import 'package:uztexpro_payment/features/home/menu_page.dart';
 import 'package:uztexpro_payment/main.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
+import '../../core/theme/app_colors.dart';
+import 'widgets/brand_transition_screen.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -31,10 +33,10 @@ class _LoginPageState extends State<LoginPage>
   bool isPasswordVisible = false;
   bool _canCheckBiometrics = false;
   bool _useBiometrics = false;
+  bool _showSuccessTransition = false;
 
-  final Color primaryColor = const Color(0xFFFF8C00);
-  final Color secondaryColor = const Color(0xFFCC1500);
-  final Color accentColor = const Color(0xFF6A1B9A);
+  final Color primaryColor = AppColors.brandOrange;
+  final Color secondaryColor = AppColors.brandRed;
 
   @override
   void initState() {
@@ -96,13 +98,6 @@ class _LoginPageState extends State<LoginPage>
     });
   }
 
-  Future<void> toggleBiometricPreference(bool value) async {
-    setState(() {
-      _useBiometrics = value;
-    });
-    await storage.write(key: 'useBiometrics', value: value.toString());
-  }
-
   Future<bool> authenticateWithBiometrics() async {
     try {
       return await auth.authenticate(
@@ -157,7 +152,7 @@ class _LoginPageState extends State<LoginPage>
         var jwt = await attemptLogIn(username, password);
         if (jwt != null) {
           await storage.write(key: "jwt", value: jwt);
-          _navigateToMainPage(jwt);
+          await _completeLogin(jwt);
         } else {
           setState(() => isLoading = false);
           _showSnackBar(s.loginError);
@@ -180,6 +175,20 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
+  // Shows the branded success transition instead of jumping straight to the
+  // main screen after a successful login (mirrors the web app's post-signin
+  // BrandLoadingScreen transition).
+  Future<void> _completeLogin(String jwt) async {
+    if (!mounted) return;
+    setState(() {
+      isLoading = false;
+      _showSuccessTransition = true;
+    });
+    await Future.delayed(const Duration(milliseconds: 900));
+    if (!mounted) return;
+    _navigateToMainPage(jwt);
+  }
+
   @override
   void dispose() {
     _animationController.dispose();
@@ -195,68 +204,22 @@ class _LoginPageState extends State<LoginPage>
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
-      // Same reasoning as MenuPage's tab bar: the native iOS 26 Liquid Glass
-      // buttons/switch on this screen sit on our own vivid orange/red
-      // gradient, and the system's real light-mode glass reads as washed
-      // out on it. Nothing else on this screen depends on the real
-      // light/dark brightness, so it's safe to force the more contrasty
-      // dark glass style everywhere here.
-      child: MediaQuery(
-        data: MediaQuery.of(
-          context,
-        ).copyWith(platformBrightness: Brightness.dark),
-        child: Scaffold(
-          body: isLoading ? _buildLoadingView(s) : _buildLoginView(s),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoadingView(S s) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? [const Color(0xFF3D1800), const Color(0xFF1F0000)]
-              : [const Color(0xFFFF8C00), const Color(0xFFCC1500)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      child: Scaffold(
+        body: Stack(
           children: [
-            SizedBox(
-              width: 70,
-              height: 70,
-              child: CircularProgressIndicator(
-                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                backgroundColor: Colors.white.withOpacity(0.2),
-                strokeWidth: 4,
+            _buildLoginView(s),
+            if (isLoading || _showSuccessTransition)
+              BrandTransitionScreen(
+                title: _showSuccessTransition
+                    ? s.loginSuccessTitle
+                    : s.enterUztexpro,
+                subtitle: _showSuccessTransition
+                    ? s.loginSuccessSubtitle
+                    : s.pleaseWait,
               ),
-            ),
-            const SizedBox(height: 30),
-            Text(
-              s.enterUztexpro,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              s.pleaseWait,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
-                fontSize: 16,
-              ),
-            ),
           ],
         ),
       ),
@@ -264,70 +227,9 @@ class _LoginPageState extends State<LoginPage>
   }
 
   Widget _buildLoginView(S s) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Stack(
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: isDark
-                  ? [const Color(0xFF3D1800), const Color(0xFF1F0000)]
-                  : [const Color(0xFFFF8C00), const Color(0xFFCC1500)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-        Positioned(
-          top: -80,
-          right: -50,
-          child: Container(
-            width: 220,
-            height: 220,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.08),
-            ),
-          ),
-        ),
-        Positioned(
-          top: 120,
-          right: 30,
-          child: Container(
-            width: 70,
-            height: 70,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.06),
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: 60,
-          left: -80,
-          child: Container(
-            width: 250,
-            height: 250,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.07),
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: 180,
-          right: -30,
-          child: Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.05),
-            ),
-          ),
-        ),
-        SafeArea(child: _buildLoginForm(s)),
-      ],
+    return Container(
+      color: AppColors.groupedBackground,
+      child: SafeArea(child: _buildLoginForm(s)),
     );
   }
 
@@ -362,14 +264,6 @@ class _LoginPageState extends State<LoginPage>
                 ),
                 const SizedBox(height: 32),
                 _buildLoginButton(s),
-                if (_canCheckBiometrics) ...[
-                  const SizedBox(height: 20),
-                  _buildBiometricToggle(s),
-                  if (_useBiometrics) ...[
-                    const SizedBox(height: 16),
-                    _buildBiometricLoginButton(s),
-                  ],
-                ],
                 const SizedBox(height: 24),
               ],
             ),
@@ -396,7 +290,7 @@ class _LoginPageState extends State<LoginPage>
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
-        child: Image.asset('assets/icon/uztexpro.png', fit: BoxFit.cover),
+        child: Image.asset('assets/icon/logo.png', fit: BoxFit.cover),
       ),
     );
   }
@@ -409,24 +303,21 @@ class _LoginPageState extends State<LoginPage>
           style: const TextStyle(
             fontSize: 26,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
-            shadows: [
-              Shadow(
-                color: Colors.black26,
-                offset: Offset(0, 1),
-                blurRadius: 4,
-              ),
-            ],
+            color: Color(0xFF1C1C1E),
           ),
         ),
         const SizedBox(height: 8),
         Text(
           s.signInAccount,
-          style: TextStyle(fontSize: 16, color: Colors.white.withOpacity(0.82)),
+          style: const TextStyle(fontSize: 16, color: Color(0xFF8A8A8E)),
         ),
       ],
     );
   }
+
+  static const BorderRadius _fieldRadius = BorderRadius.all(
+    Radius.circular(16),
+  );
 
   Widget _buildTextField({
     required TextEditingController controller,
@@ -434,54 +325,55 @@ class _LoginPageState extends State<LoginPage>
     required String label,
     required bool isPassword,
   }) {
-    return TextField(
+    // AdaptiveTextField's own default look (8pt radius, tight 8pt vertical
+    // padding, no border) reads as cramped and plain next to the rest of
+    // this screen's cards — the widget explicitly exposes decoration/padding
+    // overrides for exactly this, so give it the same white
+    // rounded-and-bordered card language as everything else here instead of
+    // its bare default box.
+    return AdaptiveTextField(
       controller: controller,
       obscureText: isPassword && !isPasswordVisible,
-      style: const TextStyle(fontSize: 16, color: Colors.white),
-      cursorColor: Colors.white,
+      placeholder: label,
+      style: const TextStyle(fontSize: 16, color: Color(0xFF1C1C1E)),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      cupertinoDecoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: _fieldRadius,
+        border: Border.all(color: AppColors.groupedBackground, width: 1),
+      ),
       decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: Colors.white.withOpacity(0.8)),
-        floatingLabelStyle: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w600,
+        hintText: label,
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(
-            color: Colors.white.withOpacity(0.4),
-            width: 1.5,
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Colors.white, width: 2),
+          borderRadius: _fieldRadius,
+          borderSide: const BorderSide(color: AppColors.groupedBackground),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(
-            color: Colors.white.withOpacity(0.4),
-            width: 1.5,
-          ),
+          borderRadius: _fieldRadius,
+          borderSide: const BorderSide(color: AppColors.groupedBackground),
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 18,
+        focusedBorder: OutlineInputBorder(
+          borderRadius: _fieldRadius,
+          borderSide: BorderSide(color: primaryColor, width: 1.5),
         ),
-        prefixIcon: Icon(icon, color: Colors.white.withOpacity(0.9)),
-        suffixIcon: isPassword
-            ? IconButton(
-                icon: Icon(
-                  isPasswordVisible ? Icons.visibility_off : Icons.visibility,
-                  color: Colors.white70,
-                ),
-                onPressed: () =>
-                    setState(() => isPasswordVisible = !isPasswordVisible),
-              )
-            : null,
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.15),
       ),
+      prefixIcon: Icon(icon, color: const Color(0xFF8A8A8E)),
+      suffixIcon: isPassword
+          ? IconButton(
+              icon: Icon(
+                isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                color: const Color(0xFF8A8A8E),
+              ),
+              onPressed: () =>
+                  setState(() => isPasswordVisible = !isPasswordVisible),
+            )
+          : null,
     );
   }
 
@@ -492,107 +384,11 @@ class _LoginPageState extends State<LoginPage>
       child: AdaptiveButton(
         onPressed: _login,
         label: s.signIn,
+        color: primaryColor,
         textColor: Colors.white,
-        style: AdaptiveButtonStyle.glass,
+        style: AdaptiveButtonStyle.filled,
         size: AdaptiveButtonSize.large,
         borderRadius: BorderRadius.circular(18),
-      ),
-    );
-  }
-
-  Widget _buildBiometricToggle(S s) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => toggleBiometricPreference(!_useBiometrics),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.fingerprint,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        s.biometricAuth,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        s.useFingerprint,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.white.withOpacity(0.75),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                AdaptiveSwitch(
-                  value: _useBiometrics,
-                  onChanged: toggleBiometricPreference,
-                  // A pure-white "on" track is invisible against this
-                  // translucent white card — use the brand accent instead.
-                  activeColor: primaryColor,
-                  thumbColor: Colors.white,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBiometricLoginButton(S s) {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: AdaptiveButton.child(
-        onPressed: () => loginWithBiometrics(context),
-        style: AdaptiveButtonStyle.glass,
-        size: AdaptiveButtonSize.large,
-        borderRadius: BorderRadius.circular(16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.fingerprint, size: 22, color: Colors.white),
-            const SizedBox(width: 10),
-            Text(
-              s.signInBiometric,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -617,7 +413,7 @@ class _LoginPageState extends State<LoginPage>
         await storage.write(key: "username", value: username);
         await storage.write(key: "password", value: password);
         await storage.write(key: "jwt", value: jwt);
-        _navigateToMainPage(jwt);
+        await _completeLogin(jwt);
       } else {
         setState(() => isLoading = false);
         _showSnackBar(s.wrongCredentials);

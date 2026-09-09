@@ -4,17 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/adaptive_back_button.dart';
 import '../../core/widgets/stagger_in.dart';
 import 'shop_api.dart';
 
 enum _RangePreset { today, week, month, custom }
 
 class _ShopPickupColors {
-  static const Color g1 = Color(0xFFFF8C00);
-  static const Color g2 = Color(0xFFCC1500);
+  static const Color g1 = AppColors.brandOrange;
+  static const Color g2 = AppColors.brandRed;
 }
 
 /// PVZ (pickup-point) order view: lists orders placed via uztexpro_store
@@ -31,8 +34,7 @@ class ShopPickupPage extends StatefulWidget {
 }
 
 class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProviderStateMixin {
-  static const Color _g1 = Color(0xFFFF8C00);
-  static const Color _g2 = Color(0xFFCC1500);
+  static const Color _g1 = AppColors.brandOrange;
 
   final NumberFormat _numberFormat = NumberFormat('#,##0', 'ru');
   final _searchController = TextEditingController();
@@ -170,30 +172,28 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
   Widget build(BuildContext context) {
     final s = S.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gradColors = isDark ? [const Color(0xFF3D1800), const Color(0xFF1F0000)] : [_g1, _g2];
-    final listBg = isDark ? Theme.of(context).colorScheme.surface : const Color(0xFFF4F4F4);
+    final listBg = isDark ? Theme.of(context).colorScheme.surface : AppColors.groupedBackground;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
       child: Scaffold(
         appBar: AppBar(
-          title: Text(s.shopPickupTitle, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+          leading: const Center(child: AdaptiveBackButton()),
+          title: Text(s.shopPickupTitle, style: const TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontSize: 18)),
           centerTitle: false,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          iconTheme: const IconThemeData(color: Colors.white),
-          flexibleSpace: Container(
-            decoration: BoxDecoration(gradient: LinearGradient(colors: gradColors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
-          ),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF1C1C1E),
+          elevation: 0.5,
+          shadowColor: Colors.black12,
         ),
         body: Column(
           children: [
             Container(
-              decoration: BoxDecoration(gradient: LinearGradient(colors: gradColors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
+              color: Colors.white,
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,11 +288,24 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
                 style: TextStyle(color: isDark ? Colors.white60 : Colors.grey.shade600, fontSize: 13, height: 1.5),
               ),
               const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: _load,
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: Text(s.refresh),
-                style: FilledButton.styleFrom(backgroundColor: _g1, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              SizedBox(
+                width: 160,
+                height: 46,
+                child: AdaptiveButton.child(
+                  onPressed: _load,
+                  style: AdaptiveButtonStyle.filled,
+                  color: _g1,
+                  borderRadius: BorderRadius.circular(12),
+                  minSize: const Size(160, 46),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.refresh_rounded, size: 18, color: Colors.white),
+                      const SizedBox(width: 8),
+                      Text(s.refresh, style: const TextStyle(color: Colors.white)),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -658,11 +671,10 @@ class _CountBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
+        color: AppColors.brandOrange.withOpacity(0.12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.35), width: 1),
       ),
-      child: Text('$count', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+      child: Text('$count', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.brandRed)),
     );
   }
 }
@@ -686,20 +698,19 @@ class _DateChip extends StatelessWidget {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
           decoration: BoxDecoration(
-            color: selected ? Colors.white : Colors.white.withOpacity(0.16),
+            color: selected ? _ShopPickupColors.g1.withOpacity(0.12) : const Color(0xFFF2F2F2),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withOpacity(selected ? 0 : 0.32)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 13, color: selected ? _ShopPickupColors.g2 : Colors.white),
+                Icon(icon, size: 13, color: selected ? _ShopPickupColors.g2 : const Color(0xFF8A8A8E)),
                 const SizedBox(width: 5),
               ],
               Text(
                 label,
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: selected ? _ShopPickupColors.g2 : Colors.white),
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: selected ? _ShopPickupColors.g2 : const Color(0xFF8A8A8E)),
               ),
             ],
           ),
@@ -722,10 +733,9 @@ class _HeaderStatTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: highlight ? Colors.white : Colors.white.withOpacity(0.14),
+        color: highlight ? _ShopPickupColors.g1.withOpacity(0.1) : const Color(0xFFF8F9FB),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(highlight ? 0 : 0.28)),
-        boxShadow: highlight ? [BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 10, offset: const Offset(0, 4))] : null,
+        border: Border.all(color: highlight ? _ShopPickupColors.g1.withOpacity(0.25) : const Color(0xFFEDEDED)),
       ),
       child: Row(
         children: [
@@ -734,10 +744,10 @@ class _HeaderStatTile extends StatelessWidget {
             height: 30,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: highlight ? _ShopPickupColors.g2.withOpacity(0.12) : Colors.white.withOpacity(0.18),
+              color: highlight ? _ShopPickupColors.g2.withOpacity(0.14) : const Color(0xFFF2F2F2),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 15, color: highlight ? _ShopPickupColors.g2 : Colors.white),
+            child: Icon(icon, size: 15, color: highlight ? _ShopPickupColors.g2 : const Color(0xFF8A8A8E)),
           ),
           const SizedBox(width: 9),
           Expanded(
@@ -749,14 +759,14 @@ class _HeaderStatTile extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 10.5, color: highlight ? _ShopPickupColors.g2.withOpacity(0.75) : Colors.white.withOpacity(0.85)),
+                  style: const TextStyle(fontSize: 10.5, color: Color(0xFF8A8A8E)),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: highlight ? _ShopPickupColors.g2 : Colors.white),
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: highlight ? _ShopPickupColors.g2 : const Color(0xFF1C1C1E)),
                 ),
               ],
             ),
@@ -790,30 +800,22 @@ class _PickupCustomRangeSheetState extends State<_PickupCustomRangeSheet> {
   }
 
   Future<void> _pickFrom() async {
-    final picked = await showDatePicker(
+    final picked = await AdaptiveDatePicker.show(
       context: context,
       firstDate: DateTime(2024, 1, 1),
       lastDate: _to,
       initialDate: _from,
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(colorScheme: Theme.of(context).colorScheme.copyWith(primary: _ShopPickupColors.g2)),
-        child: child!,
-      ),
     );
     if (picked == null || !mounted) return;
     setState(() => _from = picked);
   }
 
   Future<void> _pickTo() async {
-    final picked = await showDatePicker(
+    final picked = await AdaptiveDatePicker.show(
       context: context,
       firstDate: _from,
       lastDate: DateTime.now(),
       initialDate: _to,
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(colorScheme: Theme.of(context).colorScheme.copyWith(primary: _ShopPickupColors.g2)),
-        child: child!,
-      ),
     );
     if (picked == null || !mounted) return;
     setState(() => _to = picked);
@@ -869,18 +871,16 @@ class _PickupCustomRangeSheetState extends State<_PickupCustomRangeSheet> {
             const SizedBox(height: 20),
             SizedBox(
               height: 50,
-              child: ElevatedButton(
+              child: AdaptiveButton(
                 onPressed: () {
                   HapticFeedback.selectionClick();
                   Navigator.of(context).pop(DateTimeRange(start: _from, end: _to));
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _ShopPickupColors.g2,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: Text(s.shopIssuedApply, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                label: s.shopIssuedApply,
+                style: AdaptiveButtonStyle.filled,
+                color: _ShopPickupColors.g2,
+                textColor: Colors.white,
+                borderRadius: BorderRadius.circular(14),
               ),
             ),
           ],

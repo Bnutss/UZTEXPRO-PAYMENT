@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:uztexpro_payment/main.dart';
 import 'package:http/http.dart' as http;
@@ -6,8 +7,11 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/adaptive_back_button.dart';
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -74,8 +78,8 @@ class _MainPageScreenState extends State<MainPageScreen>
   final TextEditingController _searchController = TextEditingController();
   int? _selectedStatusFilterId;
 
-  static const Color _gradientStart = Color(0xFFFF8C00);
-  static const Color _gradientEnd = Color(0xFFCC1500);
+  static const Color _gradientStart = AppColors.brandOrange;
+  static const Color _gradientEnd = AppColors.brandRed;
 
   static List<dynamic>? _memStatuses;
   static List<dynamic>? _memReports;
@@ -112,8 +116,16 @@ class _MainPageScreenState extends State<MainPageScreen>
       parent: _animationController,
       curve: Curves.easeInOut,
     );
+    // Only rebuild when the button's visibility actually flips, instead of
+    // on every scroll delta — a plain `setState` in this listener was
+    // rebuilding the whole screen (AppBar, search bar, filter row) on every
+    // single scroll frame, which is exactly what made scrolling feel like
+    // it was hanging.
     _scrollController.addListener(() {
-      setState(() => _showBackToTopButton = _scrollController.offset >= 200);
+      final shouldShow = _scrollController.offset >= 200;
+      if (shouldShow != _showBackToTopButton) {
+        setState(() => _showBackToTopButton = shouldShow);
+      }
     });
     _searchController.addListener(() => setState(() {}));
     _initializeData();
@@ -148,38 +160,10 @@ class _MainPageScreenState extends State<MainPageScreen>
   }
 
   void showNotification(String message, bool isSuccess) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              isSuccess ? Icons.check_circle : Icons.error,
-              color: Colors.white,
-              size: 16,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 2,
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: isSuccess
-            ? const Color(0xFF43A047)
-            : const Color(0xFFD32F2F),
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(12),
-        elevation: 6,
-      ),
+    AdaptiveSnackBar.show(
+      context,
+      message: message,
+      type: isSuccess ? AdaptiveSnackBarType.success : AdaptiveSnackBarType.error,
     );
   }
 
@@ -560,45 +544,25 @@ class _MainPageScreenState extends State<MainPageScreen>
                   Row(
                     children: [
                       Expanded(
-                        child: OutlinedButton(
+                        child: AdaptiveButton(
                           onPressed: () => Navigator.of(context).pop(false),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            side: BorderSide(color: outline),
-                          ),
-                          child: Text(
-                            s.cancel,
-                            style: TextStyle(
-                              color: onSurface.withOpacity(0.7),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
+                          label: s.cancel,
+                          style: AdaptiveButtonStyle.plain,
+                          textColor: onSurface.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(12),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: ElevatedButton(
+                        child: AdaptiveButton(
                           onPressed: () => Navigator.of(context).pop(true),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            backgroundColor: _gradientStart,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: Text(
-                            s.confirm,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
+                          label: s.confirm,
+                          style: AdaptiveButtonStyle.filled,
+                          color: _gradientStart,
+                          textColor: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                       ),
                     ],
@@ -1075,31 +1039,19 @@ class _MainPageScreenState extends State<MainPageScreen>
                       child: Row(
                         children: [
                           Expanded(
-                            child: OutlinedButton(
+                            child: AdaptiveButton(
                               onPressed: () =>
                                   Navigator.of(dialogContext).pop(),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                side: BorderSide(color: outline),
-                              ),
-                              child: Text(
-                                s.cancel,
-                                style: TextStyle(
-                                  color: onSurface.withOpacity(0.7),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
+                              label: s.cancel,
+                              style: AdaptiveButtonStyle.plain,
+                              textColor: onSurface.withOpacity(0.7),
+                              borderRadius: BorderRadius.circular(12),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: ElevatedButton(
+                            child: AdaptiveButton(
                               onPressed: () {
                                 if (selectedStatus == null) {
                                   showNotification(s.selectStatusFirst, false);
@@ -1119,24 +1071,12 @@ class _MainPageScreenState extends State<MainPageScreen>
                                   partialPrice,
                                 );
                               },
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                backgroundColor: _gradientStart,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: Text(
-                                s.save,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
+                              label: s.save,
+                              style: AdaptiveButtonStyle.filled,
+                              color: _gradientStart,
+                              textColor: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
                         ],
@@ -1279,75 +1219,53 @@ class _MainPageScreenState extends State<MainPageScreen>
     );
   }
 
+
   // ── Build ─────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gradColors = isDark
-        ? [const Color(0xFF3D1800), const Color(0xFF1F0000)]
-        : [_gradientStart, _gradientEnd];
     final surface = Theme.of(context).colorScheme.surface;
-    final listBg = isDark ? surface : const Color(0xFFF4F4F4);
+    final listBg = isDark ? surface : AppColors.groupedBackground;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
       child: Scaffold(
         appBar: AppBar(
+          leading: const Center(child: AdaptiveBackButton()),
           title: Text(
             s.paymentAgreements,
             style: const TextStyle(
-              color: Colors.white,
+              color: Color(0xFF1C1C1E),
               fontWeight: FontWeight.bold,
               fontSize: 18,
             ),
           ),
           centerTitle: false,
-          systemOverlayStyle: const SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-            statusBarIconBrightness: Brightness.light,
-            statusBarBrightness: Brightness.dark,
-          ),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: gradColors,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF1C1C1E),
+          elevation: 0.5,
+          shadowColor: Colors.black12,
+          actions: [
+            if (!isLoading)
+              Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: Center(
+                  child: _PayCountBadge(
+                    shown: _filteredReports.length,
+                    total: paymentReports.length,
+                  ),
+                ),
               ),
-            ),
-          ),
+          ],
         ),
         body: Column(
           children: [
-            // ── Gradient bar + count badge ──────────────────────────────────
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: gradColors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: Row(
-                children: [
-                  const Spacer(),
-                  if (!isLoading)
-                    _PayCountBadge(
-                      shown: _filteredReports.length,
-                      total: paymentReports.length,
-                    ),
-                ],
-              ),
-            ),
             // ── Search bar ──────────────────────────────────────────────────
             Container(
               color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
@@ -1384,7 +1302,7 @@ class _MainPageScreenState extends State<MainPageScreen>
           ],
         ),
         floatingActionButton: _showBackToTopButton
-            ? FloatingActionButton(
+            ? AdaptiveFloatingActionButton(
                 onPressed: () => _scrollController.animateTo(
                   0,
                   duration: const Duration(milliseconds: 500),
@@ -1961,16 +1879,15 @@ class _PayCountBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
+        color: _MainPageScreenState._gradientStart.withOpacity(0.12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.35), width: 1),
       ),
       child: Text(
         shown == total ? '$total' : '$shown / $total',
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
-          color: Colors.white,
+          color: _MainPageScreenState._gradientEnd,
         ),
       ),
     );

@@ -4,9 +4,12 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:uztexpro_payment/main.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/adaptive_back_button.dart';
 import 'product_photo.dart';
 
 const _kDetailPath = 'sewing/product-model-list';
@@ -50,8 +53,7 @@ class ProductModelDetailPage extends StatefulWidget {
 }
 
 class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
-  static const _g1 = Color(0xFFFF8C00);
-  static const _g2 = Color(0xFFCC1500);
+  static const _g1 = AppColors.brandOrange;
 
   Map<String, dynamic>? _model;
   bool _isLoading = true;
@@ -127,23 +129,42 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
 
   Future<void> _onToggleConfirm() async {
     final confirmed = _confirmed;
-    final ok = await _confirmDialog(
-      icon: confirmed
-          ? Icons.remove_circle_outline_rounded
-          : Icons.check_circle_outline_rounded,
-      iconColor: confirmed ? Colors.red.shade600 : const Color(0xFF43A047),
+    await AdaptiveAlertDialog.show(
+      context: context,
       title: confirmed
           ? S.of(context).unconfirmPriceTitle
           : S.of(context).confirmPriceTitle,
       message: confirmed
           ? S.of(context).unconfirmPriceDesc
           : S.of(context).confirmPriceDesc,
-      confirmLabel: confirmed
-          ? S.of(context).unconfirmPriceBtn
-          : S.of(context).confirmPriceBtn,
-      confirmColor: confirmed ? Colors.red.shade600 : const Color(0xFF43A047),
+      icon: confirmed
+          ? (PlatformInfo.isIOS26OrHigher()
+                ? 'minus.circle.fill'
+                : Icons.remove_circle_outline_rounded)
+          : (PlatformInfo.isIOS26OrHigher()
+                ? 'checkmark.circle.fill'
+                : Icons.check_circle_outline_rounded),
+      iconColor: confirmed ? Colors.red.shade600 : const Color(0xFF43A047),
+      actions: [
+        AlertAction(
+          title: S.of(context).cancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+        AlertAction(
+          title: confirmed
+              ? S.of(context).unconfirmPriceBtn
+              : S.of(context).confirmPriceBtn,
+          style: confirmed
+              ? AlertActionStyle.destructive
+              : AlertActionStyle.primary,
+          onPressed: () => _doToggleConfirm(confirmed),
+        ),
+      ],
     );
-    if (!ok) return;
+  }
+
+  Future<void> _doToggleConfirm(bool confirmed) async {
     setState(() => _busy = true);
     try {
       final uri = Uri.parse(
@@ -187,137 +208,11 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
     }
   }
 
-  // ── Dialogs ──────────────────────────────────────────────────────────────────
-
-  Future<bool> _confirmDialog({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String message,
-    required String confirmLabel,
-    required Color confirmColor,
-  }) async {
-    final surface = Theme.of(context).colorScheme.surface;
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: iconColor, size: 28),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: onSurface,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: onSurface.withOpacity(0.6),
-                ),
-              ),
-              const SizedBox(height: 22),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(ctx).pop(false),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        side: BorderSide(color: onSurface.withOpacity(0.2)),
-                      ),
-                      child: Text(
-                        S.of(context).cancel,
-                        style: TextStyle(
-                          color: onSurface.withOpacity(0.7),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.of(ctx).pop(true),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: confirmColor,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        confirmLabel,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    return result ?? false;
-  }
-
   void _snack(String msg, bool ok) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              ok ? Icons.check_circle : Icons.error,
-              color: Colors.white,
-              size: 16,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                msg,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: ok ? const Color(0xFF43A047) : const Color(0xFFD32F2F),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      ),
+    AdaptiveSnackBar.show(
+      context,
+      message: msg,
+      type: ok ? AdaptiveSnackBarType.success : AdaptiveSnackBarType.error,
     );
   }
 
@@ -326,86 +221,64 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gradColors = isDark
-        ? [const Color(0xFF3D1800), const Color(0xFF1F0000)]
-        : [_g1, _g2];
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
       child: Scaffold(
-        extendBodyBehindAppBar: true,
         backgroundColor: isDark
             ? const Color(0xFF121212)
-            : const Color(0xFFF5F5F5),
+            : AppColors.groupedBackground,
         appBar: AppBar(
+          leading: const Center(child: AdaptiveBackButton()),
           title: Text(
             _model?['vendor_code']?.toString() ??
                 S.of(context).productModelDetailTitle,
             style: const TextStyle(
-              color: Colors.white,
+              color: Color(0xFF1C1C1E),
               fontWeight: FontWeight.bold,
               fontSize: 17,
             ),
           ),
           centerTitle: false,
-          systemOverlayStyle: const SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-            statusBarIconBrightness: Brightness.light,
-            statusBarBrightness: Brightness.dark,
-          ),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          iconTheme: const IconThemeData(color: Colors.white),
-          actions: [
-            IconButton(
-              icon: const Icon(
-                Icons.refresh_rounded,
-                color: Colors.white,
-                size: 22,
-              ),
-              onPressed: _isLoading ? null : _load,
-              tooltip: S.of(context).refresh,
-            ),
-          ],
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: gradColors,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-          ),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF1C1C1E),
+          elevation: 0.5,
+          shadowColor: Colors.black12,
         ),
         bottomNavigationBar:
             (!_isLoading && _error == null && widget.canConfirm)
             ? _buildBottomBar(isDark)
             : null,
         body: _isLoading
-            ? _buildShimmer(isDark, gradColors)
+            ? _buildShimmer(isDark)
             : _error != null
             ? _buildError(isDark)
-            : _buildContent(isDark, gradColors),
+            : _buildContent(isDark),
       ),
     );
   }
 
-  Widget _buildShimmer(bool isDark, List<Color> gradColors) {
+  Widget _buildShimmer(bool isDark) {
     final base = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
     final hi = isDark ? Colors.grey.shade700 : Colors.grey.shade100;
     return Column(
       children: [
         Container(
           height: 150,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: gradColors,
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+          color: Colors.white,
+          padding: const EdgeInsets.all(20),
+          child: Shimmer.fromColors(
+            baseColor: base,
+            highlightColor: hi,
+            child: Container(
+              decoration: BoxDecoration(
+                color: base,
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
           ),
         ),
@@ -464,14 +337,29 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
               ),
             ),
             const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: _load,
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: Text(S.of(context).retry),
-              style: FilledButton.styleFrom(
-                backgroundColor: _g1,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            SizedBox(
+              width: 160,
+              height: 46,
+              child: AdaptiveButton.child(
+                onPressed: _load,
+                style: AdaptiveButtonStyle.filled,
+                color: _g1,
+                borderRadius: BorderRadius.circular(12),
+                minSize: const Size(160, 46),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.refresh_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      S.of(context).retry,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -481,104 +369,98 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
     );
   }
 
-  Widget _buildContent(bool isDark, List<Color> gradColors) {
+  Widget _buildContent(bool isDark) {
     final s = S.of(context);
     final model = _model!;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final confirmed = _confirmed;
     final materials = (model['materials'] as List?) ?? [];
     final accessories = (model['accessories'] as List?) ?? [];
+    final statusColor = confirmed
+        ? const Color(0xFF43A047)
+        : const Color(0xFFF59E0B);
 
     return SingleChildScrollView(
       child: Column(
         children: [
-          // ── Gradient header ──────────────────────────────────────────────
+          // ── Status header ───────────────────────────────────────────────
           Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: gradColors,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 22),
-                child: Column(
-                  children: [
-                    ProductPhotoThumbnail(
-                      imageUrl: resolveProductImageUrl(model['image_url']),
-                      size: 88,
-                      heroTag: 'product_photo_${widget.modelId}',
-                      isDark: isDark,
-                      showRing: true,
+            color: Colors.white,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 22),
+              child: Column(
+                children: [
+                  ProductPhotoThumbnail(
+                    imageUrl: resolveProductImageUrl(model['image_url']),
+                    size: 88,
+                    heroTag: 'product_photo_${widget.modelId}',
+                    isDark: isDark,
+                    showRing: true,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    model['vendor_code']?.toString() ?? '—',
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF1C1C1E),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 20,
+                      letterSpacing: 0.2,
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      model['vendor_code']?.toString() ?? '—',
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 20,
-                        letterSpacing: 0.2,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    model['name']?.toString() ?? '—',
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF8A8A8E),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: statusColor.withOpacity(0.35),
+                        width: 1,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      model['name']?.toString() ?? '—',
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.75),
-                        fontWeight: FontWeight.w500,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.35),
-                          width: 1,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          confirmed
+                              ? Icons.check_circle_rounded
+                              : Icons.hourglass_empty_rounded,
+                          size: 15,
+                          color: statusColor,
                         ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            confirmed
-                                ? Icons.check_circle_rounded
-                                : Icons.hourglass_empty_rounded,
-                            size: 15,
-                            color: Colors.white,
+                        const SizedBox(width: 7),
+                        Text(
+                          confirmed ? s.priceConfirmed : s.priceNotConfirmed,
+                          style: TextStyle(
+                            color: statusColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
                           ),
-                          const SizedBox(width: 7),
-                          Text(
-                            confirmed ? s.priceConfirmed : s.priceNotConfirmed,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 18),
-                    _HeroPriceRow(model: model),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 18),
+                  _HeroPriceRow(model: model),
+                ],
               ),
             ),
           ),
@@ -658,9 +540,6 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
                 color: confirmed
                     ? const Color(0xFFD32F2F)
                     : const Color(0xFF2E7D32),
-                bgColor: confirmed
-                    ? const Color(0xFFFFEBEE)
-                    : const Color(0xFFE8F5E9),
                 isDark: isDark,
                 onTap: _onToggleConfirm,
               ),
@@ -682,9 +561,9 @@ class _HeroPriceRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.13),
+        color: const Color(0xFFF8F9FB),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.25), width: 1),
+        border: Border.all(color: const Color(0xFFEDEDED), width: 1),
       ),
       child: Row(
         children: [
@@ -695,11 +574,7 @@ class _HeroPriceRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          Container(
-            width: 1,
-            height: 34,
-            color: Colors.white.withOpacity(0.22),
-          ),
+          Container(width: 1, height: 34, color: const Color(0xFFE0E0E0)),
           const SizedBox(width: 16),
           Expanded(
             child: _HeroStat(
@@ -726,8 +601,8 @@ class _HeroStat extends StatelessWidget {
       children: [
         Text(
           label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.65),
+          style: const TextStyle(
+            color: Color(0xFF8A8A8E),
             fontSize: 11,
             fontWeight: FontWeight.w600,
           ),
@@ -736,7 +611,7 @@ class _HeroStat extends StatelessWidget {
         Text(
           value,
           style: const TextStyle(
-            color: Colors.white,
+            color: Color(0xFF1C1C1E),
             fontSize: 19,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.3,
@@ -1278,7 +1153,9 @@ class _MaterialRow extends StatelessWidget {
                     _Pill(
                       text:
                           '${s.pricePerKgLabel}: \$${pricePerKg.toStringAsFixed(4)}',
-                      color: isDark ? Colors.blue.shade200 : Colors.blue.shade700,
+                      color: isDark
+                          ? Colors.blue.shade200
+                          : Colors.blue.shade700,
                       bgColor: isDark
                           ? Colors.blue.withOpacity(0.18)
                           : Colors.blue.shade50,
@@ -1530,7 +1407,9 @@ class _SectionCardState extends State<_SectionCard> {
           height: 24,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: const Color(0xFFFF8C00).withOpacity(widget.isDark ? 0.2 : 0.1),
+            color: const Color(
+              0xFFFF8C00,
+            ).withOpacity(widget.isDark ? 0.2 : 0.1),
           ),
           child: Icon(widget.icon, size: 13, color: const Color(0xFFFF8C00)),
         ),
@@ -1590,7 +1469,9 @@ class _SectionCardState extends State<_SectionCard> {
                   Divider(
                     height: 14,
                     thickness: 0.5,
-                    color: widget.isDark ? Colors.white12 : Colors.grey.shade100,
+                    color: widget.isDark
+                        ? Colors.white12
+                        : Colors.grey.shade100,
                   ),
                   widget.child,
                 ],
@@ -1684,7 +1565,6 @@ class _ActionButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color color;
-  final Color bgColor;
   final bool isDark;
   final VoidCallback onTap;
 
@@ -1692,43 +1572,38 @@ class _ActionButton extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.color,
-    required this.bgColor,
     required this.isDark,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
+    return SizedBox(
+      width: double.infinity,
+      child: AdaptiveButton.child(
+        onPressed: onTap,
+        style: AdaptiveButtonStyle.tinted,
+        color: color,
+        size: AdaptiveButtonSize.large,
         borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 13),
-          decoration: BoxDecoration(
-            color: isDark ? color.withOpacity(0.15) : bgColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(isDark ? 0.35 : 0.3)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 7),
-              Flexible(
-                child: Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 7),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

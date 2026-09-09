@@ -4,9 +4,12 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:uztexpro_payment/main.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/adaptive_back_button.dart';
 
 const _kDetailPath = 'texmansys/material-purchase-application';
 
@@ -25,8 +28,7 @@ class SignRequestDetailPage extends StatefulWidget {
 }
 
 class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
-  static const Color _g1 = Color(0xFFFF8C00);
-  static const Color _g2 = Color(0xFFCC1500);
+  static const Color _g1 = AppColors.brandOrange;
 
   Map<String, dynamic>? _data;
   bool _isLoading = true;
@@ -104,30 +106,52 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
 
   Future<void> _onSign() async {
     final s = S.of(context);
-    final ok = await _confirmDialog(
-      icon: Icons.draw_rounded,
-      iconColor: Colors.green.shade600,
+    await AdaptiveAlertDialog.show(
+      context: context,
       title: s.approveConfirmTitle,
       message: s.approveConfirmDesc,
-      confirmLabel: s.signAll,
-      confirmColor: Colors.green.shade600,
+      icon: PlatformInfo.isIOS26OrHigher()
+          ? 'checkmark.circle.fill'
+          : Icons.draw_rounded,
+      iconColor: Colors.green.shade600,
+      actions: [
+        AlertAction(
+          title: s.cancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+        AlertAction(
+          title: s.signAll,
+          style: AlertActionStyle.primary,
+          onPressed: () => _process('sign'),
+        ),
+      ],
     );
-    if (!ok) return;
-    await _process('sign');
   }
 
   Future<void> _onReject() async {
     final s = S.of(context);
-    final ok = await _confirmDialog(
-      icon: Icons.cancel_rounded,
-      iconColor: Colors.red.shade600,
+    await AdaptiveAlertDialog.show(
+      context: context,
       title: s.rejectConfirmTitle,
       message: s.rejectConfirmDesc,
-      confirmLabel: s.rejectAll,
-      confirmColor: Colors.red.shade600,
+      icon: PlatformInfo.isIOS26OrHigher()
+          ? 'xmark.circle.fill'
+          : Icons.cancel_rounded,
+      iconColor: Colors.red.shade600,
+      actions: [
+        AlertAction(
+          title: s.cancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+        AlertAction(
+          title: s.rejectAll,
+          style: AlertActionStyle.destructive,
+          onPressed: () => _process('reject'),
+        ),
+      ],
     );
-    if (!ok) return;
-    await _process('reject');
   }
 
   Future<void> _process(String action) async {
@@ -162,116 +186,12 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
     }
   }
 
-  Future<bool> _confirmDialog({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String message,
-    required String confirmLabel,
-    required Color confirmColor,
-  }) async {
-    final s = S.of(context);
-    final surface = Theme.of(context).colorScheme.surface;
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: surface,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.1),
-                    shape: BoxShape.circle),
-                child: Icon(icon, color: iconColor, size: 30),
-              ),
-              const SizedBox(height: 16),
-              Text(title,
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: onSurface)),
-              const SizedBox(height: 8),
-              Text(message,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 13,
-                      color: onSurface.withOpacity(0.6))),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(ctx).pop(false),
-                      style: OutlinedButton.styleFrom(
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        side: BorderSide(
-                            color: onSurface.withOpacity(0.2)),
-                      ),
-                      child: Text(s.cancel,
-                          style: TextStyle(
-                              color: onSurface.withOpacity(0.7),
-                              fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.of(ctx).pop(true),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: confirmColor,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: Text(confirmLabel,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    return result ?? false;
-  }
-
   void _snack(String msg, bool ok) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(
-        children: [
-          Icon(ok ? Icons.check_circle : Icons.error,
-              color: Colors.white, size: 16),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Text(msg,
-                  style:
-                      const TextStyle(fontWeight: FontWeight.w500))),
-        ],
-      ),
-      backgroundColor:
-          ok ? const Color(0xFF43A047) : const Color(0xFFD32F2F),
-      behavior: SnackBarBehavior.floating,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      margin:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    ));
+    AdaptiveSnackBar.show(
+      context,
+      message: msg,
+      type: ok ? AdaptiveSnackBarType.success : AdaptiveSnackBarType.error,
+    );
   }
 
   String _fmtDate(String? raw) {
@@ -287,9 +207,6 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
   Widget build(BuildContext context) {
     final s = S.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gradientColors = isDark
-        ? [const Color(0xFF3D1800), const Color(0xFF1F0000)]
-        : [_g1, _g2];
 
     final hasPending =
         !_isLoading && _error == null && _pendingDetails.isNotEmpty;
@@ -297,82 +214,34 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
       child: Scaffold(
-        extendBodyBehindAppBar: true,
+        backgroundColor: isDark
+            ? Theme.of(context).colorScheme.surface
+            : AppColors.groupedBackground,
         appBar: AppBar(
+          leading: const Center(child: AdaptiveBackButton()),
           title: Text(
             '${s.requestNumber}${widget.appId}',
             style: const TextStyle(
-                color: Colors.white,
+                color: Color(0xFF1C1C1E),
                 fontWeight: FontWeight.bold,
                 fontSize: 18),
           ),
           centerTitle: false,
-          systemOverlayStyle: const SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-            statusBarIconBrightness: Brightness.light,
-            statusBarBrightness: Brightness.dark,
-          ),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          iconTheme: const IconThemeData(color: Colors.white),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-              onPressed: _isLoading ? null : _load,
-            ),
-          ],
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                  colors: gradientColors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight),
-              borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(20)),
-            ),
-          ),
-          shape: const RoundedRectangleBorder(
-            borderRadius:
-                BorderRadius.vertical(bottom: Radius.circular(20)),
-          ),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF1C1C1E),
+          elevation: 0.5,
+          shadowColor: Colors.black12,
         ),
         bottomNavigationBar: hasPending ? _buildBottomBar(s, isDark) : null,
-        body: Stack(
-          children: [
-            Container(
-              height: 160,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                    colors: gradientColors,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight),
-              ),
-            ),
-            Positioned.fill(
-              top: 120,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? Theme.of(context).colorScheme.surface
-                      : const Color(0xFFF0F2F5),
-                  borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(24)),
-                ),
-              ),
-            ),
-            SafeArea(
-              child: _isLoading
-                  ? _buildShimmer(isDark)
-                  : _error != null
-                      ? _buildError(s, isDark)
-                      : _buildContent(s, isDark),
-            ),
-          ],
-        ),
+        body: _isLoading
+            ? _buildShimmer(isDark)
+            : _error != null
+                ? _buildError(s, isDark)
+                : _buildContent(s, isDark),
       ),
     );
   }
@@ -433,15 +302,29 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
                         : Colors.grey.shade600,
                     fontSize: 14)),
             const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _load,
-              icon: const Icon(Icons.refresh_rounded),
-              label: Text(s.refresh),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _g1,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+            // minSize is required: the real native iOS 26 button has no way
+            // to report its content size back to Flutter's layout.
+            SizedBox(
+              width: 160,
+              height: 46,
+              child: AdaptiveButton.child(
+                onPressed: _load,
+                style: AdaptiveButtonStyle.filled,
+                color: _g1,
+                borderRadius: BorderRadius.circular(12),
+                minSize: const Size(160, 46),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.refresh_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(s.refresh, style: const TextStyle(color: Colors.white)),
+                  ],
+                ),
               ),
             ),
           ],
@@ -466,7 +349,11 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
 
-    return ListView(
+    return RefreshIndicator(
+      onRefresh: _load,
+      color: _g1,
+      child: ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
         _SectionCard(
@@ -598,6 +485,7 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
             )),
         const SizedBox(height: 80),
       ],
+      ),
     );
   }
 
@@ -639,7 +527,6 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
                     label: s.rejectAll,
                     icon: Icons.close_rounded,
                     color: const Color(0xFFEF4444),
-                    bgColor: const Color(0xFFFEF2F2),
                     isDark: isDark,
                     onTap: _onReject,
                   ),
@@ -650,7 +537,6 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
                     label: s.signAll,
                     icon: Icons.draw_rounded,
                     color: const Color(0xFF22C55E),
-                    bgColor: const Color(0xFFF0FDF4),
                     isDark: isDark,
                     onTap: _onSign,
                   ),
@@ -1246,7 +1132,6 @@ class _BottomActionBtn extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color color;
-  final Color bgColor;
   final bool isDark;
   final VoidCallback onTap;
 
@@ -1254,38 +1139,35 @@ class _BottomActionBtn extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.color,
-    required this.bgColor,
     required this.isDark,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
+    return SizedBox(
+      width: double.infinity,
+      child: AdaptiveButton.child(
+        onPressed: onTap,
+        style: AdaptiveButtonStyle.tinted,
+        color: color,
+        size: AdaptiveButtonSize.large,
         borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: isDark ? color.withOpacity(0.15) : bgColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-                color: color.withOpacity(isDark ? 0.4 : 0.3)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(width: 8),
-              Text(label,
-                  style: TextStyle(
-                      color: color,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold)),
-            ],
-          ),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: color, fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
         ),
       ),
     );

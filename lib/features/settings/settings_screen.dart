@@ -1,13 +1,14 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/localization/app_strings.dart';
+import '../../core/theme/app_colors.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -21,14 +22,21 @@ class _SettingsScreenState extends State<SettingsScreen>
   late AnimationController _animationController;
   late Animation<double> _animation;
   final AppStorage _storage = const AppStorage();
+  final LocalAuthentication _auth = LocalAuthentication();
 
   String _displayName = '';
   String _email = '';
   String _login = '';
   String _version = '';
+  bool _canCheckBiometrics = false;
+  bool _useBiometrics = false;
+  // Which biometric icon/label to show — detected per device instead of
+  // hardcoding a fingerprint (iPhones with Face ID have no Touch ID sensor
+  // at all, so "fingerprint" would be flatly wrong there).
+  BiometricType? _biometricType;
 
-  static const Color _gradientStart = Color(0xFFFF8C00);
-  static const Color _gradientEnd = Color(0xFFCC1500);
+  static const Color _gradientStart = AppColors.brandOrange;
+  static const Color _gradientEnd = AppColors.brandRed;
 
   final List<Map<String, String>> _languages = [
     {'code': 'ru', 'name': 'Русский', 'desc': 'Русский язык'},
@@ -50,10 +58,46 @@ class _SettingsScreenState extends State<SettingsScreen>
     _animationController.forward();
     _loadUserData();
     _loadVersion();
+    _checkBiometrics();
+    _loadBiometricPreference();
     localeNotifier.addListener(_onLocaleChanged);
   }
 
   void _onLocaleChanged() => setState(() {});
+
+  Future<void> _checkBiometrics() async {
+    try {
+      final canCheck = await _auth.canCheckBiometrics;
+      final isSupported = await _auth.isDeviceSupported();
+      final available = await _auth.getAvailableBiometrics();
+      BiometricType? type;
+      if (available.contains(BiometricType.face)) {
+        type = BiometricType.face;
+      } else if (available.contains(BiometricType.fingerprint)) {
+        type = BiometricType.fingerprint;
+      } else if (available.isNotEmpty) {
+        type = available.first;
+      }
+      if (mounted) {
+        setState(() {
+          _canCheckBiometrics = canCheck || isSupported;
+          _biometricType = type;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _canCheckBiometrics = false);
+    }
+  }
+
+  Future<void> _loadBiometricPreference() async {
+    final useBiometrics = await _storage.read(key: 'useBiometrics');
+    if (mounted) setState(() => _useBiometrics = useBiometrics == 'true');
+  }
+
+  Future<void> _toggleBiometricPreference(bool value) async {
+    setState(() => _useBiometrics = value);
+    await _storage.write(key: 'useBiometrics', value: value.toString());
+  }
 
   Future<void> _loadUserData() async {
     final jwtRaw = await _storage.read(key: 'jwt');
@@ -95,15 +139,9 @@ class _SettingsScreenState extends State<SettingsScreen>
     super.dispose();
   }
 
-  // No own Scaffold/gradient/AnnotatedRegion here: this screen is only ever
-  // mounted as a tab body inside MenuPage's IndexedStack, which already
-  // paints the shared background gradient + glow circles + status bar style
-  // for every tab. A second full-bleed gradient Container nested inside its
-  // own Scaffold used to duplicate that background starting partway down the
-  // screen — since each gradient positions itself relative to its own
-  // (different-sized) box, the colors didn't line up at the seam and showed
-  // as a visible hard-edged rectangle cutting through the header's glow
-  // circle. Just build the tab content directly, like the other tabs do.
+  // No own Scaffold/AnnotatedRegion here: this screen is only ever mounted
+  // as a tab body inside MenuPage's IndexedStack, which already paints the
+  // shared background + status bar style for every tab.
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
@@ -124,6 +162,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                 _buildSectionHeader(s.generalSettings),
                 const SizedBox(height: 10),
                 _buildLanguageSelector(s),
+                if (_canCheckBiometrics) ...[
+                  const SizedBox(height: 12),
+                  _buildBiometricToggle(s),
+                ],
                 const SizedBox(height: 36),
                 _buildVersionInfo(s),
               ],
@@ -140,7 +182,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       child: Text(
         s.settingsTitle,
         style: const TextStyle(
-          color: Colors.white,
+          color: Color(0xFF1C1C1E),
           fontSize: 20,
           fontWeight: FontWeight.w800,
         ),
@@ -168,14 +210,7 @@ class _SettingsScreenState extends State<SettingsScreen>
               height: 80,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.18),
-                    blurRadius: 18,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
+                color: _gradientStart.withOpacity(0.12),
               ),
               child: Center(
                 child: Text(
@@ -194,17 +229,10 @@ class _SettingsScreenState extends State<SettingsScreen>
               _displayName.isNotEmpty ? _displayName : 'UZTEXPRO',
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Colors.white,
+                color: Color(0xFF1C1C1E),
                 fontWeight: FontWeight.bold,
                 fontSize: 22,
                 letterSpacing: 0.3,
-                shadows: [
-                  Shadow(
-                    color: Colors.black26,
-                    offset: Offset(0, 1),
-                    blurRadius: 4,
-                  ),
-                ],
               ),
             ),
             if (_email.isNotEmpty) ...[
@@ -212,9 +240,9 @@ class _SettingsScreenState extends State<SettingsScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.email_outlined,
-                    color: Colors.white.withOpacity(0.65),
+                    color: Color(0xFF8A8A8E),
                     size: 14,
                   ),
                   const SizedBox(width: 6),
@@ -222,8 +250,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                     child: Text(
                       _email,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.75),
+                      style: const TextStyle(
+                        color: Color(0xFF8A8A8E),
                         fontSize: 13,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -237,16 +265,16 @@ class _SettingsScreenState extends State<SettingsScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.person_outline,
-                    color: Colors.white.withOpacity(0.55),
+                    color: Color(0xFFB0B0B5),
                     size: 13,
                   ),
                   const SizedBox(width: 6),
                   Text(
                     _login,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.55),
+                    style: const TextStyle(
+                      color: Color(0xFFB0B0B5),
                       fontSize: 12,
                     ),
                   ),
@@ -257,26 +285,22 @@ class _SettingsScreenState extends State<SettingsScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.14),
+                color: _gradientStart.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.22),
-                  width: 0.8,
-                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.business_center_outlined,
-                    color: Colors.white.withOpacity(0.75),
+                    color: _gradientEnd,
                     size: 13,
                   ),
                   const SizedBox(width: 7),
                   Text(
                     s.paymentSystem,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.85),
+                    style: const TextStyle(
+                      color: _gradientEnd,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
@@ -299,25 +323,18 @@ class _SettingsScreenState extends State<SettingsScreen>
             width: 3,
             height: 16,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.85),
+              color: _gradientStart,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
           const SizedBox(width: 10),
           Text(
             title,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
+            style: const TextStyle(
+              color: Color(0xFF1C1C1E),
               fontWeight: FontWeight.bold,
               fontSize: 14,
               letterSpacing: 0.4,
-              shadows: const [
-                Shadow(
-                  color: Colors.black26,
-                  offset: Offset(0, 1),
-                  blurRadius: 3,
-                ),
-              ],
             ),
           ),
         ],
@@ -343,12 +360,12 @@ class _SettingsScreenState extends State<SettingsScreen>
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
+                    color: _gradientStart.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
                     Icons.language_rounded,
-                    color: Colors.white,
+                    color: _gradientStart,
                     size: 22,
                   ),
                 ),
@@ -360,7 +377,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                       Text(
                         s.language,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: Color(0xFF1C1C1E),
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),
@@ -368,8 +385,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                       const SizedBox(height: 3),
                       Text(
                         s.languageDesc,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
+                        style: const TextStyle(
+                          color: Color(0xFF8A8A8E),
                           fontSize: 12,
                         ),
                       ),
@@ -416,230 +433,141 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  Widget _buildBiometricToggle(S s) {
+    final isFaceId = _biometricType == BiometricType.face;
+    final icon = isFaceId ? Icons.face_rounded : Icons.fingerprint;
+    final description = isFaceId ? s.useFaceId : s.useFingerprint;
+
+    return _GlassCard(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => _toggleBiometricPreference(!_useBiometrics),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: _gradientStart.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: _gradientStart, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.biometricAuth,
+                        style: const TextStyle(
+                          color: Color(0xFF1C1C1E),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        description,
+                        style: const TextStyle(
+                          color: Color(0xFF8A8A8E),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                AdaptiveSwitch(
+                  value: _useBiometrics,
+                  onChanged: _toggleBiometricPreference,
+                  activeColor: _gradientStart,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static const TextStyle _versionTextStyle = TextStyle(
+    color: Color(0xFF8A8A8E),
+    fontSize: 12,
+    decoration: TextDecoration.none,
+  );
+
   Widget _buildVersionInfo(S s) {
+    final label = s.appVersionLabel(_version);
+    // The real native iOS 26 button (no minSize) has no way to report its
+    // UIKit-rendered content size back to Flutter's layout, so inside a
+    // Center it just expands to the full available width instead of
+    // hugging the icon+label like the old Flutter-drawn fallback did.
+    // Measure the label ourselves and pass that as an explicit width.
+    final textPainter = TextPainter(
+      text: TextSpan(text: label, style: _versionTextStyle),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    const iconWidth = 14.0;
+    const iconGap = 7.0;
+    const horizontalPadding = 18.0 * 2;
+    final width = iconWidth + iconGap + textPainter.width + horizontalPadding;
+
     return Center(
       child: AdaptiveButton.child(
         onPressed: () => _showAboutDialog(s),
         style: AdaptiveButtonStyle.glass,
         size: AdaptiveButtonSize.small,
-        color: Colors.white,
+        color: const Color(0xFF1C1C1E),
         borderRadius: BorderRadius.circular(30),
         padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 18),
-        // useNative:false keeps this a plain Flutter-drawn button instead of
-        // a real native UIButton — the native iOS 26 path was picking up an
-        // unwanted underline under the label (iOS accessibility auto-styling
-        // real UIButtons), which a Flutter-drawn button can't be affected by.
-        useNative: false,
+        minSize: Size(width, 0),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            const Icon(
               Icons.info_outline,
-              size: 14,
-              color: Colors.white.withOpacity(0.7),
+              size: iconWidth,
+              color: Color(0xFF8A8A8E),
             ),
-            const SizedBox(width: 7),
-            Text(
-              s.appVersionLabel(_version),
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.75),
-                fontSize: 12,
-                decoration: TextDecoration.none,
-              ),
-            ),
+            const SizedBox(width: iconGap),
+            Text(label, style: _versionTextStyle),
           ],
         ),
       ),
     );
   }
 
+  // Native AdaptiveAlertDialog instead of a hand-rolled dark glass card: now
+  // that the app is a standard light theme there's no bespoke look left to
+  // preserve, and the native alert gets correct light/dark text for free.
   void _showAboutDialog(S s) {
     final copyright = DateTime.now().year > 2026
         ? '© 2026–${DateTime.now().year} UztexPro.'
         : '© 2026 UztexPro.';
 
-    showGeneralDialog(
+    AdaptiveAlertDialog.show(
       context: context,
-      barrierDismissible: true,
-      barrierLabel: s.close,
-      barrierColor: Colors.black.withOpacity(0.55),
-      transitionDuration: const Duration(milliseconds: 220),
-      pageBuilder: (context, _, _) => const SizedBox.shrink(),
-      transitionBuilder: (context, animation, _, _) {
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutBack,
-          reverseCurve: Curves.easeIn,
-        );
-        return FadeTransition(
-          opacity: animation,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.9, end: 1).animate(curved),
-            child: _AboutDialogCard(
-              version: s.versionLabel(_version),
-              copyright: copyright,
-              allRightsReserved: s.allRightsReserved,
-              closeLabel: s.close,
-              accentStart: _gradientStart,
-              accentEnd: _gradientEnd,
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ── About / version dialog ──────────────────────────────────────────────────
-//
-// Built as an app-styled glass card instead of AdaptiveAlertDialog. The
-// native iOS 26 alert renders its labels with the system's real light/dark
-// UITraitCollection regardless of the app's forced-dark Flutter theme, which
-// on a device actually set to Light Mode produced barely-readable black/gray
-// text over our dark blur. A fully in-Flutter dialog sidesteps that mismatch
-// and matches the rest of the app's frosted-glass look.
-
-class _AboutDialogCard extends StatelessWidget {
-  final String version;
-  final String copyright;
-  final String allRightsReserved;
-  final String closeLabel;
-  final Color accentStart;
-  final Color accentEnd;
-
-  const _AboutDialogCard({
-    required this.version,
-    required this.copyright,
-    required this.allRightsReserved,
-    required this.closeLabel,
-    required this.accentStart,
-    required this.accentEnd,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF241208).withOpacity(0.92),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.16),
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.4),
-                    blurRadius: 30,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
-              ),
-              // Text below has no Material ancestor otherwise (this dialog is
-              // shown via showGeneralDialog, which doesn't provide one like
-              // showDialog does) — without it, Flutter silently falls back to
-              // its debug "missing Material" text style: yellow with an
-              // underline, which is exactly the ugly text the version dialog
-              // was showing.
-              child: Material(
-                type: MaterialType.transparency,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [accentStart, accentEnd],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: accentStart.withOpacity(0.45),
-                            blurRadius: 18,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.info_outline_rounded,
-                        color: Colors.white,
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Text(
-                      version,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      copyright,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.75),
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      allRightsReserved,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.6),
-                        fontSize: 12,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 44,
-                      child: AdaptiveButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        label: closeLabel,
-                        textColor: Colors.white,
-                        color: Colors.white,
-                        style: AdaptiveButtonStyle.glass,
-                        size: AdaptiveButtonSize.large,
-                        borderRadius: BorderRadius.circular(13),
-                        // The Cupertino fallback button (useNative: false)
-                        // defaults to a large horizontal-only padding meant
-                        // for full-size buttons, which doesn't fit the fixed
-                        // 44pt height here and clipped the label. Keep it
-                        // explicit and compact instead.
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        useNative: false,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+      title: s.versionLabel(_version),
+      message: '$copyright\n${s.allRightsReserved}',
+      icon: PlatformInfo.isIOS26OrHigher()
+          ? 'info.circle.fill'
+          : Icons.info_outline_rounded,
+      actions: [
+        AlertAction(
+          title: s.close,
+          style: AlertActionStyle.primary,
+          onPressed: () {},
         ),
-      ),
+      ],
     );
   }
 }
 
-// ── Reusable glass card ─────────────────────────────────────────────────────
+// ── Reusable card ────────────────────────────────────────────────────────────
 
 class _GlassCard extends StatelessWidget {
   final Widget child;
@@ -650,39 +578,25 @@ class _GlassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFEDEDED), width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 16,
-            offset: const Offset(0, 5),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.13),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.22),
-                width: 0.8,
-              ),
-            ),
-            child: child,
-          ),
-        ),
-      ),
+      child: child,
     );
   }
 }
 
 /// Android's stand-in for [AdaptiveSegmentedControl]: a plain pill-track
-/// selector matching this card's own white/glass language instead of a
-/// Material 3 widget rendered inside an app theme that has M3 disabled.
+/// selector matching iOS's native segmented control look — light gray
+/// track, white selected pill, brand-red selected label.
 class _LanguageSegments extends StatelessWidget {
   final List<String> labels;
   final int selectedIndex;
@@ -700,7 +614,7 @@ class _LanguageSegments extends StatelessWidget {
       height: 36,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.12),
+        color: const Color(0xFFF2F2F2),
         borderRadius: BorderRadius.circular(11),
       ),
       child: Row(
@@ -715,10 +629,16 @@ class _LanguageSegments extends StatelessWidget {
                 curve: Curves.easeOut,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: selected ? Colors.white.withOpacity(0.95) : Colors.transparent,
+                  color: selected ? Colors.white : Colors.transparent,
                   borderRadius: BorderRadius.circular(9),
                   boxShadow: selected
-                      ? [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 6, offset: const Offset(0, 2))]
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.12),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
                       : null,
                 ),
                 child: Text(
@@ -726,7 +646,9 @@ class _LanguageSegments extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: selected ? const Color(0xFFCC1500) : Colors.white.withOpacity(0.7),
+                    color: selected
+                        ? AppColors.brandRed
+                        : const Color(0xFF8A8A8E),
                   ),
                 ),
               ),

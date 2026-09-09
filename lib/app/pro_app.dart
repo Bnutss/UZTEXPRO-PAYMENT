@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'dart:convert' show json, base64, ascii, jsonDecode;
 import 'package:upgrader/upgrader.dart';
 import 'package:uztexpro_payment/features/auth/login_page.dart';
 import 'package:uztexpro_payment/features/home/menu_page.dart';
 import '../core/storage/app_storage.dart';
 import '../core/localization/locale_notifier.dart';
+import '../core/theme/app_colors.dart';
 
 class PROApp extends StatefulWidget {
   @override
@@ -45,35 +48,23 @@ class _ProMobile extends State<PROApp> {
     return ValueListenableBuilder<Locale>(
       valueListenable: localeNotifier,
       builder: (context, locale, _) {
-        return MaterialApp(
-          debugShowCheckedModeBanner: false,
+        return AdaptiveApp(
+          themeMode: ThemeMode.light,
+          materialLightTheme: _lightMaterialTheme(),
+          cupertinoLightTheme: _lightCupertinoTheme(),
           locale: locale,
           // Without these, Material widgets (date pickers, etc.) fall back
-          // to English regardless of `locale` above — MaterialApp can only
+          // to English regardless of `locale` above — the app can only
           // resolve a non-default locale's built-in strings once the
-          // corresponding delegate is registered here.
+          // corresponding delegate is registered here. Keeping all three
+          // (including Material's) also lets not-yet-migrated Material
+          // widgets keep working under the iOS Cupertino root.
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
           supportedLocales: const [Locale('ru'), Locale('en'), Locale('uz')],
-          theme: _darkTheme(),
-          // adaptive_platform_ui's native iOS 26 platform views (tab bar,
-          // buttons) read MediaQuery.platformBrightness to sync their own
-          // Liquid Glass appearance — that reflects the phone's system
-          // Dark Mode setting, not our single in-app theme. Force it dark so
-          // the native bar always matches the app instead of drifting to
-          // system brightness on every didChangeDependencies (e.g. after
-          // any navigation).
-          builder: (context, child) {
-            return MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(platformBrightness: Brightness.dark),
-              child: child!,
-            );
-          },
           home: UpgradeAlert(
             upgrader: Upgrader(),
             showIgnore: false,
@@ -119,37 +110,46 @@ class _ProMobile extends State<PROApp> {
     );
   }
 
-  ThemeData _darkTheme() {
-    const primary = Color(0xFFFF9800);
+  ThemeData _lightMaterialTheme() {
     return ThemeData(
-      brightness: Brightness.dark,
+      brightness: Brightness.light,
       useMaterial3: false,
-      scaffoldBackgroundColor: const Color(0xFF121212),
-      cardColor: const Color(0xFF1E1E1E),
-      colorScheme: const ColorScheme.dark(
-        primary: primary,
-        secondary: Color(0xFFFF5722),
-        surface: Color(0xFF1E1E1E),
-        background: Color(0xFF121212),
-        onSurface: Color(0xFFE0E0E0),
-        onBackground: Color(0xFFE0E0E0),
-        outline: Color(0xFF3A3A3A),
+      scaffoldBackgroundColor: AppColors.groupedBackground,
+      cardColor: Colors.white,
+      colorScheme: const ColorScheme.light(
+        primary: AppColors.brandOrange,
+        secondary: AppColors.brandRed,
+        surface: Colors.white,
+        background: AppColors.groupedBackground,
+        onSurface: Color(0xFF1A1A1A),
+        onBackground: Color(0xFF1A1A1A),
+        outline: Color(0xFFE0E0E0),
       ),
-      cardTheme: const CardThemeData(color: Color(0xFF1E1E1E)),
+      cardTheme: const CardThemeData(color: Colors.white),
       bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: Color(0xFF1E1E1E),
+        backgroundColor: Colors.white,
       ),
-      dialogTheme: const DialogThemeData(
-        backgroundColor: Color(0xFF1E1E1E),
-      ),
+      dialogTheme: const DialogThemeData(backgroundColor: Colors.white),
       inputDecorationTheme: const InputDecorationTheme(
-        fillColor: Color(0xFF2A2A2A),
+        fillColor: Color(0xFFF2F2F2),
         filled: true,
       ),
       textTheme: const TextTheme(
-        bodyLarge: TextStyle(color: Color(0xFFE0E0E0)),
-        bodyMedium: TextStyle(color: Color(0xFFE0E0E0)),
-        titleLarge: TextStyle(color: Color(0xFFE0E0E0)),
+        bodyLarge: TextStyle(color: Color(0xFF1A1A1A)),
+        bodyMedium: TextStyle(color: Color(0xFF1A1A1A)),
+        titleLarge: TextStyle(color: Color(0xFF1A1A1A)),
+      ),
+    );
+  }
+
+  CupertinoThemeData _lightCupertinoTheme() {
+    return const CupertinoThemeData(
+      brightness: Brightness.light,
+      primaryColor: AppColors.brandOrange,
+      scaffoldBackgroundColor: AppColors.groupedBackground,
+      barBackgroundColor: Colors.white,
+      textTheme: CupertinoTextThemeData(
+        primaryColor: AppColors.brandOrange,
       ),
     );
   }

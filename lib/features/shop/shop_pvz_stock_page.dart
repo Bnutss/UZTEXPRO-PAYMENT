@@ -4,16 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/adaptive_back_button.dart';
 import 'shop_api.dart';
 
 enum _RangePreset { all, today, week, month, custom }
 
 class _ShopStockColors {
-  static const Color g1 = Color(0xFFFF8C00);
-  static const Color g2 = Color(0xFFCC1500);
+  static const Color g1 = AppColors.brandOrange;
+  static const Color g2 = AppColors.brandRed;
 }
 
 // Дни считаются от confirmed_at — момента, когда бухгалтерия подтвердила
@@ -98,8 +101,7 @@ class ShopPvzStockPage extends StatefulWidget {
 }
 
 class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerProviderStateMixin {
-  static const Color _g1 = Color(0xFFFF8C00);
-  static const Color _g2 = Color(0xFFCC1500);
+  static const Color _g1 = AppColors.brandOrange;
 
   final NumberFormat _numberFormat = NumberFormat('#,##0', 'ru');
   final _searchController = TextEditingController();
@@ -262,8 +264,7 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
   Widget build(BuildContext context) {
     final s = S.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gradColors = isDark ? [const Color(0xFF3D1800), const Color(0xFF1F0000)] : [_g1, _g2];
-    final listBg = isDark ? Theme.of(context).colorScheme.surface : const Color(0xFFF4F4F4);
+    final listBg = isDark ? Theme.of(context).colorScheme.surface : AppColors.groupedBackground;
 
     final visibleOrders = _overdueOnly
         ? _orders.where((o) => (_daysSince(o.confirmedAt) ?? 0) > _overdueDaysThreshold).toList()
@@ -276,19 +277,18 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
       child: Scaffold(
         appBar: AppBar(
-          title: Text(s.shopStockTitle, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+          leading: const Center(child: AdaptiveBackButton()),
+          title: Text(s.shopStockTitle, style: const TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontSize: 18)),
           centerTitle: false,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          iconTheme: const IconThemeData(color: Colors.white),
-          flexibleSpace: Container(
-            decoration: BoxDecoration(gradient: LinearGradient(colors: gradColors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
-          ),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF1C1C1E),
+          elevation: 0.5,
+          shadowColor: Colors.black12,
         ),
         body: RefreshIndicator(
           color: _g1,
@@ -958,30 +958,22 @@ class _StockCustomRangeSheetState extends State<_StockCustomRangeSheet> {
   }
 
   Future<void> _pickFrom() async {
-    final picked = await showDatePicker(
+    final picked = await AdaptiveDatePicker.show(
       context: context,
       firstDate: DateTime(2024, 1, 1),
       lastDate: _to,
       initialDate: _from,
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(colorScheme: Theme.of(context).colorScheme.copyWith(primary: _ShopStockColors.g2)),
-        child: child!,
-      ),
     );
     if (picked == null || !mounted) return;
     setState(() => _from = picked);
   }
 
   Future<void> _pickTo() async {
-    final picked = await showDatePicker(
+    final picked = await AdaptiveDatePicker.show(
       context: context,
       firstDate: _from,
       lastDate: DateTime.now(),
       initialDate: _to,
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(colorScheme: Theme.of(context).colorScheme.copyWith(primary: _ShopStockColors.g2)),
-        child: child!,
-      ),
     );
     if (picked == null || !mounted) return;
     setState(() => _to = picked);
@@ -1037,18 +1029,16 @@ class _StockCustomRangeSheetState extends State<_StockCustomRangeSheet> {
             const SizedBox(height: 20),
             SizedBox(
               height: 50,
-              child: ElevatedButton(
+              child: AdaptiveButton(
                 onPressed: () {
                   HapticFeedback.selectionClick();
                   Navigator.of(context).pop(DateTimeRange(start: _from, end: _to));
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _ShopStockColors.g2,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: Text(s.shopIssuedApply, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                label: s.shopIssuedApply,
+                style: AdaptiveButtonStyle.filled,
+                color: _ShopStockColors.g2,
+                textColor: Colors.white,
+                borderRadius: BorderRadius.circular(14),
               ),
             ),
           ],

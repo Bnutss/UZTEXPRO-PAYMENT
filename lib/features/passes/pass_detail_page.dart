@@ -4,10 +4,13 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:uztexpro_payment/main.dart';
 import 'passes_page.dart' show passStatusConfig;
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/adaptive_back_button.dart';
 
 const _kDP = 'common/pass';
 
@@ -44,8 +47,7 @@ class PassDetailPage extends StatefulWidget {
 }
 
 class _PassDetailPageState extends State<PassDetailPage> {
-  static const _g1 = Color(0xFFFF8C00);
-  static const _g2 = Color(0xFFCC1500);
+  static const _g1 = AppColors.brandOrange;
 
   Map<String, dynamic>? _pass;
   bool _isLoading = true;
@@ -126,23 +128,54 @@ class _PassDetailPageState extends State<PassDetailPage> {
     final status = _pass!['status'] as int? ?? 0;
     final number = _pass!['number']?.toString() ?? '';
     final label = _approveLabel(status, S.of(context));
-    final ok = await _confirmDialog(
-      icon: Icons.check_circle_outline_rounded,
-      iconColor: const Color(0xFF43A047),
+    await AdaptiveAlertDialog.show(
+      context: context,
       title: label,
       message: S.of(context).confirmPassNumber(number),
-      confirmLabel: label,
-      confirmColor: const Color(0xFF43A047),
+      icon: PlatformInfo.isIOS26OrHigher()
+          ? 'checkmark.circle.fill'
+          : Icons.check_circle_outline_rounded,
+      iconColor: const Color(0xFF43A047),
+      actions: [
+        AlertAction(
+          title: S.of(context).cancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+        AlertAction(
+          title: label,
+          style: AlertActionStyle.primary,
+          onPressed: () => _doSign('approve'),
+        ),
+      ],
     );
-    if (!ok) return;
-    await _doSign('approve');
   }
 
   Future<void> _onReject() async {
     final number = _pass!['number']?.toString() ?? '';
-    final comment = await showDialog<String>(
+    final comment = await AdaptiveAlertDialog.inputShow(
       context: context,
-      builder: (_) => _RejectDialog(number: number),
+      title: S.of(context).rejectPass,
+      message: number,
+      icon: PlatformInfo.isIOS26OrHigher()
+          ? 'xmark.circle.fill'
+          : Icons.cancel_outlined,
+      iconColor: Colors.red,
+      input: AdaptiveAlertDialogInput(
+        placeholder: S.of(context).rejectionReasonHint,
+      ),
+      actions: [
+        AlertAction(
+          title: S.of(context).cancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+        AlertAction(
+          title: S.of(context).reject,
+          style: AlertActionStyle.destructive,
+          onPressed: () {},
+        ),
+      ],
     );
     if (comment == null) return;
     await _doSign('reject', comment: comment);
@@ -150,16 +183,27 @@ class _PassDetailPageState extends State<PassDetailPage> {
 
   Future<void> _onCancel() async {
     final number = _pass!['number']?.toString() ?? '';
-    final ok = await _confirmDialog(
-      icon: Icons.cancel_outlined,
-      iconColor: Colors.grey.shade600,
+    await AdaptiveAlertDialog.show(
+      context: context,
       title: S.of(context).cancelPass,
       message: S.of(context).cancelPassMessageShort(number),
-      confirmLabel: S.of(context).cancelBtn,
-      confirmColor: Colors.grey.shade600,
+      icon: PlatformInfo.isIOS26OrHigher()
+          ? 'xmark.circle.fill'
+          : Icons.cancel_outlined,
+      iconColor: Colors.grey.shade600,
+      actions: [
+        AlertAction(
+          title: S.of(context).cancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+        AlertAction(
+          title: S.of(context).cancelBtn,
+          style: AlertActionStyle.destructive,
+          onPressed: () => _doSign('cancel'),
+        ),
+      ],
     );
-    if (!ok) return;
-    await _doSign('cancel');
   }
 
   Future<void> _doSign(String action, {String? comment}) async {
@@ -197,83 +241,12 @@ class _PassDetailPageState extends State<PassDetailPage> {
     }
   }
 
-  Future<bool> _confirmDialog({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String message,
-    required String confirmLabel,
-    required Color confirmColor,
-  }) async {
-    final surface   = Theme.of(context).colorScheme.surface;
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(color: iconColor.withOpacity(0.1), shape: BoxShape.circle),
-              child: Icon(icon, color: iconColor, size: 28),
-            ),
-            const SizedBox(height: 14),
-            Text(title,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: onSurface)),
-            const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.6))),
-            const SizedBox(height: 22),
-            Row(children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    side: BorderSide(color: onSurface.withOpacity(0.2)),
-                  ),
-                  child: Text(S.of(context).cancel,
-                      style: TextStyle(color: onSurface.withOpacity(0.7), fontWeight: FontWeight.w600, fontSize: 13)),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () => Navigator.of(ctx).pop(true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: confirmColor, foregroundColor: Colors.white,
-                    elevation: 0, padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: Text(confirmLabel,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                ),
-              ),
-            ]),
-          ]),
-        ),
-      ),
-    );
-    return result ?? false;
-  }
-
   void _snack(String msg, bool ok) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(children: [
-        Icon(ok ? Icons.check_circle : Icons.error, color: Colors.white, size: 16),
-        const SizedBox(width: 10),
-        Expanded(child: Text(msg, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13))),
-      ]),
-      backgroundColor: ok ? const Color(0xFF43A047) : const Color(0xFFD32F2F),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    ));
+    AdaptiveSnackBar.show(
+      context,
+      message: msg,
+      type: ok ? AdaptiveSnackBarType.success : AdaptiveSnackBarType.error,
+    );
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────────
@@ -281,68 +254,59 @@ class _PassDetailPageState extends State<PassDetailPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gradColors = isDark
-        ? [const Color(0xFF3D1800), const Color(0xFF1F0000)]
-        : [_g1, _g2];
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
       child: Scaffold(
-        extendBodyBehindAppBar: true,
-        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
+        backgroundColor: isDark
+            ? const Color(0xFF121212)
+            : AppColors.groupedBackground,
         appBar: AppBar(
+          leading: const Center(child: AdaptiveBackButton()),
           title: Text(
             _pass?['number']?.toString() ?? S.of(context).passTitle,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
+            style: const TextStyle(
+              color: Color(0xFF1C1C1E),
+              fontWeight: FontWeight.bold,
+              fontSize: 17,
+            ),
           ),
           centerTitle: false,
-          systemOverlayStyle: const SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-            statusBarIconBrightness: Brightness.light,
-            statusBarBrightness: Brightness.dark,
-          ),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          iconTheme: const IconThemeData(color: Colors.white),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
-              onPressed: _isLoading ? null : _load,
-              tooltip: S.of(context).refresh,
-            ),
-          ],
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: gradColors,
-                  begin: Alignment.topLeft, end: Alignment.bottomRight),
-            ),
-          ),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF1C1C1E),
+          elevation: 0.5,
+          shadowColor: Colors.black12,
         ),
         bottomNavigationBar: (!_isLoading && _error == null && (_canSignNow || _canCancelNow))
             ? _buildBottomBar(isDark)
             : null,
         body: _isLoading
-            ? _buildShimmer(isDark, gradColors)
+            ? _buildShimmer(isDark)
             : _error != null
                 ? _buildError(isDark)
-                : _buildContent(isDark, gradColors),
+                : _buildContent(isDark),
       ),
     );
   }
 
-  Widget _buildShimmer(bool isDark, List<Color> gradColors) {
+  Widget _buildShimmer(bool isDark) {
     final base = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
     final hi   = isDark ? Colors.grey.shade700 : Colors.grey.shade100;
     return Column(children: [
       Container(
-        height: 170,
-        decoration: BoxDecoration(
-            gradient: LinearGradient(colors: gradColors,
-                begin: Alignment.topLeft, end: Alignment.bottomRight)),
+        height: 130,
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+        child: Shimmer.fromColors(
+          baseColor: base, highlightColor: hi,
+          child: Container(
+            decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(14)),
+          ),
+        ),
       ),
       Expanded(
         child: ListView.builder(
@@ -394,45 +358,44 @@ class _PassDetailPageState extends State<PassDetailPage> {
     );
   }
 
-  Widget _buildContent(bool isDark, List<Color> gradColors) {
+  Widget _buildContent(bool isDark) {
     final pass      = _pass!;
     final status    = pass['status'] as int? ?? 0;
     final cfg       = passStatusConfig(status);
     final label     = pass['status_display']?.toString() ?? cfg.label;
     final onSurface = Theme.of(context).colorScheme.onSurface;
 
-    return SingleChildScrollView(
+    return RefreshIndicator(
+      onRefresh: _load,
+      color: _g1,
+      child: SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       child: Column(children: [
-        // ── Gradient header ──────────────────────────────────────────────────
+        // ── Status header ────────────────────────────────────────────────────
         Container(
-          decoration: BoxDecoration(
-              gradient: LinearGradient(colors: gradColors,
-                  begin: Alignment.topLeft, end: Alignment.bottomRight)),
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
-              child: Column(children: [
-                // Status pill
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withOpacity(0.35), width: 1),
-                  ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(cfg.icon, size: 15, color: Colors.white),
-                    const SizedBox(width: 7),
-                    Flexible(child: Text(label,
-                        style: const TextStyle(color: Colors.white,
-                            fontWeight: FontWeight.bold, fontSize: 13))),
-                  ]),
+          color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
+            child: Column(children: [
+              // Status pill
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: cfg.color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: cfg.color.withOpacity(0.35), width: 1),
                 ),
-                const SizedBox(height: 16),
-                _DetailProgress(status: status),
-              ]),
-            ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(cfg.icon, size: 15, color: cfg.color),
+                  const SizedBox(width: 7),
+                  Flexible(child: Text(label,
+                      style: TextStyle(color: cfg.color,
+                          fontWeight: FontWeight.bold, fontSize: 13))),
+                ]),
+              ),
+              const SizedBox(height: 16),
+              _DetailProgress(status: status, isDark: isDark),
+            ]),
           ),
         ),
 
@@ -455,6 +418,7 @@ class _PassDetailPageState extends State<PassDetailPage> {
           ]),
         ),
       ]),
+      ),
     );
   }
 
@@ -517,7 +481,8 @@ class _PassDetailPageState extends State<PassDetailPage> {
 
 class _DetailProgress extends StatelessWidget {
   final int status;
-  const _DetailProgress({required this.status});
+  final bool isDark;
+  const _DetailProgress({required this.status, required this.isDark});
 
   List<(int, String, Color)> _steps(S s) => [
     (0, s.progressNew, Color(0xFF1E88E5)),
@@ -529,28 +494,32 @@ class _DetailProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     if (status == -1) {
       return Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        const Icon(Icons.cancel_outlined, size: 14, color: Colors.white54),
+        const Icon(Icons.cancel_outlined, size: 14, color: Color(0xFF757575)),
         const SizedBox(width: 6),
         Text(S.of(context).passCancelled,
-            style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.6),
+            style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.4),
                 fontStyle: FontStyle.italic)),
       ]);
     }
     final steps = _steps(S.of(context));
+    final inactiveDot = isDark ? Colors.white12 : Colors.grey.shade200;
+    final inactiveLine = isDark ? Colors.white10 : Colors.grey.shade200;
     return Column(children: [
       Row(children: [
         for (int i = 0; i < steps.length; i++) ...[
           _StepDot(done: status > steps[i].$1,
-              current: status == steps[i].$1, color: steps[i].$3),
+              current: status == steps[i].$1, color: steps[i].$3,
+              inactiveColor: inactiveDot),
           if (i < steps.length - 1)
             Expanded(child: Container(
               height: 2, margin: const EdgeInsets.symmetric(horizontal: 3),
               decoration: BoxDecoration(
                 color: status > steps[i].$1
                     ? steps[i].$3
-                    : Colors.white.withOpacity(0.2),
+                    : inactiveLine,
                 borderRadius: BorderRadius.circular(1),
               ),
             )),
@@ -563,8 +532,8 @@ class _DetailProgress extends StatelessWidget {
             fontSize: 9,
             fontWeight: status == steps[i].$1 ? FontWeight.w700 : FontWeight.w400,
             color: status >= steps[i].$1
-                ? Colors.white
-                : Colors.white.withOpacity(0.3),
+                ? steps[i].$3
+                : onSurface.withOpacity(0.28),
           )),
           if (i < steps.length - 1) const Spacer(),
         ],
@@ -577,7 +546,9 @@ class _StepDot extends StatelessWidget {
   final bool done;
   final bool current;
   final Color color;
-  const _StepDot({required this.done, required this.current, required this.color});
+  final Color inactiveColor;
+  const _StepDot({required this.done, required this.current, required this.color,
+      required this.inactiveColor});
 
   @override
   Widget build(BuildContext context) {
@@ -587,9 +558,9 @@ class _StepDot extends StatelessWidget {
       width: size, height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: active ? color : Colors.white.withOpacity(0.15),
+        color: active ? color : inactiveColor,
         border: Border.all(
-            color: active ? color : Colors.white.withOpacity(0.3),
+            color: active ? color : Colors.grey.shade300,
             width: current ? 2.5 : 1.5),
         boxShadow: current
             ? [BoxShadow(color: color.withOpacity(0.5), blurRadius: 7, spreadRadius: 1)]

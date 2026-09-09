@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:uztexpro_payment/main.dart';
 import 'bonuses_page.dart' show bonusStatusConfig;
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/adaptive_back_button.dart';
 
 const _kDPBonus = 'edo/bonus-employee';
 
@@ -32,8 +35,7 @@ class BonusDetailPage extends StatefulWidget {
 }
 
 class _BonusDetailPageState extends State<BonusDetailPage> {
-  static const _g1 = Color(0xFFFF8C00);
-  static const _g2 = Color(0xFFCC1500);
+  static const _g1 = AppColors.brandOrange;
 
   late Map<String, dynamic> _item;
   bool _busy = false;
@@ -69,15 +71,30 @@ class _BonusDetailPageState extends State<BonusDetailPage> {
   // ── Actions ──────────────────────────────────────────────────────────────────
 
   Future<void> _onApprove() async {
-    final ok = await _confirmDialog(
-      icon: Icons.check_circle_outline_rounded,
-      iconColor: const Color(0xFF43A047),
+    await AdaptiveAlertDialog.show(
+      context: context,
       title: S.of(context).bonusApproveTitle,
       message: S.of(context).bonusApproveDesc,
-      confirmLabel: S.of(context).bonusApproveBtn,
-      confirmColor: const Color(0xFF43A047),
+      icon: PlatformInfo.isIOS26OrHigher()
+          ? 'checkmark.circle.fill'
+          : Icons.check_circle_outline_rounded,
+      iconColor: const Color(0xFF43A047),
+      actions: [
+        AlertAction(
+          title: S.of(context).cancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+        AlertAction(
+          title: S.of(context).bonusApproveBtn,
+          style: AlertActionStyle.primary,
+          onPressed: _doApprove,
+        ),
+      ],
     );
-    if (!ok) return;
+  }
+
+  Future<void> _doApprove() async {
     setState(() => _busy = true);
     try {
       final id   = _item['id'];
@@ -105,15 +122,30 @@ class _BonusDetailPageState extends State<BonusDetailPage> {
   }
 
   Future<void> _onDelete() async {
-    final ok = await _confirmDialog(
-      icon: Icons.delete_outline_rounded,
-      iconColor: Colors.red.shade600,
+    await AdaptiveAlertDialog.show(
+      context: context,
       title: S.of(context).bonusDeleteTitle,
       message: S.of(context).bonusDeleteDesc,
-      confirmLabel: S.of(context).deleteBtn,
-      confirmColor: Colors.red.shade600,
+      icon: PlatformInfo.isIOS26OrHigher()
+          ? 'trash.fill'
+          : Icons.delete_outline_rounded,
+      iconColor: Colors.red.shade600,
+      actions: [
+        AlertAction(
+          title: S.of(context).cancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+        AlertAction(
+          title: S.of(context).deleteBtn,
+          style: AlertActionStyle.destructive,
+          onPressed: _doDelete,
+        ),
+      ],
     );
-    if (!ok) return;
+  }
+
+  Future<void> _doDelete() async {
     setState(() => _busy = true);
     try {
       final id   = _item['id'];
@@ -135,93 +167,12 @@ class _BonusDetailPageState extends State<BonusDetailPage> {
     }
   }
 
-  Future<bool> _confirmDialog({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String message,
-    required String confirmLabel,
-    required Color confirmColor,
-  }) async {
-    final surface   = Theme.of(context).colorScheme.surface;
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1), shape: BoxShape.circle),
-              child: Icon(icon, color: iconColor, size: 28),
-            ),
-            const SizedBox(height: 14),
-            Text(title,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.bold, color: onSurface)),
-            const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.6))),
-            const SizedBox(height: 22),
-            Row(children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    side: BorderSide(color: onSurface.withOpacity(0.2)),
-                  ),
-                  child: Text(S.of(context).cancel,
-                      style: TextStyle(
-                          color: onSurface.withOpacity(0.7),
-                          fontWeight: FontWeight.w600, fontSize: 13)),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () => Navigator.of(ctx).pop(true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: confirmColor,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: Text(confirmLabel,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 13)),
-                ),
-              ),
-            ]),
-          ]),
-        ),
-      ),
-    );
-    return result ?? false;
-  }
-
   void _snack(String msg, bool ok) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(children: [
-        Icon(ok ? Icons.check_circle : Icons.error, color: Colors.white, size: 16),
-        const SizedBox(width: 10),
-        Expanded(child: Text(msg,
-            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13))),
-      ]),
-      backgroundColor: ok ? const Color(0xFF43A047) : const Color(0xFFD32F2F),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    ));
+    AdaptiveSnackBar.show(
+      context,
+      message: msg,
+      type: ok ? AdaptiveSnackBarType.success : AdaptiveSnackBarType.error,
+    );
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────────
@@ -229,53 +180,39 @@ class _BonusDetailPageState extends State<BonusDetailPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gradColors = isDark
-        ? [const Color(0xFF3D1800), const Color(0xFF1F0000)]
-        : [_g1, _g2];
     final id = _item['id']?.toString() ?? '—';
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
       child: Scaffold(
-        extendBodyBehindAppBar: true,
-        backgroundColor:
-            isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
+        backgroundColor: isDark
+            ? const Color(0xFF121212)
+            : AppColors.groupedBackground,
         appBar: AppBar(
+          leading: const Center(child: AdaptiveBackButton()),
           title: Text(
             '${S.of(context).bonusNumber}$id',
             style: const TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
+                color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontSize: 17),
           ),
           centerTitle: false,
-          systemOverlayStyle: const SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-            statusBarIconBrightness: Brightness.light,
-            statusBarBrightness: Brightness.dark,
-          ),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          iconTheme: const IconThemeData(color: Colors.white),
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                  colors: gradColors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight),
-            ),
-          ),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF1C1C1E),
+          elevation: 0.5,
+          shadowColor: Colors.black12,
         ),
         bottomNavigationBar:
             (_canSignNow || _canDeleteNow) ? _buildBottomBar(isDark) : null,
-        body: _buildContent(isDark, gradColors),
+        body: _buildContent(isDark),
       ),
     );
   }
 
-  Widget _buildContent(bool isDark, List<Color> gradColors) {
+  Widget _buildContent(bool isDark) {
     final status      = _item['status'] as int? ?? 0;
     final cfg         = bonusStatusConfig(status);
     final statusLabel = _item['status_text']?.toString() ?? cfg.label;
@@ -284,16 +221,10 @@ class _BonusDetailPageState extends State<BonusDetailPage> {
 
     return SingleChildScrollView(
       child: Column(children: [
-        // ── Gradient header ──────────────────────────────────────────────────
+        // ── Status header ────────────────────────────────────────────────────
         Container(
-          decoration: BoxDecoration(
-              gradient: LinearGradient(
-                  colors: gradColors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight)),
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
+          color: Colors.white,
+          child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
               child: Column(children: [
                 // Status pill
@@ -301,28 +232,27 @@ class _BonusDetailPageState extends State<BonusDetailPage> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
+                    color: cfg.color.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                        color: Colors.white.withOpacity(0.35), width: 1),
+                        color: cfg.color.withOpacity(0.35), width: 1),
                   ),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(cfg.icon, size: 15, color: Colors.white),
+                    Icon(cfg.icon, size: 15, color: cfg.color),
                     const SizedBox(width: 7),
                     Flexible(
                       child: Text(statusLabel,
-                          style: const TextStyle(
-                              color: Colors.white,
+                          style: TextStyle(
+                              color: cfg.color,
                               fontWeight: FontWeight.bold,
                               fontSize: 13)),
                     ),
                   ]),
                 ),
                 const SizedBox(height: 16),
-                _DetailProgress(status: status),
+                _DetailProgress(status: status, isDark: isDark),
               ]),
             ),
-          ),
         ),
 
         // ── Cards area ───────────────────────────────────────────────────────
@@ -379,7 +309,6 @@ class _BonusDetailPageState extends State<BonusDetailPage> {
                     label: S.of(context).deleteBtn,
                     icon: Icons.delete_outline_rounded,
                     color: const Color(0xFFD32F2F),
-                    bgColor: const Color(0xFFFFEBEE),
                     isDark: isDark,
                     onTap: _onDelete,
                   )),
@@ -390,7 +319,6 @@ class _BonusDetailPageState extends State<BonusDetailPage> {
                     label: S.of(context).bonusApproveBtn,
                     icon: Icons.check_rounded,
                     color: const Color(0xFF2E7D32),
-                    bgColor: const Color(0xFFE8F5E9),
                     isDark: isDark,
                     onTap: _onApprove,
                   )),
@@ -404,7 +332,8 @@ class _BonusDetailPageState extends State<BonusDetailPage> {
 
 class _DetailProgress extends StatelessWidget {
   final int status;
-  const _DetailProgress({required this.status});
+  final bool isDark;
+  const _DetailProgress({required this.status, required this.isDark});
 
   List<(int, String, Color)> _steps(S s) => [
     (1, s.bonusStatusNew, Color(0xFF1E88E5)),
@@ -423,13 +352,16 @@ class _DetailProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     final steps = _steps(S.of(context));
     final idx = _idx(steps);
+    final inactiveDot = isDark ? Colors.white12 : Colors.grey.shade200;
+    final inactiveLine = isDark ? Colors.white10 : Colors.grey.shade200;
     return Column(children: [
       Row(children: [
         for (int i = 0; i < steps.length; i++) ...[
           _StepDot(done: idx >= 0 && i < idx, current: i == idx,
-              color: steps[i].$3),
+              color: steps[i].$3, inactiveColor: inactiveDot),
           if (i < steps.length - 1)
             Expanded(child: Container(
               height: 2,
@@ -437,7 +369,7 @@ class _DetailProgress extends StatelessWidget {
               decoration: BoxDecoration(
                 color: (idx >= 0 && i < idx)
                     ? steps[i].$3
-                    : Colors.white.withOpacity(0.2),
+                    : inactiveLine,
                 borderRadius: BorderRadius.circular(1),
               ),
             )),
@@ -450,8 +382,8 @@ class _DetailProgress extends StatelessWidget {
             fontSize: 9,
             fontWeight: i == idx ? FontWeight.w700 : FontWeight.w400,
             color: (idx >= 0 && i <= idx)
-                ? Colors.white
-                : Colors.white.withOpacity(0.3),
+                ? steps[i].$3
+                : onSurface.withOpacity(0.28),
           )),
           if (i < steps.length - 1) const Spacer(),
         ],
@@ -464,7 +396,9 @@ class _StepDot extends StatelessWidget {
   final bool done;
   final bool current;
   final Color color;
-  const _StepDot({required this.done, required this.current, required this.color});
+  final Color inactiveColor;
+  const _StepDot({required this.done, required this.current, required this.color,
+      required this.inactiveColor});
 
   @override
   Widget build(BuildContext context) {
@@ -474,9 +408,9 @@ class _StepDot extends StatelessWidget {
       width: size, height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: active ? color : Colors.white.withOpacity(0.15),
+        color: active ? color : inactiveColor,
         border: Border.all(
-            color: active ? color : Colors.white.withOpacity(0.3),
+            color: active ? color : Colors.grey.shade300,
             width: current ? 2.5 : 1.5),
         boxShadow: current
             ? [BoxShadow(
@@ -996,39 +930,33 @@ class _ActionButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color color;
-  final Color bgColor;
   final bool isDark;
   final VoidCallback onTap;
   const _ActionButton({
     required this.label, required this.icon, required this.color,
-    required this.bgColor, required this.isDark, required this.onTap,
+    required this.isDark, required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
+    return SizedBox(
+      width: double.infinity,
+      child: AdaptiveButton.child(
+        onPressed: onTap,
+        style: AdaptiveButtonStyle.tinted,
+        color: color,
+        size: AdaptiveButtonSize.large,
         borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 13),
-          decoration: BoxDecoration(
-            color: isDark ? color.withOpacity(0.15) : bgColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-                color: color.withOpacity(isDark ? 0.35 : 0.3)),
-          ),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 7),
-            Flexible(child: Text(label,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    color: color, fontSize: 13,
-                    fontWeight: FontWeight.bold))),
-          ]),
-        ),
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 7),
+          Flexible(child: Text(label,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  color: color, fontSize: 13,
+                  fontWeight: FontWeight.bold))),
+        ]),
       ),
     );
   }
