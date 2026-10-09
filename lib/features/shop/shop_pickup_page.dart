@@ -1,3 +1,4 @@
+import '../../core/widgets/app_button.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -289,7 +290,9 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
             AnimatedSearchSlot(
               open: _searching,
               child: Container(
-                color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                color: isDark
+                    ? Theme.of(context).colorScheme.surface
+                    : AppColors.groupedBackground,
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                 child: _SearchBar(controller: _searchController, isDark: isDark, hintText: s.shopPickupSearchHint),
               ),
@@ -358,7 +361,7 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
               SizedBox(
                 width: 160,
                 height: 46,
-                child: AdaptiveButton.child(
+                child: AppButton(
                   onPressed: _load,
                   style: AdaptiveButtonStyle.filled,
                   color: _g1,

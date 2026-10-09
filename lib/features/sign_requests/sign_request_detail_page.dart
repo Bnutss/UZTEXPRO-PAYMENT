@@ -1,3 +1,4 @@
+import '../../core/widgets/app_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -311,7 +312,7 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
             SizedBox(
               width: 160,
               height: 46,
-              child: AdaptiveButton.child(
+              child: AppButton(
                 onPressed: _load,
                 style: AdaptiveButtonStyle.filled,
                 color: _g1,
@@ -1144,7 +1145,7 @@ class _BottomActionBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      child: AdaptiveButton.child(
+      child: AppButton(
         onPressed: onTap,
         style: AdaptiveButtonStyle.tinted,
         color: color,

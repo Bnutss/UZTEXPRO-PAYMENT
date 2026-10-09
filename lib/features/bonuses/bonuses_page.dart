@@ -1,3 +1,5 @@
+import '../../core/widgets/fade_route.dart';
+import '../../core/widgets/app_button.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -477,7 +479,9 @@ class _BonusesPageState extends State<BonusesPage>
             AnimatedSearchSlot(
               open: _searching,
               child: Container(
-                color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                color: isDark
+                    ? Theme.of(context).colorScheme.surface
+                    : AppColors.groupedBackground,
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
                 child: _SearchBar(
                   controller: _searchCtrl,
@@ -559,7 +563,7 @@ class _BonusesPageState extends State<BonusesPage>
               SizedBox(
                 width: 160,
                 height: 46,
-                child: AdaptiveButton.child(
+                child: AppButton(
                   onPressed: _invalidateAndLoad,
                   style: AdaptiveButtonStyle.filled,
                   color: _g1,
@@ -658,7 +662,7 @@ class _BonusesPageState extends State<BonusesPage>
               onDelete: () => _onDelete(item),
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(
+                FadeRoute(
                   builder: (_) => BonusDetailPage(
                     item: item,
                     jwtToken: widget.jwtToken,
@@ -1376,7 +1380,7 @@ class _ActionBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      child: AdaptiveButton.child(
+      child: AppButton(
         onPressed: onTap,
         style: AdaptiveButtonStyle.tinted,
         color: color,

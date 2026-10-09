@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 
 import '../../core/localization/app_strings.dart';
@@ -9,9 +8,12 @@ import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/adaptive_back_button.dart';
 import '../../core/widgets/app_refresh.dart';
+import '../../core/widgets/block_search_field.dart';
+import '../../core/widgets/search_toggle.dart';
 import '../../core/widgets/app_segmented_control.dart';
 import '../../core/widgets/choice_field.dart';
 import '../../core/widgets/ui_blocks.dart';
+import '../auth/widgets/logo_stroke_loader.dart';
 import 'shop_api.dart';
 
 enum _RangePreset { today, week, month, custom }
@@ -54,6 +56,16 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
   late DateTime _dateFrom;
   late DateTime _dateTo;
 
+  final TextEditingController _searchCtrl = TextEditingController();
+  bool _searching = false;
+
+  void _toggleSearch() {
+    setState(() {
+      _searching = !_searching;
+      if (!_searching) _searchCtrl.clear();
+    });
+  }
+
   List<PvzShop> _shops = [];
   int? _shopId;
 
@@ -69,6 +81,7 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
     final now = DateTime.now();
     _dateFrom = DateTime(now.year, now.month, 1);
     _dateTo = now;
+    _searchCtrl.addListener(() => setState(() {}));
     _loadShops();
     _load();
     localeNotifier.addListener(_onLocaleChanged);
@@ -79,6 +92,7 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
   @override
   void dispose() {
     _animCtrl.dispose();
+    _searchCtrl.dispose();
     localeNotifier.removeListener(_onLocaleChanged);
     super.dispose();
   }
@@ -201,6 +215,14 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
         default:
           return true;
       }
+    }).where((o) {
+      final q = _searchCtrl.text.trim().toLowerCase();
+      if (q.isEmpty) return true;
+      final hay = StringBuffer('${o.buyerName} ${o.id}');
+      for (final it in o.items) {
+        hay.write(' ${it.article} ${it.productName} ${it.color}');
+      }
+      return hay.toString().toLowerCase().contains(q);
     }).toList();
     final groups = _groupByBuyer(visible);
 
@@ -220,6 +242,7 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
           elevation: 0,
           scrolledUnderElevation: 0,
           surfaceTintColor: Colors.transparent,
+          actions: [SearchToggleButton(active: _searching, onPressed: _toggleSearch)],
         ),
         body: AppRefresh(
           onRefresh: _load,
@@ -256,6 +279,10 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
                     ],
                   ),
                 ),
+                if (_searching) ...[
+                  const SizedBox(height: 10),
+                  BlockSearchField(controller: _searchCtrl, hint: s.shopIssuedSearchHint),
+                ],
                 const SizedBox(height: 12),
                 if (_loading)
                   _skeleton(isDark)
@@ -413,33 +440,9 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
   }
 
   Widget _skeleton(bool isDark) {
-    final base = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
-    final hi = isDark ? Colors.grey.shade700 : Colors.grey.shade100;
-    Widget block({double height = 88, double? width}) => Container(
-      height: height,
-      width: width,
-      decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(16)),
-    );
-    return Shimmer.fromColors(
-      baseColor: base,
-      highlightColor: hi,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(child: block(height: 72)),
-              const SizedBox(width: 10),
-              Expanded(child: block(height: 72)),
-              const SizedBox(width: 10),
-              Expanded(flex: 2, child: block(height: 72)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          for (int i = 0; i < 4; i++)
-            Padding(padding: const EdgeInsets.only(bottom: 8), child: block()),
-        ],
-      ),
+    return const Padding(
+      padding: EdgeInsets.only(top: 56, bottom: 56),
+      child: Center(child: LogoStrokeLoader(size: 120)),
     );
   }
 }

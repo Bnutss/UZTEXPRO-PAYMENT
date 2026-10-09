@@ -2,17 +2,18 @@ import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:shimmer/shimmer.dart';
 
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/adaptive_back_button.dart';
 import '../../core/widgets/app_refresh.dart';
+import '../../core/widgets/block_search_field.dart';
 import '../../core/widgets/app_segmented_control.dart';
 import '../../core/widgets/choice_field.dart';
 import '../../core/widgets/search_toggle.dart';
 import '../../core/widgets/ui_blocks.dart';
+import '../auth/widgets/logo_stroke_loader.dart';
 import 'shop_api.dart';
 
 enum _RangePreset { all, today, week, month, custom }
@@ -185,10 +186,6 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
   void _selectTab(_Tab tab) {
     setState(() {
       _tab = tab;
-      if (tab != _Tab.stock && _searching) {
-        _searching = false;
-        _searchCtrl.clear();
-      }
     });
   }
 
@@ -218,7 +215,7 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
           scrolledUnderElevation: 0,
           surfaceTintColor: Colors.transparent,
           actions: [
-            if (_tab == _Tab.stock) SearchToggleButton(active: _searching, onPressed: _toggleSearch),
+            SearchToggleButton(active: _searching, onPressed: _toggleSearch),
           ],
         ),
         body: AppRefresh(
@@ -324,9 +321,9 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
         minSegmentWidth: 88,
         padding: EdgeInsets.zero,
       ),
-      if (_searching && _tab == _Tab.stock) ...[
+      if (_searching) ...[
         const SizedBox(height: 10),
-        _SearchField(controller: _searchCtrl, hint: s.shopAnalyticsSearchHint),
+        BlockSearchField(controller: _searchCtrl, hint: s.shopAnalyticsSearchHint),
       ],
     ];
   }
@@ -358,14 +355,18 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
                 ? data.topShops
                 : data.topBuyers;
         final maxValue = rows.fold<double>(0, (m, r) => r.totalValue > m ? r.totalValue : m);
-        count = rows.length;
+        final rq = _searchCtrl.text.trim().toLowerCase();
+        final shownRows = rq.isEmpty
+            ? rows
+            : rows.where((r) => '${r.title} ${r.subtitle}'.toLowerCase().contains(rq)).toList();
+        count = shownRows.length;
         rowAt = (i) => _RankRow(
               rank: i + 1,
-              row: rows[i],
+              row: shownRows[i],
               kind: _tab,
               fmt: _fmt,
-              share: maxValue > 0 ? rows[i].totalValue / maxValue : 0,
-              ordersLabel: s.shopStockOrdersCount(rows[i].salesCount),
+              share: maxValue > 0 ? shownRows[i].totalValue / maxValue : 0,
+              ordersLabel: s.shopStockOrdersCount(shownRows[i].salesCount),
               pcsLabel: s.shopAnalyticsPcs,
             );
         break;
@@ -407,55 +408,14 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
   }
 
   Widget _skeleton(bool isDark) {
-    final base = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
-    final hi = isDark ? Colors.grey.shade700 : Colors.grey.shade100;
-    return Shimmer.fromColors(
-      baseColor: base,
-      highlightColor: hi,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Container(
-          height: 280,
-          decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(16)),
-        ),
-      ),
+    return const Padding(
+      padding: EdgeInsets.only(top: 56, bottom: 56),
+      child: Center(child: LogoStrokeLoader(size: 120)),
     );
   }
 }
 
 // ─── Widgets ───────────────────────────────────────────────────────────────
-
-class _SearchField extends StatelessWidget {
-  const _SearchField({required this.controller, required this.hint});
-
-  final TextEditingController controller;
-  final String hint;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 42,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kInk.withOpacity(0.08)),
-      ),
-      child: TextField(
-        controller: controller,
-        autofocus: true,
-        style: const TextStyle(color: kInk, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: kInkMuted, fontSize: 14),
-          prefixIcon: const Icon(Icons.search_rounded, size: 20, color: kInkMuted),
-          filled: false,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 11),
-        ),
-      ),
-    );
-  }
-}
 
 class _RankRow extends StatelessWidget {
   const _RankRow({

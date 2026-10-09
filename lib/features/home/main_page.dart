@@ -1285,7 +1285,9 @@ class _MainPageScreenState extends State<MainPageScreen>
             AnimatedSearchSlot(
               open: _searching,
               child: Container(
-                color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                color: isDark
+                    ? Theme.of(context).colorScheme.surface
+                    : AppColors.groupedBackground,
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
                 child: _PaySearchBar(
                   controller: _searchController,

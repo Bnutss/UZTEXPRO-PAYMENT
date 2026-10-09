@@ -1,3 +1,5 @@
+import '../../core/widgets/fade_route.dart';
+import '../../core/widgets/app_button.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -429,7 +431,9 @@ class _SignRequestsPageState extends State<SignRequestsPage>
             AnimatedSearchSlot(
               open: _searching,
               child: Container(
-                color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                color: isDark
+                    ? Theme.of(context).colorScheme.surface
+                    : AppColors.groupedBackground,
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
                 child: _SearchBar(controller: _searchCtrl, isDark: isDark),
               ),
@@ -497,7 +501,7 @@ class _SignRequestsPageState extends State<SignRequestsPage>
               SizedBox(
                 width: 160,
                 height: 46,
-                child: AdaptiveButton.child(
+                child: AppButton(
                   onPressed: () => _load(forceRefresh: true),
                   style: AdaptiveButtonStyle.filled,
                   color: _g1,
@@ -580,7 +584,7 @@ class _SignRequestsPageState extends State<SignRequestsPage>
             onReject: () => _onReject(_shown[i]),
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
+              FadeRoute(
                 builder: (_) => SignRequestDetailPage(
                   appId: _shown[i]['id'] as int,
                   jwtToken: widget.jwtToken,
@@ -1093,7 +1097,7 @@ class _ActionBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      child: AdaptiveButton.child(
+      child: AppButton(
         onPressed: onTap,
         style: AdaptiveButtonStyle.tinted,
         color: color,

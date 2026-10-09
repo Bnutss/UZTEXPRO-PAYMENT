@@ -351,6 +351,12 @@ class S {
     'uz': 'Artikul, nomi, rangi',
   });
 
+  String get shopIssuedSearchHint => _t({
+    'ru': 'Покупатель, № заказа, товар',
+    'en': 'Buyer, order no., product',
+    'uz': 'Xaridor, buyurtma №, mahsulot',
+  });
+
   String get shopAnalyticsPcs => _t({
     'ru': 'шт',
     'en': 'pcs',

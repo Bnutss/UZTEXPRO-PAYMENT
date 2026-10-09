@@ -1,3 +1,5 @@
+import '../../core/widgets/fade_route.dart';
+import '../../core/widgets/app_button.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -584,22 +586,6 @@ class _PassesPageState extends State<PassesPage>
           scrolledUnderElevation: 0,
           surfaceTintColor: Colors.transparent,
           actions: [
-            // Refreshing indicator only — the manual refresh button was
-            // redundant now that the list already supports pull-to-refresh.
-            if (_refreshing)
-              const Padding(
-                padding: EdgeInsets.only(right: 16),
-                child: Center(
-                  child: SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(Color(0xFF8A8A8E)),
-                    ),
-                  ),
-                ),
-              ),
             if (!_isLoading && _error == null)
               Padding(
                 padding: const EdgeInsets.only(right: 12),
@@ -620,7 +606,9 @@ class _PassesPageState extends State<PassesPage>
             AnimatedSearchSlot(
               open: _searching,
               child: Container(
-                color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                color: isDark
+                    ? Theme.of(context).colorScheme.surface
+                    : AppColors.groupedBackground,
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
                 child: _SearchBar(
                   controller: _searchCtrl,
@@ -703,7 +691,7 @@ class _PassesPageState extends State<PassesPage>
               SizedBox(
                 width: 160,
                 height: 46,
-                child: AdaptiveButton.child(
+                child: AppButton(
                   onPressed: _invalidateAndLoad,
                   style: AdaptiveButtonStyle.filled,
                   color: _g1,
@@ -807,7 +795,7 @@ class _PassesPageState extends State<PassesPage>
               onCancel: () => _onCancel(pass),
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(
+                FadeRoute(
                   builder: (_) => PassDetailPage(
                     passId: pass['id'] as int,
                     jwtToken: widget.jwtToken,
@@ -1145,31 +1133,37 @@ class _ActionBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Plain Flutter button: a native AdaptiveButton is a platform view that
+    // ignores the FadeRoute opacity and flashes when the page closes.
     return SizedBox(
       width: double.infinity,
-      child: AdaptiveButton.child(
-        onPressed: onTap,
-        style: AdaptiveButtonStyle.tinted,
-        color: color,
+      child: Material(
+        color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(10),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 15),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                label,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: color, size: 15),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

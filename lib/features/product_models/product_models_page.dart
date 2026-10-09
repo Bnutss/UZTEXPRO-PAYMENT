@@ -1,3 +1,5 @@
+import '../../core/widgets/fade_route.dart';
+import '../../core/widgets/app_button.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -568,7 +570,9 @@ class _ProductModelsPageState extends State<ProductModelsPage>
             AnimatedSearchSlot(
               open: _searching,
               child: Container(
-                color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                color: isDark
+                    ? Theme.of(context).colorScheme.surface
+                    : AppColors.groupedBackground,
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
                 child: _SearchBar(
                   controller: _searchCtrl,
@@ -658,7 +662,7 @@ class _ProductModelsPageState extends State<ProductModelsPage>
               SizedBox(
                 width: 160,
                 height: 46,
-                child: AdaptiveButton.child(
+                child: AppButton(
                   onPressed: () => _load(reset: true),
                   style: AdaptiveButtonStyle.filled,
                   color: _g1,
@@ -776,7 +780,7 @@ class _ProductModelsPageState extends State<ProductModelsPage>
               onToggleConfirm: () => _onToggleConfirm(item),
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(
+                FadeRoute(
                   builder: (_) => ProductModelDetailPage(
                     modelId: item['id'] as int,
                     jwtToken: widget.jwtToken,
@@ -838,7 +842,7 @@ class _ProductModelsPageState extends State<ProductModelsPage>
             SizedBox(
               width: 190,
               height: 44,
-              child: AdaptiveButton.child(
+              child: AppButton(
                 onPressed: _resetFilters,
                 style: AdaptiveButtonStyle.plain,
                 color: _g1,
