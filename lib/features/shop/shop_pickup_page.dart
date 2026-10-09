@@ -222,18 +222,24 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
           leading: const Center(child: AdaptiveBackButton()),
           title: Text(s.shopPickupTitle, style: const TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontSize: 18)),
           centerTitle: false,
-          backgroundColor: Colors.white,
+          backgroundColor: isDark ? Theme.of(context).colorScheme.surface : AppColors.groupedBackground,
           foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0.5,
-          shadowColor: Colors.black12,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
           actions: [
+            if (!_loading && _error == null)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Center(child: _CountBadge(count: _orders.length)),
+              ),
             SearchToggleButton(active: _searching, onPressed: _toggleSearch),
           ],
         ),
         body: Column(
           children: [
             Container(
-              color: Colors.white,
+              color: listBg,
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,8 +247,6 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
                   Row(
                     children: [
                       Expanded(child: _buildDateFilterRow(s)),
-                      const SizedBox(width: 8),
-                      if (!_loading && _error == null) _CountBadge(count: _orders.length),
                     ],
                   ),
                   if (_shops.isNotEmpty) ...[
@@ -754,7 +758,7 @@ class _HeaderStatTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: highlight ? _ShopPickupColors.g1.withOpacity(0.1) : const Color(0xFFF8F9FB),
+        color: highlight ? _ShopPickupColors.g1.withOpacity(0.1) : Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: highlight ? _ShopPickupColors.g1.withOpacity(0.25) : const Color(0xFFEDEDED)),
       ),

@@ -277,10 +277,13 @@ class _PassDetailPageState extends State<PassDetailPage> {
             ),
           ),
           centerTitle: false,
-          backgroundColor: Colors.white,
+          backgroundColor: isDark
+              ? const Color(0xFF121212)
+              : AppColors.groupedBackground,
           foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0.5,
-          shadowColor: Colors.black12,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
         ),
         bottomNavigationBar: (!_isLoading && _error == null && (_canSignNow || _canCancelNow))
             ? _buildBottomBar(isDark)
@@ -300,7 +303,7 @@ class _PassDetailPageState extends State<PassDetailPage> {
     return Column(children: [
       Container(
         height: 130,
-        color: Colors.white,
+        color: isDark ? const Color(0xFF121212) : AppColors.groupedBackground,
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
         child: Shimmer.fromColors(
           baseColor: base, highlightColor: hi,
@@ -375,7 +378,7 @@ class _PassDetailPageState extends State<PassDetailPage> {
       child: Column(children: [
         // ── Status header ────────────────────────────────────────────────────
         Container(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF121212) : AppColors.groupedBackground,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
             child: Column(children: [
@@ -434,14 +437,9 @@ class _PassDetailPageState extends State<PassDetailPage> {
       top: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        decoration: BoxDecoration(
-          color: isDark ? Theme.of(context).colorScheme.surface : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.09),
-                blurRadius: 16, offset: const Offset(0, -4)),
-          ],
-        ),
+        color: isDark
+            ? const Color(0xFF121212)
+            : AppColors.groupedBackground,
         child: _busy
             ? const Center(child: SizedBox(width: 28, height: 28,
                 child: CircularProgressIndicator(strokeWidth: 2.5,
@@ -507,8 +505,9 @@ class _DetailProgress extends StatelessWidget {
       ]);
     }
     final steps = _steps(S.of(context));
-    final inactiveDot = isDark ? Colors.white12 : Colors.grey.shade200;
-    final inactiveLine = isDark ? Colors.white10 : Colors.grey.shade200;
+    // Light grey (EEE) vanished against the grey page background.
+    final inactiveDot = isDark ? Colors.white12 : const Color(0xFFC7C7CC);
+    final inactiveLine = isDark ? Colors.white10 : const Color(0xFFC7C7CC);
     return Column(children: [
       Row(children: [
         for (int i = 0; i < steps.length; i++) ...[

@@ -556,10 +556,13 @@ class _SettingsScreenState extends State<SettingsScreen>
       icon: PlatformInfo.isIOS26OrHigher()
           ? 'info.circle.fill'
           : Icons.info_outline_rounded,
+      iconColor: AppColors.brandOrange,
       actions: [
         AlertAction(
           title: s.close,
-          style: AlertActionStyle.primary,
+          // `primary` makes the native iOS 26 alert force systemBlue as its
+          // tint; a default action keeps the app's orange tint.
+          style: AlertActionStyle.defaultAction,
           onPressed: () {},
         ),
       ],

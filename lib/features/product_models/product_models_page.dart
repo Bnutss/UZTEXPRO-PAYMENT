@@ -531,10 +531,13 @@ class _ProductModelsPageState extends State<ProductModelsPage>
             ),
           ),
           centerTitle: false,
-          backgroundColor: Colors.white,
+          backgroundColor: isDark
+              ? Theme.of(context).colorScheme.surface
+              : AppColors.groupedBackground,
           foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0.5,
-          shadowColor: Colors.black12,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
           actions: [
             // Refreshing indicator only — refresh itself happens via
             // pull-to-refresh on the list below.
@@ -552,28 +555,16 @@ class _ProductModelsPageState extends State<ProductModelsPage>
                   ),
                 ),
               ),
+            if (!_isLoading && _error == null)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Center(child: _CountBadge(count: _count)),
+              ),
             SearchToggleButton(active: _searching, onPressed: _toggleSearch),
           ],
         ),
         body: Column(
           children: [
-            Container(
-              color: Colors.white,
-              child: SafeArea(
-                bottom: false,
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-                  child: Row(
-                    children: [
-                      const Spacer(),
-                      if (!_isLoading && _error == null)
-                        _CountBadge(count: _count),
-                    ],
-                  ),
-                ),
-              ),
-            ),
             AnimatedSearchSlot(
               open: _searching,
               child: Container(
@@ -589,8 +580,10 @@ class _ProductModelsPageState extends State<ProductModelsPage>
             ),
             if (_knownFirms.isNotEmpty)
               Container(
-                color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                color: isDark
+                    ? Theme.of(context).colorScheme.surface
+                    : AppColors.groupedBackground,
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
                 child: Builder(
                   builder: (_) {
                     final firmActive =

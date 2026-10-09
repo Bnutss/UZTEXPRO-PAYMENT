@@ -431,10 +431,13 @@ class _BonusesPageState extends State<BonusesPage>
             ),
           ),
           centerTitle: false,
-          backgroundColor: Colors.white,
+          backgroundColor: isDark
+              ? Theme.of(context).colorScheme.surface
+              : AppColors.groupedBackground,
           foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0.5,
-          shadowColor: Colors.black12,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
           actions: [
             // Refreshing indicator only — refresh itself happens via
             // pull-to-refresh on the list below.
@@ -452,6 +455,11 @@ class _BonusesPageState extends State<BonusesPage>
                   ),
                 ),
               ),
+            if (!_isLoading && _error == null)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Center(child: _CountBadge(count: _shown.length)),
+              ),
             SearchToggleButton(active: _searching, onPressed: _toggleSearch),
           ],
         ),
@@ -459,28 +467,11 @@ class _BonusesPageState extends State<BonusesPage>
           children: [
             // ── Header: toggle + count ────────────────────────────────────────
             Container(
-              color: Colors.white,
-              child: SafeArea(
-                bottom: false,
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _ViewToggle(
-                          selected: _viewMode,
-                          onChanged: _switchView,
-                        ),
-                      ),
-                      if (!_isLoading && _error == null) ...[
-                        const SizedBox(width: 12),
-                        _CountBadge(count: _shown.length),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
+              color: isDark
+                  ? Theme.of(context).colorScheme.surface
+                  : AppColors.groupedBackground,
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+              child: _ViewToggle(selected: _viewMode, onChanged: _switchView),
             ),
             // ── Search ───────────────────────────────────────────────────────
             AnimatedSearchSlot(

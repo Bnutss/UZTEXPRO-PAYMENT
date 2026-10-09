@@ -200,10 +200,13 @@ class _BonusDetailPageState extends State<BonusDetailPage> {
                 color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontSize: 17),
           ),
           centerTitle: false,
-          backgroundColor: Colors.white,
+          backgroundColor: isDark
+              ? const Color(0xFF121212)
+              : AppColors.groupedBackground,
           foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0.5,
-          shadowColor: Colors.black12,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
         ),
         bottomNavigationBar:
             (_canSignNow || _canDeleteNow) ? _buildBottomBar(isDark) : null,
@@ -223,7 +226,7 @@ class _BonusDetailPageState extends State<BonusDetailPage> {
       child: Column(children: [
         // ── Status header ────────────────────────────────────────────────────
         Container(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF121212) : AppColors.groupedBackground,
           child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
               child: Column(children: [
@@ -283,16 +286,9 @@ class _BonusDetailPageState extends State<BonusDetailPage> {
       top: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        decoration: BoxDecoration(
-          color: isDark ? Theme.of(context).colorScheme.surface : Colors.white,
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(20)),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.3 : 0.09),
-                blurRadius: 16, offset: const Offset(0, -4)),
-          ],
-        ),
+        color: isDark
+            ? const Color(0xFF121212)
+            : AppColors.groupedBackground,
         child: _busy
             ? const Center(
                 child: SizedBox(
@@ -355,8 +351,8 @@ class _DetailProgress extends StatelessWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final steps = _steps(S.of(context));
     final idx = _idx(steps);
-    final inactiveDot = isDark ? Colors.white12 : Colors.grey.shade200;
-    final inactiveLine = isDark ? Colors.white10 : Colors.grey.shade200;
+    final inactiveDot = isDark ? Colors.white12 : const Color(0xFFC7C7CC);
+    final inactiveLine = isDark ? Colors.white10 : const Color(0xFFC7C7CC);
     return Column(children: [
       Row(children: [
         for (int i = 0; i < steps.length; i++) ...[

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:uztexpro_payment/main.dart';
 import 'package:http/http.dart' as http;
@@ -1259,10 +1260,11 @@ class _MainPageScreenState extends State<MainPageScreen>
             ),
           ),
           centerTitle: false,
-          backgroundColor: Colors.white,
+          backgroundColor: listBg,
           foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0.5,
-          shadowColor: Colors.black12,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
           actions: [
             if (!isLoading)
               Padding(
@@ -1369,7 +1371,6 @@ class _MainPageScreenState extends State<MainPageScreen>
                       final url =
                           'https://uztex.pro${report['contract_document_url']}';
                       await Clipboard.setData(ClipboardData(text: url));
-                      showNotification(s.urlCopiedShort, true);
                     }
                   : null,
             );
@@ -1653,6 +1654,7 @@ class _PayCard extends StatelessWidget {
                                   _PayIconBtn(
                                     icon: Icons.copy_rounded,
                                     tooltip: 'Копировать',
+                                    doneLabel: s.copiedShort,
                                     onTap: onCopyUrl!,
                                   ),
                                 ],
@@ -2027,47 +2029,86 @@ class _AmtCell extends StatelessWidget {
 
 // ─── File button ──────────────────────────────────────────────────────────────
 
-class _PayIconBtn extends StatelessWidget {
+class _PayIconBtn extends StatefulWidget {
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
+
+  /// When set, the button confirms the action in place: after a tap it shows
+  /// a check mark and this label for a moment instead of a top notification.
+  final String? doneLabel;
 
   const _PayIconBtn({
     required this.icon,
     required this.tooltip,
     required this.onTap,
+    this.doneLabel,
   });
+
+  @override
+  State<_PayIconBtn> createState() => _PayIconBtnState();
+}
+
+class _PayIconBtnState extends State<_PayIconBtn> {
+  bool _done = false;
+  Timer? _timer;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    widget.onTap();
+    if (widget.doneLabel == null) return;
+    HapticFeedback.selectionClick();
+    setState(() => _done = true);
+    _timer?.cancel();
+    _timer = Timer(const Duration(milliseconds: 1600), () {
+      if (mounted) setState(() => _done = false);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = isDark ? Colors.blue.shade300 : Colors.blue.shade600;
+    final base = _done ? Colors.green : Colors.blue;
+    final color = _done
+        ? (isDark ? Colors.green.shade300 : Colors.green.shade700)
+        : (isDark ? Colors.blue.shade300 : Colors.blue.shade600);
+    final label = _done ? widget.doneLabel! : widget.tooltip;
     return Tooltip(
-      message: tooltip,
+      message: widget.tooltip,
       preferBelow: false,
       child: InkWell(
-        onTap: onTap,
+        onTap: _handleTap,
         borderRadius: BorderRadius.circular(8),
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: isDark
-                ? Colors.blue.withValues(alpha: 0.1)
-                : Colors.blue.shade50,
+                ? base.withValues(alpha: 0.1)
+                : (_done ? Colors.green.shade50 : Colors.blue.shade50),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: isDark
-                  ? Colors.blue.withValues(alpha: 0.25)
-                  : Colors.blue.shade100,
+                  ? base.withValues(alpha: 0.25)
+                  : (_done ? Colors.green.shade100 : Colors.blue.shade100),
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 14, color: color),
+              Icon(
+                _done ? Icons.check_rounded : widget.icon,
+                size: 14,
+                color: color,
+              ),
               const SizedBox(width: 5),
               Text(
-                tooltip,
+                label,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,

@@ -244,10 +244,13 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
             ),
           ),
           centerTitle: false,
-          backgroundColor: Colors.white,
+          backgroundColor: isDark
+              ? const Color(0xFF121212)
+              : AppColors.groupedBackground,
           foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0.5,
-          shadowColor: Colors.black12,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
         ),
         bottomNavigationBar:
             (!_isLoading && _error == null && widget.canConfirm)
@@ -269,7 +272,7 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
       children: [
         Container(
           height: 150,
-          color: Colors.white,
+          color: isDark ? const Color(0xFF121212) : AppColors.groupedBackground,
           padding: const EdgeInsets.all(20),
           child: Shimmer.fromColors(
             baseColor: base,
@@ -385,7 +388,7 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
         children: [
           // ── Status header ───────────────────────────────────────────────
           Container(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF121212) : AppColors.groupedBackground,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 22),
               child: Column(
@@ -510,17 +513,9 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
       top: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        decoration: BoxDecoration(
-          color: isDark ? Theme.of(context).colorScheme.surface : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.3 : 0.09),
-              blurRadius: 16,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
+        color: isDark
+            ? const Color(0xFF121212)
+            : AppColors.groupedBackground,
         child: _busy
             ? const Center(
                 child: SizedBox(

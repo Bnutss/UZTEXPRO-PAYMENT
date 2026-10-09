@@ -232,10 +232,13 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
                 fontSize: 18),
           ),
           centerTitle: false,
-          backgroundColor: Colors.white,
+          backgroundColor: isDark
+              ? Theme.of(context).colorScheme.surface
+              : AppColors.groupedBackground,
           foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0.5,
-          shadowColor: Colors.black12,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
         ),
         bottomNavigationBar: hasPending ? _buildBottomBar(s, isDark) : null,
         body: _isLoading
@@ -500,17 +503,9 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
   Widget _buildBottomBar(S s, bool isDark) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Theme.of(context).colorScheme.surface
-            : Colors.white,
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 16,
-              offset: const Offset(0, -4)),
-        ],
-      ),
+      color: isDark
+          ? Theme.of(context).colorScheme.surface
+          : AppColors.groupedBackground,
       child: _busy
           ? const Center(
               child: SizedBox(

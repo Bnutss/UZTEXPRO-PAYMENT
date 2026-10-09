@@ -175,12 +175,29 @@ class _PassesPageState extends State<PassesPage>
     _animCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 350),
+      // Start fully visible: fading in from 0 after the shimmer left a blank
+      // frame between shimmer and list, which read as screen flicker.
+      value: 1,
     );
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
     _searchCtrl.addListener(() {
       _debounce?.cancel();
       _debounce = Timer(const Duration(milliseconds: 250), _filter);
     });
+    // Fresh in-memory cache: render the list on the very first frame instead
+    // of flashing the shimmer for one frame first.
+    final cached = _memCache[_viewMode];
+    final cachedAt = _memCacheTime[_viewMode];
+    if (cached != null &&
+        cachedAt != null &&
+        DateTime.now().difference(cachedAt) < _kCacheTTL) {
+      _all = List.from(cached);
+      _shown = _all.where((p) {
+        final status = p['status'] as int? ?? 0;
+        return _viewMode != _kStage || _signerStatuses.contains(status);
+      }).toList();
+      _isLoading = false;
+    }
     _load();
     localeNotifier.addListener(_onLocale);
   }
@@ -212,7 +229,6 @@ class _PassesPageState extends State<PassesPage>
               _isLoading = false;
               _refreshing = false;
             });
-          _animCtrl.forward(from: 0);
           return;
         }
         _all = List.from(cached);
@@ -223,7 +239,6 @@ class _PassesPageState extends State<PassesPage>
             _refreshing = true;
             _error = null;
           });
-        _animCtrl.forward(from: 0);
         await _fetchFromNetwork(silent: true);
         return;
       }
@@ -244,7 +259,6 @@ class _PassesPageState extends State<PassesPage>
             _refreshing = true;
             _error = null;
           });
-          _animCtrl.forward(from: 0);
           await _fetchFromNetwork(silent: true);
           return;
         }
@@ -279,7 +293,6 @@ class _PassesPageState extends State<PassesPage>
           _isLoading = false;
           _refreshing = false;
         });
-        if (!silent) _animCtrl.forward(from: 0);
       } else {
         if (!silent) {
           setState(() {
@@ -563,10 +576,13 @@ class _PassesPageState extends State<PassesPage>
             ),
           ),
           centerTitle: false,
-          backgroundColor: Colors.white,
+          backgroundColor: isDark
+              ? Theme.of(context).colorScheme.surface
+              : AppColors.groupedBackground,
           foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0.5,
-          shadowColor: Colors.black12,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
           actions: [
             // Refreshing indicator only — the manual refresh button was
             // redundant now that the list already supports pull-to-refresh.
@@ -584,34 +600,22 @@ class _PassesPageState extends State<PassesPage>
                   ),
                 ),
               ),
+            if (!_isLoading && _error == null)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Center(child: _CountBadge(count: _shown.length)),
+              ),
             SearchToggleButton(active: _searching, onPressed: _toggleSearch),
           ],
         ),
         body: Column(
           children: [
             Container(
-              color: Colors.white,
-              child: SafeArea(
-                bottom: false,
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _ViewToggle(
-                          selected: _viewMode,
-                          onChanged: _switchView,
-                        ),
-                      ),
-                      if (!_isLoading && _error == null) ...[
-                        const SizedBox(width: 12),
-                        _CountBadge(count: _shown.length),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
+              color: isDark
+                  ? Theme.of(context).colorScheme.surface
+                  : AppColors.groupedBackground,
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+              child: _ViewToggle(selected: _viewMode, onChanged: _switchView),
             ),
             AnimatedSearchSlot(
               open: _searching,

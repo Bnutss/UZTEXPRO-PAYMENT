@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
@@ -17,6 +18,11 @@ class AppSegmentedControl extends StatelessWidget {
   final double minSegmentWidth;
   final EdgeInsetsGeometry padding;
 
+  /// Skip the native iOS control and always draw the Flutter pill track.
+  /// Use on screens that flicker while the platform view is being created
+  /// during the route transition.
+  final bool forcePill;
+
   const AppSegmentedControl({
     super.key,
     required this.labels,
@@ -24,6 +30,7 @@ class AppSegmentedControl extends StatelessWidget {
     required this.onChanged,
     this.minSegmentWidth = 104,
     this.padding = const EdgeInsets.symmetric(horizontal: 12),
+    this.forcePill = false,
   });
 
   @override
@@ -37,13 +44,21 @@ class AppSegmentedControl extends StatelessWidget {
       builder: (context, constraints) {
         final resolved = padding.resolve(Directionality.of(context));
         final available = constraints.maxWidth - resolved.horizontal;
-        final needed = labels.length * minSegmentWidth;
-        final scrolls = needed > available;
+        // Each segment is at least [minSegmentWidth], but grows to fit its
+        // label so long names are never ellipsized.
+        final widths = [
+          for (final l in labels) math.max(minSegmentWidth, _textWidth(l) + 28),
+        ];
+        final equal = widths.reduce(math.max) * labels.length;
+        final needed = widths.fold<double>(0, (a, b) => a + b);
+        // minSegmentWidth == 0 means "never scroll, just share the width":
+        // those callers (short 2-3 segment sets) keep the native control.
+        final scrolls = minSegmentWidth > 0 && equal > available;
 
         // The native iOS control can't scroll and swallows touches inside a
         // scroll view, so it is only used when every segment fits; wider
         // sets get the scrollable pill track on both platforms.
-        final Widget control = Platform.isIOS && !scrolls
+        final Widget control = Platform.isIOS && !scrolls && !forcePill
             ? AdaptiveSegmentedControl(
                 labels: labels,
                 selectedIndex: selectedIndex,
@@ -54,6 +69,7 @@ class AppSegmentedControl extends StatelessWidget {
                 labels: labels,
                 selectedIndex: selectedIndex,
                 onChanged: handleChanged,
+                widths: scrolls ? widths : null,
               );
 
         final sized = SizedBox(
@@ -72,6 +88,18 @@ class AppSegmentedControl extends StatelessWidget {
   }
 }
 
+double _textWidth(String text) {
+  final tp = TextPainter(
+    text: TextSpan(
+      text: text,
+      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+    ),
+    maxLines: 1,
+    textDirection: TextDirection.ltr,
+  )..layout();
+  return tp.width;
+}
+
 /// Android's stand-in for the native iOS control: light track with a white
 /// selected pill.
 class _PillSegments extends StatelessWidget {
@@ -79,10 +107,14 @@ class _PillSegments extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onChanged;
 
+  /// Per-segment widths when the track scrolls; null = equal split.
+  final List<double>? widths;
+
   const _PillSegments({
     required this.labels,
     required this.selectedIndex,
     required this.onChanged,
+    this.widths,
   });
 
   @override
@@ -96,43 +128,44 @@ class _PillSegments extends StatelessWidget {
       child: Row(
         children: List.generate(labels.length, (i) {
           final selected = i == selectedIndex;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => onChanged(i),
-              behavior: HitTestBehavior.opaque,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
-                alignment: Alignment.center,
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                decoration: BoxDecoration(
-                  color: selected ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
-                  boxShadow: selected
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.12),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Text(
-                  labels[i],
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: selected
-                        ? AppColors.brandOrange
-                        : const Color(0xFF8A8A8E),
-                  ),
+          final cell = GestureDetector(
+            onTap: () => onChanged(i),
+            behavior: HitTestBehavior.opaque,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              decoration: BoxDecoration(
+                color: selected ? Colors.white : Colors.transparent,
+                borderRadius: BorderRadius.circular(9),
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.12),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Text(
+                labels[i],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: selected
+                      ? AppColors.brandOrange
+                      : const Color(0xFF8A8A8E),
                 ),
               ),
             ),
           );
+          return widths == null
+              ? Expanded(child: cell)
+              : SizedBox(width: widths![i] - 6 / labels.length, child: cell);
         }),
       ),
     );

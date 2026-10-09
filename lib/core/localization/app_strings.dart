@@ -603,6 +603,15 @@ class S {
   String get passwordField =>
       _t({'ru': 'Пароль', 'en': 'Password', 'uz': 'Parol'});
 
+  String get biometricSignInLabel => _t({
+    'ru': 'Войти по биометрии',
+    'en': 'Sign in with biometrics',
+    'uz': 'Biometriya orqali kirish',
+  });
+
+  String get notificationNow =>
+      _t({'ru': 'сейчас', 'en': 'now', 'uz': 'hozir'});
+
   String get signIn => _t({'ru': 'ВОЙТИ', 'en': 'SIGN IN', 'uz': 'KIRISH'});
 
   String get biometricAuth => _t({
@@ -853,6 +862,9 @@ class S {
     'en': 'Error opening file',
     'uz': 'Faylni ochishda xato',
   });
+
+  String get copiedShort =>
+      _t({'ru': 'Скопировано', 'en': 'Copied', 'uz': 'Nusxalandi'});
 
   String get urlCopiedShort =>
       _t({'ru': 'URL скопирован', 'en': 'URL copied', 'uz': 'URL nusxalandi'});

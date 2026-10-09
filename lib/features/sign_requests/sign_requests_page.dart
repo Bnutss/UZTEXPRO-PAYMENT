@@ -372,10 +372,13 @@ class _SignRequestsPageState extends State<SignRequestsPage>
             ),
           ),
           centerTitle: false,
-          backgroundColor: Colors.white,
+          backgroundColor: isDark
+              ? Theme.of(context).colorScheme.surface
+              : AppColors.groupedBackground,
           foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0.5,
-          shadowColor: Colors.black12,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
           actions: [
             // Refreshing indicator only — refresh itself happens via
             // pull-to-refresh on the list below.
@@ -393,46 +396,35 @@ class _SignRequestsPageState extends State<SignRequestsPage>
                   ),
                 ),
               ),
+            if (!_isLoading && _error == null)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _g1.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${_shown.length}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.brandRed,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             SearchToggleButton(active: _searching, onPressed: _toggleSearch),
           ],
         ),
         body: Column(
           children: [
-            // Count badge
-            Container(
-              color: Colors.white,
-              child: SafeArea(
-                bottom: false,
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
-                  child: Row(
-                    children: [
-                      const Spacer(),
-                      if (!_isLoading && _error == null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _g1.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            '${_shown.length}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.brandRed,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
             // Search bar
             AnimatedSearchSlot(
               open: _searching,

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../core/widgets/fade_route.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -464,9 +465,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     HapticFeedback.lightImpact();
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => AiAssistantPage(jwtToken: widget.jwtToken),
-      ),
+      FadeRoute(builder: (_) => AiAssistantPage(jwtToken: widget.jwtToken)),
     );
   }
 
@@ -1378,9 +1377,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       description: s.menuPassesDesc,
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => PassesPage(jwtToken: widget.jwtToken),
-        ),
+        FadeRoute(builder: (_) => PassesPage(jwtToken: widget.jwtToken)),
       ),
     );
 
@@ -1399,9 +1396,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         description: s.menuPaymentsDesc,
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => MainPageScreen(jwtToken: widget.jwtToken),
-          ),
+          FadeRoute(builder: (_) => MainPageScreen(jwtToken: widget.jwtToken)),
         ),
       ),
       const SizedBox(height: 12),
@@ -1413,7 +1408,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         description: s.menuSignRequestsDesc,
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(
+          FadeRoute(
             builder: (_) => SignRequestsPage(jwtToken: widget.jwtToken),
           ),
         ),
@@ -1425,9 +1420,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         description: s.menuBonusesDesc,
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => BonusesPage(jwtToken: widget.jwtToken),
-          ),
+          FadeRoute(builder: (_) => BonusesPage(jwtToken: widget.jwtToken)),
         ),
       ),
     ];
@@ -1452,7 +1445,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   description: s.menuProductModelsDesc,
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(
+                    FadeRoute(
                       builder: (_) =>
                           ProductModelsPage(jwtToken: widget.jwtToken),
                     ),
@@ -1480,7 +1473,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             description: s.shopPickupDesc,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
+              FadeRoute(
                 builder: (_) => ShopPickupPage(jwtToken: widget.jwtToken),
               ),
             ),
@@ -1492,7 +1485,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             description: s.shopStockDesc,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
+              FadeRoute(
                 builder: (_) => ShopPvzStockPage(jwtToken: widget.jwtToken),
               ),
             ),
@@ -1504,7 +1497,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             description: s.shopAnalyticsDesc,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
+              FadeRoute(
                 builder: (_) => ShopAnalyticsPage(jwtToken: widget.jwtToken),
               ),
             ),
@@ -1517,7 +1510,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               description: s.shopIssuedDesc,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(
+                FadeRoute(
                   builder: (_) =>
                       ShopIssuedReportPage(jwtToken: widget.jwtToken),
                 ),
