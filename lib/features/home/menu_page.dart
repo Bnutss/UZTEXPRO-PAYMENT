@@ -16,6 +16,7 @@ import '../sign_requests/sign_requests_page.dart';
 import '../bonuses/bonuses_page.dart';
 import '../product_models/product_models_page.dart';
 import '../ai_assistant/ai_assistant_page.dart';
+import '../shop/shop_analytics_page.dart';
 import '../shop/shop_issued_report_page.dart';
 import '../shop/shop_pickup_page.dart';
 import '../shop/shop_pvz_stock_page.dart';
@@ -472,8 +473,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   Widget _buildAiButton() {
     if (Platform.isIOS) {
       return SizedBox(
-        width: 40,
-        height: 40,
+        width: 46,
+        height: 46,
         child: AdaptiveButton.icon(
           onPressed: _openAiAssistant,
           icon: Icons.auto_awesome_rounded,
@@ -482,7 +483,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           style: AdaptiveButtonStyle.glass,
           size: AdaptiveButtonSize.medium,
           useSmoothRectangleBorder: false,
-          minSize: const Size(40, 40),
+          minSize: const Size(46, 46),
         ),
       );
     }
@@ -497,8 +498,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       child: InkWell(
         onTap: _openAiAssistant,
         child: Container(
-          width: 40,
-          height: 40,
+          width: 46,
+          height: 46,
           alignment: Alignment.center,
           decoration: const BoxDecoration(
             color: Color(0xFFF2F2F2),
@@ -507,7 +508,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           child: const Icon(
             Icons.auto_awesome_rounded,
             color: Color(0xFF1C1C1E),
-            size: 20,
+            size: 22,
           ),
         ),
       ),
@@ -568,8 +569,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
     if (Platform.isIOS) {
       return SizedBox(
-        width: 40,
-        height: 40,
+        width: 46,
+        height: 46,
         child: AdaptiveButton.icon(
           onPressed: onPressed,
           icon: Icons.logout_rounded,
@@ -578,7 +579,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           style: AdaptiveButtonStyle.glass,
           size: AdaptiveButtonSize.medium,
           useSmoothRectangleBorder: false,
-          minSize: const Size(40, 40),
+          minSize: const Size(46, 46),
         ),
       );
     }
@@ -590,8 +591,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       child: InkWell(
         onTap: onPressed,
         child: Container(
-          width: 40,
-          height: 40,
+          width: 46,
+          height: 46,
           alignment: Alignment.center,
           decoration: const BoxDecoration(
             color: Color(0xFFF2F2F2),
@@ -600,7 +601,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           child: const Icon(
             Icons.logout_rounded,
             color: Color(0xFF1C1C1E),
-            size: 20,
+            size: 22,
           ),
         ),
       ),
@@ -1493,6 +1494,18 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               context,
               MaterialPageRoute(
                 builder: (_) => ShopPvzStockPage(jwtToken: widget.jwtToken),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _MenuCard(
+            icon: Icons.insights_rounded,
+            label: s.shopAnalyticsTitle,
+            description: s.shopAnalyticsDesc,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ShopAnalyticsPage(jwtToken: widget.jwtToken),
               ),
             ),
           ),

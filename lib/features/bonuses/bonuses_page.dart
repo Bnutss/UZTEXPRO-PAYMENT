@@ -10,6 +10,9 @@ import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/adaptive_back_button.dart';
+import '../../core/widgets/app_refresh.dart';
+import '../../core/widgets/app_segmented_control.dart';
+import '../../core/widgets/search_toggle.dart';
 import 'bonus_detail_page.dart';
 
 const _kBonusPath = 'edo/bonus-employee';
@@ -104,6 +107,15 @@ class _BonusesPageState extends State<BonusesPage>
   int? _statusFilter;
 
   final _searchCtrl = TextEditingController();
+  bool _searching = false;
+
+  void _toggleSearch() {
+    setState(() {
+      _searching = !_searching;
+      if (!_searching) _searchCtrl.clear();
+    });
+  }
+
   Timer? _debounce;
 
   late AnimationController _animCtrl;
@@ -440,6 +452,7 @@ class _BonusesPageState extends State<BonusesPage>
                   ),
                 ),
               ),
+            SearchToggleButton(active: _searching, onPressed: _toggleSearch),
           ],
         ),
         body: Column(
@@ -454,23 +467,32 @@ class _BonusesPageState extends State<BonusesPage>
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
                   child: Row(
                     children: [
-                      _ViewToggle(selected: _viewMode, onChanged: _switchView),
-                      const Spacer(),
-                      if (!_isLoading && _error == null)
+                      Expanded(
+                        child: _ViewToggle(
+                          selected: _viewMode,
+                          onChanged: _switchView,
+                        ),
+                      ),
+                      if (!_isLoading && _error == null) ...[
+                        const SizedBox(width: 12),
                         _CountBadge(count: _shown.length),
+                      ],
                     ],
                   ),
                 ),
               ),
             ),
             // ── Search ───────────────────────────────────────────────────────
-            Container(
-              color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-              child: _SearchBar(
-                controller: _searchCtrl,
-                hintText: S.of(context).bonusSearchHint,
-                isDark: isDark,
+            AnimatedSearchSlot(
+              open: _searching,
+              child: Container(
+                color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                child: _SearchBar(
+                  controller: _searchCtrl,
+                  hintText: S.of(context).bonusSearchHint,
+                  isDark: isDark,
+                ),
               ),
             ),
             // ── Status filter chips ──────────────────────────────────────────
@@ -485,7 +507,7 @@ class _BonusesPageState extends State<BonusesPage>
                 allLabel: s.filterAll,
                 onSelect: (code) {
                   setState(
-                    () => _statusFilter = _statusFilter == code ? null : code,
+                    () => _statusFilter = code,
                   );
                   _filter();
                 },
@@ -625,9 +647,8 @@ class _BonusesPageState extends State<BonusesPage>
 
     return FadeTransition(
       opacity: _fadeAnim,
-      child: RefreshIndicator(
+      child: AppRefresh(
         onRefresh: () async => _invalidateAndLoad(),
-        color: _g1,
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 32),
           itemCount: _shown.length,
@@ -1059,69 +1080,17 @@ class _ViewToggle extends StatelessWidget {
 
   const _ViewToggle({required this.selected, required this.onChanged});
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 34,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2F2F2),
-        borderRadius: BorderRadius.circular(17),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _VTab(
-            label: S.of(context).forSigning,
-            active: selected == 'stage',
-            onTap: () => onChanged('stage'),
-          ),
-          _VTab(
-            label: S.of(context).filterAll,
-            active: selected == 'all',
-            onTap: () => onChanged('all'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _VTab extends StatelessWidget {
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  const _VTab({required this.label, required this.active, required this.onTap});
+  static const _modes = ['stage', 'all'];
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
-        decoration: BoxDecoration(
-          color: active ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: active
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ]
-              : null,
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: active ? AppColors.brandRed : const Color(0xFF8A8A8E),
-          ),
-        ),
-      ),
+    final t = S.of(context);
+    return AppSegmentedControl(
+      labels: [t.forSigning, t.filterAll],
+      selectedIndex: _modes.indexOf(selected).clamp(0, _modes.length - 1),
+      onChanged: (i) => onChanged(_modes[i]),
+      minSegmentWidth: 0,
+      padding: EdgeInsets.zero,
     );
   }
 }
@@ -1141,109 +1110,17 @@ class _StatusFilterRow extends StatelessWidget {
     required this.onSelect,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 34,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        children: [
-          _SChip(
-            label: allLabel,
-            selected: selected == null,
-            color: isDark ? Colors.white70 : Colors.grey.shade600,
-            isDark: isDark,
-            onTap: () => onSelect(null),
-          ),
-          for (final code in [1, 5, 2, 3, 4]) ...[
-            const SizedBox(width: 6),
-            _SChip(
-              label: bonusStatusConfig(code).short,
-              selected: selected == code,
-              color: bonusStatusConfig(code).color,
-              isDark: isDark,
-              onTap: () => onSelect(code),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _SChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final Color color;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  const _SChip({
-    required this.label,
-    required this.selected,
-    required this.color,
-    required this.isDark,
-    required this.onTap,
-  });
+  static const _codes = <int?>[null, 1, 5, 2, 3, 4];
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected
-              ? color
-              : (isDark ? Colors.white.withOpacity(0.07) : Colors.white),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: selected
-                ? color
-                : (isDark ? Colors.white12 : Colors.grey.shade200),
-          ),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: color.withOpacity(0.28),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : [
-                  if (!isDark)
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!selected)
-              Container(
-                width: 7,
-                height: 7,
-                margin: const EdgeInsets.only(right: 6),
-                decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-              ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: selected
-                    ? Colors.white
-                    : (isDark ? Colors.white70 : Colors.grey.shade700),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return AppSegmentedControl(
+      labels: [
+        allLabel,
+        for (final code in _codes.skip(1)) bonusStatusConfig(code!).short,
+      ],
+      selectedIndex: _codes.indexOf(selected).clamp(0, _codes.length - 1),
+      onChanged: (i) => onSelect(_codes[i]),
     );
   }
 }
@@ -1283,6 +1160,7 @@ class _SearchBar extends StatelessWidget {
               ],
       ),
       child: TextField(
+        autofocus: true,
         controller: controller,
         style: TextStyle(color: onSurface, fontSize: 14),
         decoration: InputDecoration(

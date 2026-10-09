@@ -255,6 +255,108 @@ class S {
   String get shopIssuedApply =>
       _t({'ru': 'Применить', 'en': 'Apply', 'uz': "Qo'llash"});
 
+  String get shopIssuedStatusIssued => _t({
+    'ru': 'Выданные',
+    'en': 'Issued',
+    'uz': 'Topshirilgan',
+  });
+
+  String get shopIssuedStatusPending => _t({
+    'ru': 'Ожидают выдачи',
+    'en': 'Awaiting pickup',
+    'uz': 'Topshirish kutilmoqda',
+  });
+
+  String get shopIssuedBadgeIssued => _t({
+    'ru': 'Выдан',
+    'en': 'Issued',
+    'uz': 'Topshirilgan',
+  });
+
+  String get shopIssuedWaitingBadge => _t({
+    'ru': 'Ожидает выдачи',
+    'en': 'Awaiting pickup',
+    'uz': 'Topshirish kutilmoqda',
+  });
+
+  String get shopIssuedConfirmedAt => _t({
+    'ru': 'Подтверждён',
+    'en': 'Confirmed',
+    'uz': 'Tasdiqlangan',
+  });
+
+  String get shopAnalyticsTitle => _t({
+    'ru': 'Аналитика товаров',
+    'en': 'Product analytics',
+    'uz': 'Mahsulotlar tahlili',
+  });
+
+  String get shopAnalyticsDesc => _t({
+    'ru': 'Остатки, лидеры продаж, магазины и покупатели',
+    'en': 'Stock, best sellers, shops and buyers',
+    'uz': "Qoldiqlar, eng ko'p sotilganlar, do'konlar va xaridorlar",
+  });
+
+  String get shopAnalyticsTabProducts => _t({
+    'ru': 'Товары',
+    'en': 'Products',
+    'uz': 'Mahsulotlar',
+  });
+
+  String get shopAnalyticsTabShops => _t({
+    'ru': 'Магазины',
+    'en': 'Shops',
+    'uz': "Do'konlar",
+  });
+
+  String get shopAnalyticsTabBuyers => _t({
+    'ru': 'Покупатели',
+    'en': 'Buyers',
+    'uz': 'Xaridorlar',
+  });
+
+  String get shopAnalyticsTabStock => _t({
+    'ru': 'Остатки',
+    'en': 'Stock',
+    'uz': 'Qoldiqlar',
+  });
+
+  String get shopAnalyticsSoldSum => _t({
+    'ru': 'Сумма продаж',
+    'en': 'Sales amount',
+    'uz': 'Sotuv summasi',
+  });
+
+  String get shopAnalyticsStockQty => _t({
+    'ru': 'На складе, шт',
+    'en': 'In stock, pcs',
+    'uz': 'Omborda, dona',
+  });
+
+  String get shopAnalyticsStockValue => _t({
+    'ru': 'Стоимость остатков',
+    'en': 'Stock value',
+    'uz': 'Qoldiq qiymati',
+  });
+
+  String get shopAnalyticsEmpty => _t({
+    'ru': 'Нет данных за этот период',
+    'en': 'No data for this period',
+    'uz': "Ushbu davr uchun ma'lumot yo'q",
+  });
+
+  String get shopAnalyticsSearchHint => _t({
+    'ru': 'Артикул, название, цвет',
+    'en': 'Article, name, colour',
+    'uz': 'Artikul, nomi, rangi',
+  });
+
+  String get shopAnalyticsPcs => _t({
+    'ru': 'шт',
+    'en': 'pcs',
+    'uz': 'dona',
+  });
+
   String get shopStockAllPeriod =>
       _t({'ru': 'Весь период', 'en': 'All time', 'uz': 'Barcha davr'});
 

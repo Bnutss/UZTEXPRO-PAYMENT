@@ -8,7 +8,10 @@ import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/adaptive_back_button.dart';
-import '../../core/widgets/stagger_in.dart';
+import '../../core/widgets/app_refresh.dart';
+import '../../core/widgets/app_segmented_control.dart';
+import '../../core/widgets/choice_field.dart';
+import '../../core/widgets/ui_blocks.dart';
 import 'shop_api.dart';
 
 enum _RangePreset { today, week, month, custom }
@@ -29,7 +32,6 @@ class ShopIssuedReportPage extends StatefulWidget {
 }
 
 class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with SingleTickerProviderStateMixin {
-  static const Color _g1 = AppColors.brandOrange;
 
   final NumberFormat _numberFormat = NumberFormat('#,##0', 'ru');
 
@@ -37,6 +39,18 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
   late final Animation<double> _fadeAnim;
 
   _RangePreset _preset = _RangePreset.month;
+  // Bumped when the custom-range sheet is dismissed so the segmented control
+  // snaps back to the real preset instead of staying on "custom".
+  int _segmentsEpoch = 0;
+
+  // 'all' | 'issued' | 'pending' — only narrows the list and the totals
+  // computed from it; the server always returns every confirmed order.
+  String _statusFilter = 'all';
+
+  // Buyer groups start collapsed; keyed by buyerId (-1 = unknown buyer).
+  final Set<int> _expandedBuyers = {};
+
+  late final Map<String, String> _imgHeaders = PvzApi.imageHeaders(widget.jwtToken);
   late DateTime _dateFrom;
   late DateTime _dateTo;
 
@@ -136,7 +150,10 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
       backgroundColor: Colors.transparent,
       builder: (_) => _CustomRangeSheet(initialRange: DateTimeRange(start: _dateFrom, end: _dateTo)),
     );
-    if (range == null) return;
+    if (range == null) {
+      setState(() => _segmentsEpoch++);
+      return;
+    }
     setState(() {
       _preset = _RangePreset.custom;
       _dateFrom = range.start;
@@ -150,6 +167,13 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
     HapticFeedback.selectionClick();
     setState(() => _shopId = shopId);
     _load();
+  }
+
+  void _toggleBuyer(int key) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (!_expandedBuyers.remove(key)) _expandedBuyers.add(key);
+    });
   }
 
   void _openDetail(PvzOrder order) {
@@ -168,6 +192,17 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final listBg = isDark ? Theme.of(context).colorScheme.surface : AppColors.groupedBackground;
     final report = _report;
+    final visible = (report?.sales ?? const <PvzOrder>[]).where((o) {
+      switch (_statusFilter) {
+        case 'issued':
+          return o.isIssued;
+        case 'pending':
+          return !o.isIssued;
+        default:
+          return true;
+      }
+    }).toList();
+    final groups = _groupByBuyer(visible);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -185,27 +220,42 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
           elevation: 0.5,
           shadowColor: Colors.black12,
         ),
-        body: RefreshIndicator(
-          color: _g1,
+        body: AppRefresh(
           onRefresh: _load,
           child: Container(
             color: listBg,
             child: ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
               children: [
-                _buildDateFilterRow(s),
-                const SizedBox(height: 8),
-                Center(
-                  child: Text(
-                    '${_formatDate(_dateFrom)} — ${_formatDate(_dateTo)}',
-                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                BlockCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildDateFilterRow(s),
+                      const SizedBox(height: 6),
+                      Center(
+                        child: Text(
+                          '${_formatDate(_dateFrom)} — ${_formatDate(_dateTo)}',
+                          style: const TextStyle(fontSize: 11.5, color: kInkMuted),
+                        ),
+                      ),
+                      if (_shops.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        BlockCaption(s.shopIssuedShopFilterTitle),
+                        _buildShopFilterRow(s, isDark),
+                      ],
+                      const SizedBox(height: 12),
+                      AppSegmentedControl(
+                        labels: [s.filterAll, s.shopIssuedStatusIssued, s.shopIssuedStatusPending],
+                        selectedIndex: const ['all', 'issued', 'pending'].indexOf(_statusFilter),
+                        onChanged: (i) => setState(() => _statusFilter = const ['all', 'issued', 'pending'][i]),
+                        minSegmentWidth: 0,
+                        padding: EdgeInsets.zero,
+                      ),
+                    ],
                   ),
                 ),
-                if (_shops.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  _buildShopFilterRow(s, isDark),
-                ],
-                const SizedBox(height: 18),
+                const SizedBox(height: 12),
                 if (_loading)
                   _skeleton(isDark)
                 else if (_error != null)
@@ -214,30 +264,17 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
                     child: Center(child: Text(_error!, style: const TextStyle(color: Color(0xFFD32F2F)))),
                   )
                 else if (report != null) ...[
-                  FadeTransition(opacity: _fadeAnim, child: _buildSummary(s, report)),
-                  const SizedBox(height: 20),
-                  if (report.sales.isEmpty)
+                  FadeTransition(opacity: _fadeAnim, child: _buildSummary(s, visible)),
+                  const SizedBox(height: 18),
+                  if (visible.isEmpty)
                     Padding(
-                      padding: const EdgeInsets.only(top: 40),
+                      padding: const EdgeInsets.only(top: 28),
                       child: Center(
                         child: Column(
                           children: [
-                            Container(
-                              width: 72,
-                              height: 72,
-                              decoration: BoxDecoration(
-                                color: isDark ? Colors.white10 : Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12)],
-                              ),
-                              child: Icon(Icons.checklist_rtl_rounded, size: 34, color: isDark ? Colors.white38 : Colors.grey.shade400),
-                            ),
-                            const SizedBox(height: 14),
-                            Text(
-                              s.shopIssuedEmpty,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55), fontSize: 13),
-                            ),
+                            Icon(Icons.checklist_rtl_rounded, size: 40, color: kInkMuted.withOpacity(0.6)),
+                            const SizedBox(height: 10),
+                            Text(s.shopIssuedEmpty, textAlign: TextAlign.center, style: const TextStyle(color: kInkMuted, fontSize: 13)),
                           ],
                         ),
                       ),
@@ -246,19 +283,55 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
                     FadeTransition(
                       opacity: _fadeAnim,
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          for (final (i, order) in report.sales.indexed)
-                            StaggerIn(
-                              delay: Duration(milliseconds: 40 * i.clamp(0, 8)),
-                              child: _IssuedOrderTile(
-                                order: order,
-                                isDark: isDark,
-                                numberFormat: _numberFormat,
-                                s: s,
-                                showShop: _shopId == null,
-                                onTap: () => _openDetail(order),
-                              ),
+                          BlockCaption(
+                            s.shopAnalyticsTabBuyers,
+                            trailing: Text('${groups.length}', style: const TextStyle(fontSize: 11.5, color: kInkMuted, fontWeight: FontWeight.w600)),
+                          ),
+                          BlockCard(
+                            padding: EdgeInsets.zero,
+                            child: Column(
+                              children: [
+                                for (final (i, group) in groups.indexed) ...[
+                                  if (i > 0) const Divider(height: 1, thickness: 0.6, indent: 64),
+                                  _IssuedBuyerHeader(
+                                    group: group,
+                                    imgHeaders: _imgHeaders,
+                                    numberFormat: _numberFormat,
+                                    s: s,
+                                    expanded: _expandedBuyers.contains(group.key),
+                                    onTap: () => _toggleBuyer(group.key),
+                                  ),
+                                  AnimatedSize(
+                                    duration: const Duration(milliseconds: 220),
+                                    curve: Curves.easeOutCubic,
+                                    alignment: Alignment.topCenter,
+                                    child: _expandedBuyers.contains(group.key)
+                                        ? Container(
+                                            color: kInk.withOpacity(0.025),
+                                            child: Column(
+                                              children: [
+                                                for (final (j, order) in group.orders.indexed) ...[
+                                                  if (j > 0) const Divider(height: 1, thickness: 0.6, indent: 64),
+                                                  _IssuedOrderRow(
+                                                    order: order,
+                                                    imgHeaders: _imgHeaders,
+                                                                    numberFormat: _numberFormat,
+                                                    s: s,
+                                                    showShop: _shopId == null && _shops.length > 1,
+                                                    onTap: () => _openDetail(order),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          )
+                                        : const SizedBox(width: double.infinity),
+                                  ),
+                                ],
+                              ],
                             ),
+                          ),
                         ],
                       ),
                     ),
@@ -272,66 +345,69 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
   }
 
   Widget _buildDateFilterRow(S s) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _FilterChip(label: s.shopIssuedToday, selected: _preset == _RangePreset.today, onTap: () => _applyPreset(_RangePreset.today)),
-          const SizedBox(width: 8),
-          _FilterChip(label: s.shopIssuedWeek, selected: _preset == _RangePreset.week, onTap: () => _applyPreset(_RangePreset.week)),
-          const SizedBox(width: 8),
-          _FilterChip(label: s.shopIssuedMonth, selected: _preset == _RangePreset.month, onTap: () => _applyPreset(_RangePreset.month)),
-          const SizedBox(width: 8),
-          _FilterChip(
-            label: s.shopIssuedCustomPeriod,
-            icon: Icons.date_range_rounded,
-            selected: _preset == _RangePreset.custom,
-            onTap: _pickCustomRange,
-          ),
-        ],
-      ),
+    const presets = _RangePreset.values;
+    return AppSegmentedControl(
+      key: ValueKey(_segmentsEpoch),
+      labels: [
+        s.shopIssuedToday,
+        s.shopIssuedWeek,
+        s.shopIssuedMonth,
+        s.shopIssuedCustomPeriod,
+      ],
+      selectedIndex: presets.indexOf(_preset),
+      onChanged: (i) => presets[i] == _RangePreset.custom
+          ? _pickCustomRange()
+          : _applyPreset(presets[i]),
+      minSegmentWidth: 80,
+      padding: EdgeInsets.zero,
     );
   }
 
   Widget _buildShopFilterRow(S s, bool isDark) {
-    return SizedBox(
-      height: 34,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: [
-          _ShopChip(label: s.shopIssuedAllShops, selected: _shopId == null, isDark: isDark, onTap: () => _selectShop(null)),
-          for (final shop in _shops) ...[
-            const SizedBox(width: 8),
-            _ShopChip(label: shop.name, selected: _shopId == shop.id, isDark: isDark, onTap: () => _selectShop(shop.id)),
-          ],
-        ],
-      ),
+    return ChoiceField<int?>(
+      title: s.shopIssuedShopFilterTitle,
+      options: [
+        ChoiceOption<int?>(null, s.shopIssuedAllShops),
+        for (final shop in _shops) ChoiceOption<int?>(shop.id, shop.name),
+      ],
+      selected: _shopId,
+      onChanged: _selectShop,
     );
   }
 
-  Widget _buildSummary(S s, PvzIssuedReport report) {
-    return Row(
-      children: [
-        Expanded(child: _SummaryCard(label: s.shopIssuedCountLabel, value: '${report.salesCount}', icon: Icons.receipt_long_rounded)),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _SummaryCard(
-            label: s.shopIssuedAmountLabel,
-            value: _numberFormat.format(report.totalAmount),
-            icon: Icons.inventory_2_rounded,
+  Widget _buildSummary(S s, List<PvzOrder> orders) {
+    final totalAmount = orders.fold<double>(0, (sum, o) => sum + o.totalAmount);
+    final totalValue = orders.fold<double>(0, (sum, o) => sum + o.totalValue);
+    return BlockCard(
+      child: Column(
+        children: [
+          MetricRow(
+            flex: const [2, 2, 3],
+            metrics: [
+              Metric(s.shopIssuedCountLabel, '${orders.length}'),
+              Metric(s.shopIssuedAmountLabel, _numberFormat.format(totalAmount)),
+              Metric(s.shopIssuedValueLabel, _numberFormat.format(totalValue)),
+            ],
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          flex: 2,
-          child: _SummaryCard(
-            label: s.shopIssuedValueLabel,
-            value: _numberFormat.format(report.totalValue),
-            icon: Icons.payments_rounded,
-            highlight: true,
+          const BlockDivider(),
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(color: AppColors.brandRed.withOpacity(0.1), shape: BoxShape.circle),
+                child: const Icon(Icons.account_balance_wallet_rounded, size: 15, color: AppColors.brandRed),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Text(s.shopPickupSalaryLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kInk))),
+              Text(
+                '${_numberFormat.format(pvzSellerSalary(totalValue))} сум',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.brandRed),
+              ),
+            ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -536,47 +612,118 @@ class _DatePickerField extends StatelessWidget {
   }
 }
 
-// ─── Filter chips ──────────────────────────────────────────────────────────
+class _ShopIssuedReportPageColors {
+  static const Color g1 = AppColors.brandOrange;
+  static const Color g2 = AppColors.brandRed;
+}
 
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({required this.label, required this.selected, required this.onTap, this.icon});
+// ─── Buyer groups ────────────────────────────────────────────────────────
 
-  final String label;
-  final bool selected;
+class _IssuedBuyerGroup {
+  _IssuedBuyerGroup(this.key, this.name) : orders = [];
+
+  final int key;
+  final String name;
+  final List<PvzOrder> orders;
+
+  double get totalValue => orders.fold(0, (sum, o) => sum + o.totalValue);
+
+  int get pendingCount => orders.where((o) => !o.isIssued).length;
+
+  /// Photo candidates, best first: the buyer's profile photo, the latest
+  /// hand-over snapshot (orders arrive newest-first), then their access photo.
+  List<PhotoSource> photoSources(Map<String, String> imgHeaders) {
+    final sources = <PhotoSource>[];
+    for (final o in orders) {
+      if (o.buyerAvatarUrl != null) {
+        sources.add(PhotoSource(o.buyerAvatarUrl!));
+        break;
+      }
+    }
+    for (final o in orders) {
+      if (o.isIssued && o.buyerPhotoUrl != null) {
+        sources.add(PhotoSource(o.buyerPhotoUrl!));
+        break;
+      }
+    }
+    if (key > 0) sources.add(PhotoSource(PvzApi.buyerFaceUrl(key), headers: imgHeaders));
+    return sources;
+  }
+}
+
+/// Groups orders by buyer, keeping the server's newest-first order for both
+/// the groups (by their latest order) and the orders inside each one.
+List<_IssuedBuyerGroup> _groupByBuyer(List<PvzOrder> orders) {
+  final groups = <int, _IssuedBuyerGroup>{};
+  for (final order in orders) {
+    final key = order.buyerId ?? -1;
+    groups.putIfAbsent(key, () => _IssuedBuyerGroup(key, order.buyerName)).orders.add(order);
+  }
+  return groups.values.toList();
+}
+
+class _IssuedBuyerHeader extends StatelessWidget {
+  const _IssuedBuyerHeader({
+    required this.group,
+    required this.imgHeaders,
+    required this.numberFormat,
+    required this.s,
+    required this.expanded,
+    required this.onTap,
+  });
+
+  final _IssuedBuyerGroup group;
+  final Map<String, String> imgHeaders;
+  final NumberFormat numberFormat;
+  final S s;
+  final bool expanded;
   final VoidCallback onTap;
-  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            gradient: selected
-                ? const LinearGradient(colors: [_ShopIssuedReportPageColors.g1, _ShopIssuedReportPageColors.g2])
-                : null,
-            color: selected ? null : Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: selected ? Colors.transparent : onSurface.withOpacity(0.15)),
-            boxShadow: selected
-                ? [BoxShadow(color: _ShopIssuedReportPageColors.g2.withOpacity(0.28), blurRadius: 8, offset: const Offset(0, 2))]
-                : null,
-          ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              if (icon != null) ...[
-                Icon(icon, size: 15, color: selected ? Colors.white : onSurface.withOpacity(0.6)),
+              PersonAvatar(
+                name: group.name,
+                sources: group.photoSources(imgHeaders),
+                size: 40,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      group.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${s.shopStockOrdersCount(group.orders.length)} · ${numberFormat.format(group.totalValue)} сум',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11.5, color: kInkMuted),
+                    ),
+                  ],
+                ),
+              ),
+              if (group.pendingCount > 0) ...[
+                StatusTag('${group.pendingCount}', color: const Color(0xFFE08A00)),
                 const SizedBox(width: 6),
               ],
-              Text(
-                label,
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: selected ? Colors.white : onSurface),
+              AnimatedRotation(
+                turns: expanded ? 0.5 : 0,
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                child: const Icon(Icons.keyboard_arrow_down_rounded, size: 22, color: kInkMuted),
               ),
             ],
           ),
@@ -586,118 +733,12 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-class _ShopChip extends StatelessWidget {
-  const _ShopChip({required this.label, required this.selected, required this.isDark, required this.onTap});
+// ─── Order row ───────────────────────────────────────────────────────────
 
-  final String label;
-  final bool selected;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected ? _ShopIssuedReportPageColors.g2 : (isDark ? Colors.white.withOpacity(0.07) : Colors.white),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: selected ? _ShopIssuedReportPageColors.g2 : (isDark ? Colors.white12 : Colors.grey.shade200)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!selected)
-              Container(
-                width: 6,
-                height: 6,
-                margin: const EdgeInsets.only(right: 6),
-                decoration: const BoxDecoration(shape: BoxShape.circle, color: _ShopIssuedReportPageColors.g1),
-              ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: selected ? Colors.white : (isDark ? Colors.white70 : Colors.grey.shade700),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ShopIssuedReportPageColors {
-  static const Color g1 = AppColors.brandOrange;
-  static const Color g2 = AppColors.brandRed;
-}
-
-// ─── Summary card ────────────────────────────────────────────────────────
-
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.label, required this.value, required this.icon, this.highlight = false});
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final bool highlight;
-
-  @override
-  Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        gradient: highlight ? const LinearGradient(colors: [_ShopIssuedReportPageColors.g1, _ShopIssuedReportPageColors.g2]) : null,
-        color: highlight ? null : Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: highlight ? Colors.transparent : onSurface.withOpacity(0.12)),
-        boxShadow: [
-          BoxShadow(
-            color: highlight ? _ShopIssuedReportPageColors.g2.withOpacity(0.28) : Colors.black.withOpacity(0.05),
-            blurRadius: highlight ? 14 : 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: highlight ? Colors.white.withOpacity(0.18) : _ShopIssuedReportPageColors.g2.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 16, color: highlight ? Colors.white : _ShopIssuedReportPageColors.g2),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: highlight ? Colors.white : onSurface),
-          ),
-          const SizedBox(height: 2),
-          Text(label, style: TextStyle(fontSize: 11, color: highlight ? Colors.white.withOpacity(0.85) : onSurface.withOpacity(0.55))),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Order tile ──────────────────────────────────────────────────────────
-
-class _IssuedOrderTile extends StatelessWidget {
-  const _IssuedOrderTile({
+class _IssuedOrderRow extends StatelessWidget {
+  const _IssuedOrderRow({
     required this.order,
-    required this.isDark,
+    required this.imgHeaders,
     required this.numberFormat,
     required this.s,
     required this.showShop,
@@ -705,7 +746,7 @@ class _IssuedOrderTile extends StatelessWidget {
   });
 
   final PvzOrder order;
-  final bool isDark;
+  final Map<String, String> imgHeaders;
   final NumberFormat numberFormat;
   final S s;
   final bool showShop;
@@ -713,100 +754,82 @@ class _IssuedOrderTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final cardBg = isDark ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.white;
-    const accent = Color(0xFF2E7D32);
+    const issuedColor = Color(0xFF2E7D32);
+    const pendingColor = Color(0xFFE08A00);
+    final color = order.isIssued ? issuedColor : pendingColor;
+    // The hand-over photo only exists once the order is picked up.
+    final when = order.isIssued ? order.issuedAt : order.confirmedAt;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.18 : 0.05), blurRadius: 10, offset: const Offset(0, 2))],
-            ),
-            // See _OrderCard in shop_pickup_page.dart: a single-side Border
-            // can't be rounded together with the container's borderRadius,
-            // so the accent strip is clipped instead of drawn as a border.
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+    Widget placeholder() => _thumbPlaceholder(
+          order.isIssued ? Icons.person_rounded : Icons.hourglass_top_rounded,
+          order.isIssued ? kInkMuted : pendingColor,
+          order.isIssued ? kInk.withOpacity(0.06) : pendingColor.withOpacity(0.12),
+        );
+
+    // Profile photo, then the hand-over snapshot, then the access photo.
+    Widget photo() {
+      final sources = <PhotoSource>[
+        if (order.buyerAvatarUrl != null) PhotoSource(order.buyerAvatarUrl!),
+        if (order.isIssued && order.buyerPhotoUrl != null) PhotoSource(order.buyerPhotoUrl!),
+        if (order.buyerId != null) PhotoSource(PvzApi.buyerFaceUrl(order.buyerId!), headers: imgHeaders),
+      ];
+      if (sources.isEmpty) return placeholder();
+      return FallbackNetworkImage(sources: sources, width: 40, height: 40, placeholder: placeholder);
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(9),
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: photo(),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(width: 4, color: accent),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(10, 12, 12, 12),
-                        child: Row(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: order.buyerPhotoUrl != null
-                                  ? Image.network(order.buyerPhotoUrl!, width: 44, height: 44, fit: BoxFit.cover)
-                                  : Container(
-                                      width: 44,
-                                      height: 44,
-                                      color: onSurface.withOpacity(0.06),
-                                      child: Icon(Icons.person_rounded, color: onSurface.withOpacity(0.35)),
-                                    ),
+                    Text(
+                      '№${order.id}${when != null ? ' · ${_formatDateTime(when)}' : ''}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kInk),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        StatusTag(order.isIssued ? s.shopIssuedBadgeIssued : s.shopIssuedWaitingBadge, color: color),
+                        if (showShop && order.shopName.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              order.shopName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11, color: kInkMuted),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: accent.withOpacity(isDark ? 0.2 : 0.1),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text('№${order.id}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: accent)),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          order.buyerName,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: onSurface),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  if (showShop)
-                                    _TileInfoLine(icon: Icons.storefront_rounded, text: order.shopName, onSurface: onSurface),
-                                  if (showShop) const SizedBox(height: 3),
-                                  _TileInfoLine(
-                                    icon: Icons.event_available_rounded,
-                                    text: order.issuedAt != null ? _formatDateTime(order.issuedAt!) : '—',
-                                    onSurface: onSurface,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '${numberFormat.format(order.totalValue)} сум',
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: accent),
-                            ),
-                          ],
-                        ),
-                      ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Text(
+                '${numberFormat.format(order.totalValue)} сум',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kInk),
+              ),
+            ],
           ),
         ),
       ),
@@ -814,31 +837,11 @@ class _IssuedOrderTile extends StatelessWidget {
   }
 }
 
-class _TileInfoLine extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  final Color onSurface;
-
-  const _TileInfoLine({required this.icon, required this.text, required this.onSurface});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 12, color: onSurface.withOpacity(0.4)),
-        const SizedBox(width: 5),
-        Expanded(
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 11.5, color: onSurface.withOpacity(0.55)),
-          ),
-        ),
-      ],
+Widget _thumbPlaceholder(IconData icon, Color iconColor, Color bg) => Container(
+      color: bg,
+      alignment: Alignment.center,
+      child: Icon(icon, size: 20, color: iconColor),
     );
-  }
-}
 
 // ─── Order detail sheet ────────────────────────────────────────────────
 
@@ -875,17 +878,21 @@ class _IssuedOrderDetailSheet extends StatelessWidget {
                   decoration: BoxDecoration(color: onSurface.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
                 ),
               ),
-              if (order.buyerPhotoUrl != null) _PhotoPreview(photoUrl: order.buyerPhotoUrl!, heroTag: 'issued_order_photo_${order.id}'),
+              if (order.isIssued && order.buyerPhotoUrl != null) _PhotoPreview(photoUrl: order.buyerPhotoUrl!, heroTag: 'issued_order_photo_${order.id}'),
               const SizedBox(height: 16),
               Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2E7D32).withOpacity(0.12),
+                      color: (order.isIssued ? const Color(0xFF2E7D32) : const Color(0xFFE08A00)).withOpacity(0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.check_circle_rounded, color: Color(0xFF2E7D32), size: 20),
+                    child: Icon(
+                      order.isIssued ? Icons.check_circle_rounded : Icons.hourglass_top_rounded,
+                      color: order.isIssued ? const Color(0xFF2E7D32) : const Color(0xFFE08A00),
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(

@@ -11,6 +11,9 @@ import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/adaptive_back_button.dart';
+import '../../core/widgets/app_refresh.dart';
+import '../../core/widgets/app_segmented_control.dart';
+import '../../core/widgets/search_toggle.dart';
 import 'product_model_detail_page.dart';
 import 'product_photo.dart';
 
@@ -74,6 +77,15 @@ class _ProductModelsPageState extends State<ProductModelsPage>
   bool? _statusFilter; // null = all, true = confirmed, false = not confirmed
 
   final _searchCtrl = TextEditingController();
+  bool _searching = false;
+
+  void _toggleSearch() {
+    setState(() {
+      _searching = !_searching;
+      if (!_searching) _searchCtrl.clear();
+    });
+  }
+
   final _scrollCtrl = ScrollController();
   Timer? _debounce;
 
@@ -486,53 +498,6 @@ class _ProductModelsPageState extends State<ProductModelsPage>
     );
   }
 
-  Future<void> _showStatusPicker() async {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final s = S.of(context);
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _PickerSheet(
-        isDark: isDark,
-        title: s.selectStatusTitle,
-        children: [
-          _PickerTile(
-            icon: Icons.apps_rounded,
-            label: s.filterAll,
-            selected: _statusFilter == null,
-            isDark: isDark,
-            onTap: () {
-              Navigator.pop(ctx);
-              _setStatusFilter(null);
-            },
-          ),
-          _PickerTile(
-            icon: Icons.check_circle_outline_rounded,
-            label: s.priceConfirmed,
-            selected: _statusFilter == true,
-            isDark: isDark,
-            accentColor: const Color(0xFF43A047),
-            onTap: () {
-              Navigator.pop(ctx);
-              _setStatusFilter(true);
-            },
-          ),
-          _PickerTile(
-            icon: Icons.hourglass_empty_rounded,
-            label: s.priceNotConfirmed,
-            selected: _statusFilter == false,
-            isDark: isDark,
-            onTap: () {
-              Navigator.pop(ctx);
-              _setStatusFilter(false);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
   void _snack(String msg, bool ok) {
     AdaptiveSnackBar.show(
       context,
@@ -587,6 +552,7 @@ class _ProductModelsPageState extends State<ProductModelsPage>
                   ),
                 ),
               ),
+            SearchToggleButton(active: _searching, onPressed: _toggleSearch),
           ],
         ),
         body: Column(
@@ -608,13 +574,17 @@ class _ProductModelsPageState extends State<ProductModelsPage>
                 ),
               ),
             ),
-            Container(
-              color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-              child: _SearchBar(
-                controller: _searchCtrl,
-                hintText: s.productModelSearchHint,
-                isDark: isDark,
+            AnimatedSearchSlot(
+              open: _searching,
+              child: Container(
+                color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                child: _SearchBar(
+                  controller: _searchCtrl,
+                  hintText: s.productModelSearchHint,
+                  isDark: isDark,
+                  autofocus: true,
+                ),
               ),
             ),
             if (_knownFirms.isNotEmpty)
@@ -629,15 +599,13 @@ class _ProductModelsPageState extends State<ProductModelsPage>
                       isDark: isDark,
                       firmActive: firmActive,
                       firmLabel: firmActive ? _query : s.firmLabel,
-                      statusActive: _statusFilter != null,
-                      statusLabel: _statusFilter == null
-                          ? s.filterByStatus
-                          : (_statusFilter == true
-                                ? s.confirmedShort
-                                : s.notConfirmedShort),
+                      statusFilter: _statusFilter,
+                      allLabel: s.filterAll,
+                      confirmedLabel: s.confirmedShort,
+                      notConfirmedLabel: s.notConfirmedShort,
                       showReset: firmActive || _statusFilter != null,
                       onFirmTap: _showFirmPicker,
-                      onStatusTap: _showStatusPicker,
+                      onStatusChanged: _setStatusFilter,
                       onReset: _resetFilters,
                     );
                   },
@@ -785,9 +753,8 @@ class _ProductModelsPageState extends State<ProductModelsPage>
 
     return FadeTransition(
       opacity: _fadeAnim,
-      child: RefreshIndicator(
+      child: AppRefresh(
         onRefresh: _onRefresh,
-        color: _g1,
         child: ListView.builder(
           controller: _scrollCtrl,
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 32),
@@ -1283,11 +1250,13 @@ class _SearchBar extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
   final bool isDark;
+  final bool autofocus;
 
   const _SearchBar({
     required this.controller,
     required this.hintText,
     required this.isDark,
+    this.autofocus = false,
   });
 
   @override
@@ -1312,6 +1281,7 @@ class _SearchBar extends StatelessWidget {
               ],
       ),
       child: TextField(
+        autofocus: autofocus,
         controller: controller,
         style: TextStyle(color: onSurface, fontSize: 14),
         decoration: InputDecoration(
@@ -1384,52 +1354,60 @@ class _FilterBar extends StatelessWidget {
   final bool isDark;
   final bool firmActive;
   final String firmLabel;
-  final bool statusActive;
-  final String statusLabel;
+  final bool? statusFilter;
+  final String allLabel;
+  final String confirmedLabel;
+  final String notConfirmedLabel;
   final bool showReset;
   final VoidCallback onFirmTap;
-  final VoidCallback onStatusTap;
+  final ValueChanged<bool?> onStatusChanged;
   final VoidCallback onReset;
 
   const _FilterBar({
     required this.isDark,
     required this.firmActive,
     required this.firmLabel,
-    required this.statusActive,
-    required this.statusLabel,
+    required this.statusFilter,
+    required this.allLabel,
+    required this.confirmedLabel,
+    required this.notConfirmedLabel,
     required this.showReset,
     required this.onFirmTap,
-    required this.onStatusTap,
+    required this.onStatusChanged,
     required this.onReset,
   });
 
+  static const _values = <bool?>[null, true, false];
+
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _FilterPill(
-            icon: Icons.storefront_outlined,
-            label: firmLabel,
-            active: firmActive,
-            isDark: isDark,
-            onTap: onFirmTap,
-          ),
+        AppSegmentedControl(
+          labels: [allLabel, confirmedLabel, notConfirmedLabel],
+          selectedIndex: _values.indexOf(statusFilter),
+          onChanged: (i) => onStatusChanged(_values[i]),
+          minSegmentWidth: 0,
+          padding: EdgeInsets.zero,
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _FilterPill(
-            icon: Icons.verified_outlined,
-            label: statusLabel,
-            active: statusActive,
-            isDark: isDark,
-            onTap: onStatusTap,
-          ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _FilterPill(
+                icon: Icons.storefront_outlined,
+                label: firmLabel,
+                active: firmActive,
+                isDark: isDark,
+                onTap: onFirmTap,
+              ),
+            ),
+            if (showReset) ...[
+              const SizedBox(width: 8),
+              _ResetFiltersButton(isDark: isDark, onTap: onReset),
+            ],
+          ],
         ),
-        if (showReset) ...[
-          const SizedBox(width: 8),
-          _ResetFiltersButton(isDark: isDark, onTap: onReset),
-        ],
       ],
     );
   }

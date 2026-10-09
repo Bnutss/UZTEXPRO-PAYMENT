@@ -10,6 +10,10 @@ import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/adaptive_back_button.dart';
+import '../../core/widgets/app_refresh.dart';
+import '../../core/widgets/app_segmented_control.dart';
+import '../../core/widgets/choice_field.dart';
+import '../../core/widgets/search_toggle.dart';
 import 'shop_api.dart';
 
 enum _RangePreset { all, today, week, month, custom }
@@ -101,16 +105,27 @@ class ShopPvzStockPage extends StatefulWidget {
 }
 
 class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerProviderStateMixin {
-  static const Color _g1 = AppColors.brandOrange;
 
   final NumberFormat _numberFormat = NumberFormat('#,##0', 'ru');
   final _searchController = TextEditingController();
+  bool _searching = false;
+
+  void _toggleSearch() {
+    setState(() {
+      _searching = !_searching;
+      if (!_searching) _searchController.clear();
+    });
+  }
+
   Timer? _debounce;
 
   late final AnimationController _animCtrl;
   late final Animation<double> _fadeAnim;
 
   _RangePreset _preset = _RangePreset.all;
+  // Bumped when the custom-range sheet is dismissed so the segmented control
+  // snaps back to the real preset instead of staying on "custom".
+  int _segmentsEpoch = 0;
   DateTime? _dateFrom;
   DateTime? _dateTo;
 
@@ -118,6 +133,8 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
   int? _shopId;
 
   bool _overdueOnly = false;
+  // Buyer groups start collapsed; keyed by buyerId (-1 = unknown buyer).
+  final Set<int> _expandedBuyers = {};
 
   List<PvzOrder> _orders = [];
   bool _loading = true;
@@ -229,7 +246,10 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
       backgroundColor: Colors.transparent,
       builder: (_) => _StockCustomRangeSheet(initialRange: DateTimeRange(start: _dateFrom ?? now, end: _dateTo ?? now)),
     );
-    if (range == null) return;
+    if (range == null) {
+      setState(() => _segmentsEpoch++);
+      return;
+    }
     setState(() {
       _preset = _RangePreset.custom;
       _dateFrom = range.start;
@@ -243,6 +263,13 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
     HapticFeedback.selectionClick();
     setState(() => _shopId = shopId);
     _load();
+  }
+
+  void _toggleBuyer(int key) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (!_expandedBuyers.remove(key)) _expandedBuyers.add(key);
+    });
   }
 
   void _toggleOverdueOnly() {
@@ -289,9 +316,11 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
           foregroundColor: const Color(0xFF1C1C1E),
           elevation: 0.5,
           shadowColor: Colors.black12,
+          actions: [
+            SearchToggleButton(active: _searching, onPressed: _toggleSearch),
+          ],
         ),
-        body: RefreshIndicator(
-          color: _g1,
+        body: AppRefresh(
           onRefresh: _load,
           child: Container(
             color: listBg,
@@ -308,14 +337,34 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
                     ),
                   ),
                 ],
-                const SizedBox(height: 14),
-                _SearchBar(controller: _searchController, isDark: isDark, hintText: s.shopPickupSearchHint),
-                if (_shops.length > 1) ...[
+                AnimatedSearchSlot(
+                  open: _searching,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 14),
+                    child: _SearchBar(controller: _searchController, isDark: isDark, hintText: s.shopPickupSearchHint),
+                  ),
+                ),
+                if (_shops.isNotEmpty) ...[
                   const SizedBox(height: 14),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 2, bottom: 6),
+                    child: Text(
+                      s.shopIssuedShopFilterTitle,
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                    ),
+                  ),
                   _buildShopFilterRow(s, isDark),
                 ],
                 const SizedBox(height: 10),
-                _ToggleChip(label: s.shopStockOverdueOnly, selected: _overdueOnly, isDark: isDark, onTap: _toggleOverdueOnly),
+                AppSegmentedControl(
+                  labels: [s.filterAll, s.shopStockOverdueOnly],
+                  selectedIndex: _overdueOnly ? 1 : 0,
+                  onChanged: (i) {
+                    if ((i == 1) != _overdueOnly) _toggleOverdueOnly();
+                  },
+                  minSegmentWidth: 0,
+                  padding: EdgeInsets.zero,
+                ),
                 const SizedBox(height: 18),
                 if (_loading)
                   _skeleton(isDark)
@@ -362,20 +411,37 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
                       child: Column(
                         children: [
                           for (final group in groups) ...[
-                            _BuyerGroupHeader(group: group, s: s, isDark: isDark),
-                            const SizedBox(height: 8),
-                            for (final order in group.orders)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: _StockOrderTile(
-                                  order: order,
-                                  isDark: isDark,
-                                  numberFormat: _numberFormat,
-                                  s: s,
-                                  showShop: _shopId == null && _shops.length > 1,
-                                  onTap: () => _openDetail(order),
-                                ),
-                              ),
+                            _BuyerGroupHeader(
+                              group: group,
+                              s: s,
+                              isDark: isDark,
+                              expanded: _expandedBuyers.contains(group.buyerId ?? -1),
+                              onTap: () => _toggleBuyer(group.buyerId ?? -1),
+                            ),
+                            AnimatedSize(
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOutCubic,
+                              alignment: Alignment.topCenter,
+                              child: _expandedBuyers.contains(group.buyerId ?? -1)
+                                  ? Column(
+                                      children: [
+                                        const SizedBox(height: 8),
+                                        for (final order in group.orders)
+                                          Padding(
+                                            padding: const EdgeInsets.only(bottom: 8),
+                                            child: _StockOrderTile(
+                                              order: order,
+                                              isDark: isDark,
+                                              numberFormat: _numberFormat,
+                                              s: s,
+                                              showShop: _shopId == null && _shops.length > 1,
+                                              onTap: () => _openDetail(order),
+                                            ),
+                                          ),
+                                      ],
+                                    )
+                                  : const SizedBox(width: double.infinity),
+                            ),
                             const SizedBox(height: 10),
                           ],
                         ],
@@ -391,42 +457,34 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
   }
 
   Widget _buildDateFilterRow(S s) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _RangeChip(label: s.shopStockAllPeriod, selected: _preset == _RangePreset.all, onTap: () => _applyPreset(_RangePreset.all)),
-          const SizedBox(width: 8),
-          _RangeChip(label: s.shopIssuedToday, selected: _preset == _RangePreset.today, onTap: () => _applyPreset(_RangePreset.today)),
-          const SizedBox(width: 8),
-          _RangeChip(label: s.shopIssuedWeek, selected: _preset == _RangePreset.week, onTap: () => _applyPreset(_RangePreset.week)),
-          const SizedBox(width: 8),
-          _RangeChip(label: s.shopIssuedMonth, selected: _preset == _RangePreset.month, onTap: () => _applyPreset(_RangePreset.month)),
-          const SizedBox(width: 8),
-          _RangeChip(
-            label: s.shopIssuedCustomPeriod,
-            icon: Icons.date_range_rounded,
-            selected: _preset == _RangePreset.custom,
-            onTap: _pickCustomRange,
-          ),
-        ],
-      ),
+    const presets = _RangePreset.values;
+    return AppSegmentedControl(
+      key: ValueKey(_segmentsEpoch),
+      labels: [
+        s.shopStockAllPeriod,
+        s.shopIssuedToday,
+        s.shopIssuedWeek,
+        s.shopIssuedMonth,
+        s.shopIssuedCustomPeriod,
+      ],
+      selectedIndex: presets.indexOf(_preset),
+      onChanged: (i) => presets[i] == _RangePreset.custom
+          ? _pickCustomRange()
+          : _applyPreset(presets[i]),
+      minSegmentWidth: 84,
+      padding: EdgeInsets.zero,
     );
   }
 
   Widget _buildShopFilterRow(S s, bool isDark) {
-    return SizedBox(
-      height: 34,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: [
-          _ShopChip(label: s.shopIssuedAllShops, selected: _shopId == null, isDark: isDark, onTap: () => _selectShop(null)),
-          for (final shop in _shops) ...[
-            const SizedBox(width: 8),
-            _ShopChip(label: shop.name, selected: _shopId == shop.id, isDark: isDark, onTap: () => _selectShop(shop.id)),
-          ],
-        ],
-      ),
+    return ChoiceField<int?>(
+      title: s.shopIssuedShopFilterTitle,
+      options: [
+        ChoiceOption<int?>(null, s.shopIssuedAllShops),
+        for (final shop in _shops) ChoiceOption<int?>(shop.id, shop.name),
+      ],
+      selected: _shopId,
+      onChanged: _selectShop,
     );
   }
 
@@ -503,17 +561,24 @@ String _stockFormatDateTime(DateTime dt) {
 // ─── Buyer group header ─────────────────────────────────────────────────
 
 class _BuyerGroupHeader extends StatelessWidget {
-  const _BuyerGroupHeader({required this.group, required this.s, required this.isDark});
+  const _BuyerGroupHeader({required this.group, required this.s, required this.isDark, required this.expanded, required this.onTap});
 
   final _BuyerGroup group;
   final S s;
   final bool isDark;
+  final bool expanded;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final hasOverdue = group.maxDays > _overdueDaysThreshold;
-    return Container(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
@@ -548,7 +613,16 @@ class _BuyerGroupHeader extends StatelessWidget {
               child: Text(s.shopStockGroupBadge, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF991B1B))),
             ),
           ],
+          const SizedBox(width: 6),
+          AnimatedRotation(
+            turns: expanded ? 0.5 : 0,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            child: Icon(Icons.keyboard_arrow_down_rounded, size: 22, color: onSurface.withOpacity(0.45)),
+          ),
         ],
+      ),
+        ),
       ),
     );
   }
@@ -1093,128 +1167,6 @@ class _StockDatePickerField extends StatelessWidget {
 
 // ─── Filter chips ──────────────────────────────────────────────────────────
 
-class _RangeChip extends StatelessWidget {
-  const _RangeChip({required this.label, required this.selected, required this.onTap, this.icon});
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            gradient: selected ? const LinearGradient(colors: [_ShopStockColors.g1, _ShopStockColors.g2]) : null,
-            color: selected ? null : Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: selected ? Colors.transparent : onSurface.withOpacity(0.15)),
-            boxShadow: selected ? [BoxShadow(color: _ShopStockColors.g2.withOpacity(0.28), blurRadius: 8, offset: const Offset(0, 2))] : null,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 15, color: selected ? Colors.white : onSurface.withOpacity(0.6)),
-                const SizedBox(width: 6),
-              ],
-              Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: selected ? Colors.white : onSurface)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ToggleChip extends StatelessWidget {
-  const _ToggleChip({required this.label, required this.selected, required this.isDark, required this.onTap});
-
-  final String label;
-  final bool selected;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFFDC2626) : (isDark ? Colors.white.withOpacity(0.07) : Colors.white),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? const Color(0xFFDC2626) : (isDark ? Colors.white12 : Colors.grey.shade200)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              selected ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
-              size: 15,
-              color: selected ? Colors.white : (isDark ? Colors.white70 : Colors.grey.shade600),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: selected ? Colors.white : (isDark ? Colors.white70 : Colors.grey.shade700)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ShopChip extends StatelessWidget {
-  const _ShopChip({required this.label, required this.selected, required this.isDark, required this.onTap});
-
-  final String label;
-  final bool selected;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected ? _ShopStockColors.g2 : (isDark ? Colors.white.withOpacity(0.07) : Colors.white),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: selected ? _ShopStockColors.g2 : (isDark ? Colors.white12 : Colors.grey.shade200)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!selected)
-              Container(
-                width: 6,
-                height: 6,
-                margin: const EdgeInsets.only(right: 6),
-                decoration: const BoxDecoration(shape: BoxShape.circle, color: _ShopStockColors.g1),
-              ),
-            Text(
-              label,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: selected ? Colors.white : (isDark ? Colors.white70 : Colors.grey.shade700)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ─── Summary card ────────────────────────────────────────────────────────
 
 class _SummaryCard extends StatelessWidget {
@@ -1284,6 +1236,7 @@ class _SearchBar extends StatelessWidget {
         boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2))],
       ),
       child: TextField(
+        autofocus: true,
         controller: controller,
         style: TextStyle(color: onSurface, fontSize: 14),
         decoration: InputDecoration(

@@ -11,6 +11,7 @@ import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/adaptive_back_button.dart';
+import '../../core/widgets/app_refresh.dart';
 
 const _kDP = 'common/pass';
 
@@ -365,11 +366,12 @@ class _PassDetailPageState extends State<PassDetailPage> {
     final label     = pass['status_display']?.toString() ?? cfg.label;
     final onSurface = Theme.of(context).colorScheme.onSurface;
 
-    return RefreshIndicator(
+    return AppRefresh(
       onRefresh: _load,
-      color: _g1,
       child: SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
+      ),
       child: Column(children: [
         // ── Status header ────────────────────────────────────────────────────
         Container(

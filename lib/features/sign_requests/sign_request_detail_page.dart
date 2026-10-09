@@ -10,6 +10,7 @@ import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/adaptive_back_button.dart';
+import '../../core/widgets/app_refresh.dart';
 
 const _kDetailPath = 'texmansys/material-purchase-application';
 
@@ -349,11 +350,12 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
 
-    return RefreshIndicator(
+    return AppRefresh(
       onRefresh: _load,
-      color: _g1,
       child: ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
+      ),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
         _SectionCard(

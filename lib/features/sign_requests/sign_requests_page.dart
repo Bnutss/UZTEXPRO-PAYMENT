@@ -11,6 +11,9 @@ import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/adaptive_back_button.dart';
+import '../../core/widgets/app_refresh.dart';
+import '../../core/widgets/app_segmented_control.dart';
+import '../../core/widgets/search_toggle.dart';
 import 'sign_request_detail_page.dart';
 
 const _kPath = 'texmansys/material-purchase-application';
@@ -41,6 +44,15 @@ class _SignRequestsPageState extends State<SignRequestsPage>
   String _statusFilter = 'all';
 
   final _searchCtrl = TextEditingController();
+  bool _searching = false;
+
+  void _toggleSearch() {
+    setState(() {
+      _searching = !_searching;
+      if (!_searching) _searchCtrl.clear();
+    });
+  }
+
   Timer? _debounce;
 
   late AnimationController _animCtrl;
@@ -381,6 +393,7 @@ class _SignRequestsPageState extends State<SignRequestsPage>
                   ),
                 ),
               ),
+            SearchToggleButton(active: _searching, onPressed: _toggleSearch),
           ],
         ),
         body: Column(
@@ -421,10 +434,13 @@ class _SignRequestsPageState extends State<SignRequestsPage>
               ),
             ),
             // Search bar
-            Container(
-              color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-              child: _SearchBar(controller: _searchCtrl, isDark: isDark),
+            AnimatedSearchSlot(
+              open: _searching,
+              child: Container(
+                color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                child: _SearchBar(controller: _searchCtrl, isDark: isDark),
+              ),
             ),
             // Filter chips
             if (!_isLoading && _error == null)
@@ -560,9 +576,8 @@ class _SignRequestsPageState extends State<SignRequestsPage>
 
     return FadeTransition(
       opacity: _fadeAnim,
-      child: RefreshIndicator(
+      child: AppRefresh(
         onRefresh: () => _load(forceRefresh: true),
-        color: _g1,
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           itemCount: _shown.length,
@@ -639,6 +654,7 @@ class _SearchBar extends StatelessWidget {
               ],
       ),
       child: TextField(
+        autofocus: true,
         controller: controller,
         style: TextStyle(color: onSurface, fontSize: 14),
         decoration: InputDecoration(
@@ -696,100 +712,21 @@ class _FilterBar extends StatelessWidget {
     required this.onSelect,
   });
 
+  static const _values = ['all', 'pending', 'signing'];
+
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 34,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        children: [
-          _chip(context, 'all', S.of(context).filterAll, allCount),
-          const SizedBox(width: 6),
-          _chip(
-            context,
-            'pending',
-            S.of(context).pending,
-            pendingCount,
-            color: const Color(0xFFF59E0B),
-          ),
-          const SizedBox(width: 6),
-          _chip(
-            context,
-            'signing',
-            S.of(context).filterForSigning,
-            signingCount,
-            color: const Color(0xFF3B82F6),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _chip(
-    BuildContext context,
-    String value,
-    String label,
-    int count, {
-    Color? color,
-  }) {
-    final isSelected = selected == value;
-    final chipColor = color ?? const Color(0xFFFF8C00);
-    return GestureDetector(
-      onTap: () => onSelect(value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? chipColor.withOpacity(isDark ? 0.25 : 0.12)
-              : (isDark ? Colors.white.withOpacity(0.07) : Colors.white),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected
-                ? chipColor.withOpacity(isDark ? 0.6 : 0.5)
-                : (isDark ? Colors.white24 : Colors.grey.shade300),
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected
-                    ? chipColor
-                    : (isDark ? Colors.white60 : Colors.grey.shade600),
-              ),
-            ),
-            if (count > 0) ...[
-              const SizedBox(width: 5),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? chipColor.withOpacity(isDark ? 0.3 : 0.15)
-                      : (isDark ? Colors.white12 : Colors.grey.shade100),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '$count',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: isSelected
-                        ? chipColor
-                        : (isDark ? Colors.white54 : Colors.grey.shade500),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+    final t = S.of(context);
+    String withCount(String label, int count) =>
+        count > 0 ? '$label $count' : label;
+    return AppSegmentedControl(
+      labels: [
+        withCount(t.filterAll, allCount),
+        withCount(t.pending, pendingCount),
+        withCount(t.filterForSigning, signingCount),
+      ],
+      selectedIndex: _values.indexOf(selected).clamp(0, _values.length - 1),
+      onChanged: (i) => onSelect(_values[i]),
     );
   }
 }

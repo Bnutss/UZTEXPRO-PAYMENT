@@ -10,6 +10,10 @@ import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/adaptive_back_button.dart';
+import '../../core/widgets/app_refresh.dart';
+import '../../core/widgets/app_segmented_control.dart';
+import '../../core/widgets/choice_field.dart';
+import '../../core/widgets/search_toggle.dart';
 import '../../core/widgets/stagger_in.dart';
 import 'shop_api.dart';
 
@@ -38,26 +42,37 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
 
   final NumberFormat _numberFormat = NumberFormat('#,##0', 'ru');
   final _searchController = TextEditingController();
+  bool _searching = false;
+
+  void _toggleSearch() {
+    setState(() {
+      _searching = !_searching;
+      if (!_searching) _searchController.clear();
+    });
+  }
+
   Timer? _debounce;
 
   late final AnimationController _animCtrl;
   late final Animation<double> _fadeAnim;
+
+  List<PvzShop> _shops = [];
+  int? _shopId;
 
   List<PvzOrder> _orders = [];
   bool _loading = true;
   String? _error;
 
   _RangePreset _preset = _RangePreset.today;
+  // Bumped when the custom-range sheet is dismissed so the segmented control
+  // snaps back to the real preset instead of staying on "custom".
+  int _segmentsEpoch = 0;
   late DateTime _dateFrom;
   late DateTime _dateTo;
 
   double get _totalSum => _orders.fold<double>(0, (sum, o) => sum + o.totalValue);
 
-  int get _salary {
-    if (_totalSum <= 0) return 0;
-    final raw = _totalSum * 0.05;
-    return (raw / 100).round() * 100;
-  }
+  int get _salary => pvzSellerSalary(_totalSum);
 
   @override
   void initState() {
@@ -72,6 +87,7 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
       _debounce?.cancel();
       _debounce = Timer(const Duration(milliseconds: 350), _load);
     });
+    _loadShops();
     localeNotifier.addListener(_onLocaleChanged);
   }
 
@@ -86,6 +102,23 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
     super.dispose();
   }
 
+  Future<void> _loadShops() async {
+    try {
+      final shops = await PvzApi.fetchShops(widget.jwtToken);
+      if (!mounted) return;
+      setState(() => _shops = shops);
+    } on PvzApiException {
+      // The shop filter is a convenience — the list still loads without it.
+    }
+  }
+
+  void _selectShop(int? shopId) {
+    if (_shopId == shopId) return;
+    HapticFeedback.selectionClick();
+    setState(() => _shopId = shopId);
+    _load();
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -97,6 +130,7 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
         query: _searchController.text.trim(),
         dateFrom: _dateFrom,
         dateTo: _dateTo,
+        shopId: _shopId,
       );
       if (!mounted) return;
       setState(() {
@@ -146,7 +180,10 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
       backgroundColor: Colors.transparent,
       builder: (_) => _PickupCustomRangeSheet(initialRange: DateTimeRange(start: _dateFrom, end: _dateTo)),
     );
-    if (range == null) return;
+    if (range == null) {
+      setState(() => _segmentsEpoch++);
+      return;
+    }
     setState(() {
       _preset = _RangePreset.custom;
       _dateFrom = range.start;
@@ -189,6 +226,9 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
           foregroundColor: const Color(0xFF1C1C1E),
           elevation: 0.5,
           shadowColor: Colors.black12,
+          actions: [
+            SearchToggleButton(active: _searching, onPressed: _toggleSearch),
+          ],
         ),
         body: Column(
           children: [
@@ -205,6 +245,17 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
                       if (!_loading && _error == null) _CountBadge(count: _orders.length),
                     ],
                   ),
+                  if (_shops.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 2, bottom: 6),
+                      child: Text(
+                        s.shopIssuedShopFilterTitle,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                      ),
+                    ),
+                    _buildShopFilterRow(s),
+                  ],
                   if (!_loading && _error == null) ...[
                     const SizedBox(height: 12),
                     Row(
@@ -231,10 +282,13 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
                 ],
               ),
             ),
-            Container(
-              color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-              child: _SearchBar(controller: _searchController, isDark: isDark, hintText: s.shopPickupSearchHint),
+            AnimatedSearchSlot(
+              open: _searching,
+              child: Container(
+                color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                child: _SearchBar(controller: _searchController, isDark: isDark, hintText: s.shopPickupSearchHint),
+              ),
             ),
             Expanded(child: Container(color: listBg, child: _buildBody(isDark, s))),
           ],
@@ -244,24 +298,33 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
   }
 
   Widget _buildDateFilterRow(S s) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _DateChip(label: s.shopIssuedToday, selected: _preset == _RangePreset.today, onTap: () => _applyPreset(_RangePreset.today)),
-          const SizedBox(width: 8),
-          _DateChip(label: s.shopIssuedWeek, selected: _preset == _RangePreset.week, onTap: () => _applyPreset(_RangePreset.week)),
-          const SizedBox(width: 8),
-          _DateChip(label: s.shopIssuedMonth, selected: _preset == _RangePreset.month, onTap: () => _applyPreset(_RangePreset.month)),
-          const SizedBox(width: 8),
-          _DateChip(
-            label: s.shopIssuedCustomPeriod,
-            icon: Icons.date_range_rounded,
-            selected: _preset == _RangePreset.custom,
-            onTap: _pickCustomRange,
-          ),
-        ],
-      ),
+    const presets = _RangePreset.values;
+    return AppSegmentedControl(
+      key: ValueKey(_segmentsEpoch),
+      labels: [
+        s.shopIssuedToday,
+        s.shopIssuedWeek,
+        s.shopIssuedMonth,
+        s.shopIssuedCustomPeriod,
+      ],
+      selectedIndex: presets.indexOf(_preset),
+      onChanged: (i) => presets[i] == _RangePreset.custom
+          ? _pickCustomRange()
+          : _applyPreset(presets[i]),
+      minSegmentWidth: 80,
+      padding: EdgeInsets.zero,
+    );
+  }
+
+  Widget _buildShopFilterRow(S s) {
+    return ChoiceField<int?>(
+      title: s.shopIssuedShopFilterTitle,
+      options: [
+        ChoiceOption<int?>(null, s.shopIssuedAllShops),
+        for (final shop in _shops) ChoiceOption<int?>(shop.id, shop.name),
+      ],
+      selected: _shopId,
+      onChanged: _selectShop,
     );
   }
 
@@ -338,9 +401,8 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
       );
     }
 
-    return RefreshIndicator(
+    return AppRefresh(
       onRefresh: _load,
-      color: _g1,
       child: FadeTransition(
         opacity: _fadeAnim,
         child: ListView.builder(
@@ -679,47 +741,6 @@ class _CountBadge extends StatelessWidget {
   }
 }
 
-class _DateChip extends StatelessWidget {
-  final String label;
-  final IconData? icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _DateChip({required this.label, this.icon, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-          decoration: BoxDecoration(
-            color: selected ? _ShopPickupColors.g1.withOpacity(0.12) : const Color(0xFFF2F2F2),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 13, color: selected ? _ShopPickupColors.g2 : const Color(0xFF8A8A8E)),
-                const SizedBox(width: 5),
-              ],
-              Text(
-                label,
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: selected ? _ShopPickupColors.g2 : const Color(0xFF8A8A8E)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _HeaderStatTile extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -957,6 +978,7 @@ class _SearchBar extends StatelessWidget {
         boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2))],
       ),
       child: TextField(
+        autofocus: true,
         controller: controller,
         style: TextStyle(color: onSurface, fontSize: 14),
         decoration: InputDecoration(

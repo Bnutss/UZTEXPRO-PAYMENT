@@ -1,4 +1,3 @@
-import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:uztexpro_payment/main.dart';
 import 'package:http/http.dart' as http;
@@ -12,6 +11,9 @@ import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/adaptive_back_button.dart';
+import '../../core/widgets/app_refresh.dart';
+import '../../core/widgets/app_segmented_control.dart';
+import '../../core/widgets/search_toggle.dart';
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -76,6 +78,15 @@ class _MainPageScreenState extends State<MainPageScreen>
   bool _showBackToTopButton = false;
 
   final TextEditingController _searchController = TextEditingController();
+  bool _searching = false;
+
+  void _toggleSearch() {
+    setState(() {
+      _searching = !_searching;
+      if (!_searching) _searchController.clear();
+    });
+  }
+
   int? _selectedStatusFilterId;
 
   static const Color _gradientStart = AppColors.brandOrange;
@@ -163,7 +174,9 @@ class _MainPageScreenState extends State<MainPageScreen>
     AdaptiveSnackBar.show(
       context,
       message: message,
-      type: isSuccess ? AdaptiveSnackBarType.success : AdaptiveSnackBarType.error,
+      type: isSuccess
+          ? AdaptiveSnackBarType.success
+          : AdaptiveSnackBarType.error,
     );
   }
 
@@ -1219,7 +1232,6 @@ class _MainPageScreenState extends State<MainPageScreen>
     );
   }
 
-
   // ── Build ─────────────────────────────────────────────────────────────────────
 
   @override
@@ -1254,7 +1266,7 @@ class _MainPageScreenState extends State<MainPageScreen>
           actions: [
             if (!isLoading)
               Padding(
-                padding: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.only(right: 12),
                 child: Center(
                   child: _PayCountBadge(
                     shown: _filteredReports.length,
@@ -1262,18 +1274,22 @@ class _MainPageScreenState extends State<MainPageScreen>
                   ),
                 ),
               ),
+            SearchToggleButton(active: _searching, onPressed: _toggleSearch),
           ],
         ),
         body: Column(
           children: [
             // ── Search bar ──────────────────────────────────────────────────
-            Container(
-              color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-              child: _PaySearchBar(
-                controller: _searchController,
-                hint: s.paymentSearchHint,
-                isDark: isDark,
+            AnimatedSearchSlot(
+              open: _searching,
+              child: Container(
+                color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                child: _PaySearchBar(
+                  controller: _searchController,
+                  hint: s.paymentSearchHint,
+                  isDark: isDark,
+                ),
               ),
             ),
             // ── Status filter ───────────────────────────────────────────────
@@ -1324,9 +1340,8 @@ class _MainPageScreenState extends State<MainPageScreen>
     if (paymentReports.isEmpty) return _emptyState(s, isDark);
     if (_filteredReports.isEmpty) return _noResultsState(s, isDark);
 
-    return RefreshIndicator(
+    return AppRefresh(
       onRefresh: _refreshData,
-      color: _gradientStart,
       child: FadeTransition(
         opacity: _animation,
         child: ListView.builder(
@@ -1693,6 +1708,7 @@ class _PaySearchBar extends StatelessWidget {
               ],
       ),
       child: TextField(
+        autofocus: true,
         controller: controller,
         style: TextStyle(color: onSurface, fontSize: 14),
         decoration: InputDecoration(
@@ -1761,107 +1777,14 @@ class _PayFilterRow extends StatelessWidget {
         .toList();
     if (active.isEmpty) return const SizedBox.shrink();
 
-    return SizedBox(
-      height: 34,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        children: [
-          _PaySChip(
-            label: allLabel,
-            selected: selected == null,
-            color: isDark ? Colors.white70 : Colors.grey.shade600,
-            isDark: isDark,
-            onTap: () => onSelect(null),
-          ),
-          for (final st in active) ...[
-            const SizedBox(width: 6),
-            _PaySChip(
-              label: st['name'] as String,
-              selected: selected == st['id'],
-              color: payStatusConfig(st['id'] as int).color,
-              isDark: isDark,
-              onTap: () => onSelect(st['id'] as int),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
+    final labels = [allLabel, for (final st in active) st['name'] as String];
+    final ids = <int?>[null, for (final st in active) st['id'] as int];
+    final index = ids.indexOf(selected).clamp(0, ids.length - 1);
 
-class _PaySChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final Color color;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  const _PaySChip({
-    required this.label,
-    required this.selected,
-    required this.color,
-    required this.isDark,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected
-              ? color
-              : (isDark ? Colors.white.withOpacity(0.07) : Colors.white),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: selected
-                ? color
-                : (isDark ? Colors.white12 : Colors.grey.shade200),
-          ),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: color.withOpacity(0.28),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : [
-                  if (!isDark)
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!selected)
-              Container(
-                width: 7,
-                height: 7,
-                margin: const EdgeInsets.only(right: 6),
-                decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-              ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: selected
-                    ? Colors.white
-                    : (isDark ? Colors.white70 : Colors.grey.shade700),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return AppSegmentedControl(
+      labels: labels,
+      selectedIndex: index,
+      onChanged: (i) => onSelect(ids[i]),
     );
   }
 }

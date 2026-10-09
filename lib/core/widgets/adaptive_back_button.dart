@@ -25,8 +25,8 @@ class AdaptiveBackButton extends StatelessWidget {
 
     if (Platform.isIOS) {
       return SizedBox(
-        width: 40,
-        height: 40,
+        width: 46,
+        height: 46,
         child: AdaptiveButton.icon(
           onPressed: handlePressed,
           icon: Icons.arrow_back_ios_new_rounded,
@@ -35,7 +35,7 @@ class AdaptiveBackButton extends StatelessWidget {
           style: AdaptiveButtonStyle.glass,
           size: AdaptiveButtonSize.medium,
           useSmoothRectangleBorder: false,
-          minSize: const Size(40, 40),
+          minSize: const Size(46, 46),
         ),
       );
     }
@@ -47,8 +47,8 @@ class AdaptiveBackButton extends StatelessWidget {
       child: InkWell(
         onTap: handlePressed,
         child: Container(
-          width: 40,
-          height: 40,
+          width: 46,
+          height: 46,
           alignment: Alignment.center,
           decoration: const BoxDecoration(
             color: Color(0xFFF2F2F2),
@@ -57,7 +57,7 @@ class AdaptiveBackButton extends StatelessWidget {
           child: const Icon(
             Icons.arrow_back_rounded,
             color: Color(0xFF1C1C1E),
-            size: 20,
+            size: 22,
           ),
         ),
       ),
