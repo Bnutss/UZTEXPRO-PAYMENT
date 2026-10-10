@@ -364,7 +364,8 @@ class _SignRequestsPageState extends State<SignRequestsPage>
       ),
       child: Scaffold(
         appBar: AppBar(
-          leading: const Center(child: AdaptiveBackButton()),
+          leadingWidth: kBackButtonLeadingWidth,
+          leading: const AdaptiveBackButton(),
           title: Text(
             s.signRequestsTitle,
             style: const TextStyle(

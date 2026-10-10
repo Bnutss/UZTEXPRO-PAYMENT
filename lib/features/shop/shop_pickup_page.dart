@@ -220,7 +220,8 @@ class _ShopPickupPageState extends State<ShopPickupPage> with SingleTickerProvid
       ),
       child: Scaffold(
         appBar: AppBar(
-          leading: const Center(child: AdaptiveBackButton()),
+          leadingWidth: kBackButtonLeadingWidth,
+          leading: const AdaptiveBackButton(),
           title: Text(s.shopPickupTitle, style: const TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontSize: 18)),
           centerTitle: false,
           backgroundColor: isDark ? Theme.of(context).colorScheme.surface : AppColors.groupedBackground,

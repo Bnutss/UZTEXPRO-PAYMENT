@@ -194,7 +194,8 @@ class _BonusDetailPageState extends State<BonusDetailPage> {
             ? const Color(0xFF121212)
             : AppColors.groupedBackground,
         appBar: AppBar(
-          leading: const Center(child: AdaptiveBackButton()),
+          leadingWidth: kBackButtonLeadingWidth,
+          leading: const AdaptiveBackButton(),
           title: Text(
             '${S.of(context).bonusNumber}$id',
             style: const TextStyle(

@@ -64,11 +64,36 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
     _dateTo = now;
     _searchCtrl.addListener(() => setState(() {}));
     localeNotifier.addListener(_onLocaleChanged);
-    _loadShops();
-    _load();
+    _startAfterTransition();
   }
 
   void _onLocaleChanged() => setState(() {});
+
+  // Data landing in the middle of the route fade swaps the body and makes the
+  // app bar flicker on the first open: wait for the transition to finish.
+  void _startAfterTransition() {
+    void start() {
+      if (!mounted) return;
+      _loadShops();
+      _load();
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final anim = ModalRoute.of(context)?.animation;
+      if (anim == null || anim.isCompleted) {
+        start();
+        return;
+      }
+      void listener(AnimationStatus status) {
+        if (status == AnimationStatus.completed) {
+          anim.removeStatusListener(listener);
+          start();
+        }
+      }
+
+      anim.addStatusListener(listener);
+    });
+  }
 
   @override
   void dispose() {
@@ -203,7 +228,8 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
       ),
       child: Scaffold(
         appBar: AppBar(
-          leading: const Center(child: AdaptiveBackButton()),
+          leadingWidth: kBackButtonLeadingWidth,
+          leading: const AdaptiveBackButton(),
           title: Text(
             s.shopAnalyticsTitle,
             style: const TextStyle(color: kInk, fontWeight: FontWeight.bold, fontSize: 18),
@@ -218,28 +244,43 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
             SearchToggleButton(active: _searching, onPressed: _toggleSearch),
           ],
         ),
-        body: AppRefresh(
-          onRefresh: _load,
-          child: Container(
-            color: listBg,
-            child: CustomScrollView(
-              slivers: [
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                  sliver: SliverList(delegate: SliverChildListDelegate(_header(s))),
-                ),
-                ..._content(s, isDark),
-              ],
+        // Filters and tabs live in a fixed header and only the results scroll,
+        // same layout as the passes screen.
+        body: Column(
+          children: [
+            Container(
+              color: listBg,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: _fixedHeader(s),
+              ),
             ),
-          ),
+            Expanded(
+              child: AppRefresh(
+                onRefresh: _load,
+                child: Container(
+                  color: listBg,
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                        sliver: SliverList(delegate: SliverChildListDelegate(_metricsBlock(s))),
+                      ),
+                      ..._content(s, isDark),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  List<Widget> _header(S s) {
+  List<Widget> _fixedHeader(S s) {
     const presets = _RangePreset.values;
-    final data = _data;
     return [
       BlockCard(
         child: Column(
@@ -285,6 +326,28 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
         ),
       ),
       const SizedBox(height: 12),
+      AppSegmentedControl(
+        labels: [
+          s.shopAnalyticsTabProducts,
+          s.shopAnalyticsTabShops,
+          s.shopAnalyticsTabBuyers,
+          s.shopAnalyticsTabStock,
+        ],
+        selectedIndex: _tab.index,
+        onChanged: (i) => _selectTab(_Tab.values[i]),
+        minSegmentWidth: 88,
+        padding: EdgeInsets.zero,
+      ),
+      if (_searching) ...[
+        const SizedBox(height: 10),
+        BlockSearchField(controller: _searchCtrl, hint: s.shopAnalyticsSearchHint),
+      ],
+    ];
+  }
+
+  List<Widget> _metricsBlock(S s) {
+    final data = _data;
+    return [
       if (data != null) ...[
         BlockCard(
           child: Column(
@@ -308,22 +371,6 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
           ),
         ),
         const SizedBox(height: 12),
-      ],
-      AppSegmentedControl(
-        labels: [
-          s.shopAnalyticsTabProducts,
-          s.shopAnalyticsTabShops,
-          s.shopAnalyticsTabBuyers,
-          s.shopAnalyticsTabStock,
-        ],
-        selectedIndex: _tab.index,
-        onChanged: (i) => _selectTab(_Tab.values[i]),
-        minSegmentWidth: 88,
-        padding: EdgeInsets.zero,
-      ),
-      if (_searching) ...[
-        const SizedBox(height: 10),
-        BlockSearchField(controller: _searchCtrl, hint: s.shopAnalyticsSearchHint),
       ],
     ];
   }

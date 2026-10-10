@@ -234,7 +234,8 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
             ? const Color(0xFF121212)
             : AppColors.groupedBackground,
         appBar: AppBar(
-          leading: const Center(child: AdaptiveBackButton()),
+          leadingWidth: kBackButtonLeadingWidth,
+          leading: const AdaptiveBackButton(),
           title: Text(
             _model?['vendor_code']?.toString() ??
                 S.of(context).productModelDetailTitle,

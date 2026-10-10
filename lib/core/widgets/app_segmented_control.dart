@@ -53,12 +53,16 @@ class AppSegmentedControl extends StatelessWidget {
         final needed = widths.fold<double>(0, (a, b) => a + b);
         // minSegmentWidth == 0 means "never scroll, just share the width":
         // those callers (short 2-3 segment sets) keep the native control.
-        final scrolls = minSegmentWidth > 0 && equal > available;
+        final overflows = minSegmentWidth > 0 && equal > available;
+        // Segments of uneven width still fit: stretch them proportionally to
+        // fill the row instead of leaving an empty gap on the right.
+        final stretch = overflows && needed <= available;
+        final scrolls = overflows && !stretch;
 
         // The native iOS control can't scroll and swallows touches inside a
         // scroll view, so it is only used when every segment fits; wider
         // sets get the scrollable pill track on both platforms.
-        final Widget control = Platform.isIOS && !scrolls && !forcePill
+        final Widget control = Platform.isIOS && !overflows && !forcePill
             ? AdaptiveSegmentedControl(
                 labels: labels,
                 selectedIndex: selectedIndex,
@@ -69,7 +73,11 @@ class AppSegmentedControl extends StatelessWidget {
                 labels: labels,
                 selectedIndex: selectedIndex,
                 onChanged: handleChanged,
-                widths: scrolls ? widths : null,
+                widths: scrolls
+                    ? widths
+                    : stretch
+                        ? [for (final w in widths) w * available / needed]
+                        : null,
               );
 
         final sized = SizedBox(

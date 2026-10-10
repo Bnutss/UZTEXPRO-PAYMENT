@@ -423,7 +423,8 @@ class _BonusesPageState extends State<BonusesPage>
       ),
       child: Scaffold(
         appBar: AppBar(
-          leading: const Center(child: AdaptiveBackButton()),
+          leadingWidth: kBackButtonLeadingWidth,
+          leading: const AdaptiveBackButton(),
           title: Text(
             s.bonusesTitle,
             style: const TextStyle(

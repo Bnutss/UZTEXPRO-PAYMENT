@@ -523,7 +523,8 @@ class _ProductModelsPageState extends State<ProductModelsPage>
       ),
       child: Scaffold(
         appBar: AppBar(
-          leading: const Center(child: AdaptiveBackButton()),
+          leadingWidth: kBackButtonLeadingWidth,
+          leading: const AdaptiveBackButton(),
           title: Text(
             s.productModelsTitle,
             style: const TextStyle(

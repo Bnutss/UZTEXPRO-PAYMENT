@@ -568,7 +568,8 @@ class _PassesPageState extends State<PassesPage>
       ),
       child: Scaffold(
         appBar: AppBar(
-          leading: const Center(child: AdaptiveBackButton()),
+          leadingWidth: kBackButtonLeadingWidth,
+          leading: const AdaptiveBackButton(),
           title: Text(
             s.menuPasses,
             style: const TextStyle(

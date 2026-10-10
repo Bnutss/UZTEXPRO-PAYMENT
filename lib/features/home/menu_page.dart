@@ -629,7 +629,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   Widget _buildHomeTab(S s) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 24),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

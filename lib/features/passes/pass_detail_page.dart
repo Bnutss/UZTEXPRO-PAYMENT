@@ -267,7 +267,8 @@ class _PassDetailPageState extends State<PassDetailPage> {
             ? const Color(0xFF121212)
             : AppColors.groupedBackground,
         appBar: AppBar(
-          leading: const Center(child: AdaptiveBackButton()),
+          leadingWidth: kBackButtonLeadingWidth,
+          leading: const AdaptiveBackButton(),
           title: Text(
             _pass?['number']?.toString() ?? S.of(context).passTitle,
             style: const TextStyle(

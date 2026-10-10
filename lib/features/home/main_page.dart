@@ -1250,7 +1250,8 @@ class _MainPageScreenState extends State<MainPageScreen>
       ),
       child: Scaffold(
         appBar: AppBar(
-          leading: const Center(child: AdaptiveBackButton()),
+          leadingWidth: kBackButtonLeadingWidth,
+          leading: const AdaptiveBackButton(),
           title: Text(
             s.paymentAgreements,
             style: const TextStyle(

@@ -224,7 +224,8 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
             ? Theme.of(context).colorScheme.surface
             : AppColors.groupedBackground,
         appBar: AppBar(
-          leading: const Center(child: AdaptiveBackButton()),
+          leadingWidth: kBackButtonLeadingWidth,
+          leading: const AdaptiveBackButton(),
           title: Text(
             '${s.requestNumber}${widget.appId}',
             style: const TextStyle(

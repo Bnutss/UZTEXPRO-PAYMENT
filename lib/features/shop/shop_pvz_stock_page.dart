@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 
 import '../../core/localization/app_strings.dart';
@@ -14,6 +13,7 @@ import '../../core/widgets/app_refresh.dart';
 import '../../core/widgets/app_segmented_control.dart';
 import '../../core/widgets/choice_field.dart';
 import '../../core/widgets/search_toggle.dart';
+import '../auth/widgets/logo_stroke_loader.dart';
 import 'shop_api.dart';
 
 enum _RangePreset { all, today, week, month, custom }
@@ -145,8 +145,7 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
     super.initState();
     _animCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
-    _loadShops();
-    _load();
+    _startAfterTransition();
     _searchController.addListener(() {
       _debounce?.cancel();
       _debounce = Timer(const Duration(milliseconds: 350), _load);
@@ -155,6 +154,33 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
   }
 
   void _onLocaleChanged() => setState(() {});
+
+  // Network data landing in the middle of the route fade swaps the whole body
+  // (loader -> list) and makes the app bar flicker on the first open. Wait
+  // for the transition to finish first.
+  void _startAfterTransition() {
+    void start() {
+      if (!mounted) return;
+      _loadShops();
+      _load();
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final anim = ModalRoute.of(context)?.animation;
+      if (anim == null || anim.isCompleted) {
+        start();
+        return;
+      }
+      void listener(AnimationStatus status) {
+        if (status == AnimationStatus.completed) {
+          anim.removeStatusListener(listener);
+          start();
+        }
+      }
+
+      anim.addStatusListener(listener);
+    });
+  }
 
   @override
   void dispose() {
@@ -309,7 +335,8 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
       ),
       child: Scaffold(
         appBar: AppBar(
-          leading: const Center(child: AdaptiveBackButton()),
+          leadingWidth: kBackButtonLeadingWidth,
+          leading: const AdaptiveBackButton(),
           title: Text(s.shopStockTitle, style: const TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontSize: 18)),
           centerTitle: false,
           backgroundColor: isDark ? Theme.of(context).colorScheme.surface : AppColors.groupedBackground,
@@ -321,13 +348,16 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
             SearchToggleButton(active: _searching, onPressed: _toggleSearch),
           ],
         ),
-        body: AppRefresh(
-          onRefresh: _load,
-          child: Container(
-            color: listBg,
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
+        // Filters live in a fixed header and only the list scrolls, same
+        // layout as the passes screen.
+        body: Column(
+          children: [
+            Container(
+              color: listBg,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                 _buildDateFilterRow(s),
                 if (_preset != _RangePreset.all) ...[
                   const SizedBox(height: 8),
@@ -366,7 +396,17 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
                   minSegmentWidth: 0,
                   padding: EdgeInsets.zero,
                 ),
-                const SizedBox(height: 18),
+                ],
+              ),
+            ),
+            Expanded(
+              child: AppRefresh(
+                onRefresh: _load,
+                child: Container(
+                  color: listBg,
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+                    children: [
                 if (_loading)
                   _skeleton(isDark)
                 else if (_error != null)
@@ -449,9 +489,12 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
                       ),
                     ),
                 ],
-              ],
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -520,30 +563,9 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
   }
 
   Widget _skeleton(bool isDark) {
-    final base = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
-    final hi = isDark ? Colors.grey.shade700 : Colors.grey.shade100;
-    Widget block({double height = 88, double? width}) => Container(
-      height: height,
-      width: width,
-      decoration: BoxDecoration(color: base, borderRadius: BorderRadius.circular(16)),
-    );
-    return Shimmer.fromColors(
-      baseColor: base,
-      highlightColor: hi,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(child: block(height: 72)),
-              const SizedBox(width: 10),
-              Expanded(child: block(height: 72)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          for (int i = 0; i < 4; i++) Padding(padding: const EdgeInsets.only(bottom: 8), child: block()),
-        ],
-      ),
+    return const Padding(
+      padding: EdgeInsets.only(top: 56, bottom: 56),
+      child: Center(child: LogoStrokeLoader(size: 120)),
     );
   }
 }

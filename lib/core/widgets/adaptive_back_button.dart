@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 
+/// `AppBar.leadingWidth` that fits [AdaptiveBackButton] with its 12px left
+/// inset (46 + 12), mirroring the right inset of the search button.
+const double kBackButtonLeadingWidth = 58;
+
 /// Round glass back button used as an `AppBar.leading` on every pushed
 /// screen, instead of the platform's default flat back arrow — kept as one
 /// shared widget so every screen renders it identically instead of each
@@ -23,6 +27,13 @@ class AdaptiveBackButton extends StatelessWidget {
       }
     }
 
+    return Padding(
+      padding: const EdgeInsets.only(left: 12),
+      child: Center(child: _build(handlePressed)),
+    );
+  }
+
+  Widget _build(VoidCallback handlePressed) {
     if (Platform.isIOS) {
       return SizedBox(
         width: 46,

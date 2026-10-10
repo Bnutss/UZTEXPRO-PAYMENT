@@ -82,12 +82,37 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
     _dateFrom = DateTime(now.year, now.month, 1);
     _dateTo = now;
     _searchCtrl.addListener(() => setState(() {}));
-    _loadShops();
-    _load();
+    _startAfterTransition();
     localeNotifier.addListener(_onLocaleChanged);
   }
 
   void _onLocaleChanged() => setState(() {});
+
+  // Data landing in the middle of the route fade swaps the body and makes the
+  // app bar flicker on the first open: wait for the transition to finish.
+  void _startAfterTransition() {
+    void start() {
+      if (!mounted) return;
+      _loadShops();
+      _load();
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final anim = ModalRoute.of(context)?.animation;
+      if (anim == null || anim.isCompleted) {
+        start();
+        return;
+      }
+      void listener(AnimationStatus status) {
+        if (status == AnimationStatus.completed) {
+          anim.removeStatusListener(listener);
+          start();
+        }
+      }
+
+      anim.addStatusListener(listener);
+    });
+  }
 
   @override
   void dispose() {
@@ -234,7 +259,8 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
       ),
       child: Scaffold(
         appBar: AppBar(
-          leading: const Center(child: AdaptiveBackButton()),
+          leadingWidth: kBackButtonLeadingWidth,
+          leading: const AdaptiveBackButton(),
           title: Text(s.shopIssuedTitle, style: const TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontSize: 18)),
           centerTitle: false,
           backgroundColor: isDark ? Theme.of(context).colorScheme.surface : AppColors.groupedBackground,
@@ -244,13 +270,16 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
           surfaceTintColor: Colors.transparent,
           actions: [SearchToggleButton(active: _searching, onPressed: _toggleSearch)],
         ),
-        body: AppRefresh(
-          onRefresh: _load,
-          child: Container(
-            color: listBg,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-              children: [
+        // Filters live in a fixed header and only the list scrolls, same
+        // layout as the passes screen.
+        body: Column(
+          children: [
+            Container(
+              color: listBg,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                 BlockCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,7 +312,17 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
                   const SizedBox(height: 10),
                   BlockSearchField(controller: _searchCtrl, hint: s.shopIssuedSearchHint),
                 ],
-                const SizedBox(height: 12),
+                ],
+              ),
+            ),
+            Expanded(
+              child: AppRefresh(
+                onRefresh: _load,
+                child: Container(
+                  color: listBg,
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+                    children: [
                 if (_loading)
                   _skeleton(isDark)
                 else if (_error != null)
@@ -364,9 +403,12 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
                       ),
                     ),
                 ],
-              ],
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
