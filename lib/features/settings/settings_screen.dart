@@ -9,6 +9,7 @@ import '../../core/storage/app_storage.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/confirm_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -502,6 +503,7 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Widget _buildVersionInfo(S s) {
     final label = s.appVersionLabel(_version);
+    if (!Platform.isIOS) return _buildAndroidVersionInfo(label, s);
     // The real native iOS 26 button (no minSize) has no way to report its
     // UIKit-rendered content size back to Flutter's layout, so inside a
     // Center it just expands to the full available width instead of
@@ -541,6 +543,53 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  /// Android: белая «таблетка» в стиле карточек приложения с логотипом
+  /// и номером версии, по нажатию открывается окно «О приложении».
+  Widget _buildAndroidVersionInfo(String label, S s) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return Center(
+      child: Material(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(30),
+        elevation: 0,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(30),
+          onTap: () => _showAboutDialog(s),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(8, 8, 18, 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: onSurface.withOpacity(0.08)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/icon/logo.png',
+                    width: 26,
+                    height: 26,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: onSurface.withOpacity(0.6),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // Native AdaptiveAlertDialog instead of a hand-rolled dark glass card: now
   // that the app is a standard light theme there's no bespoke look left to
   // preserve, and the native alert gets correct light/dark text for free.
@@ -548,6 +597,16 @@ class _SettingsScreenState extends State<SettingsScreen>
     final copyright = DateTime.now().year > 2026
         ? '© 2026–${DateTime.now().year} UztexPro.'
         : '© 2026 UztexPro.';
+
+    if (!Platform.isIOS) {
+      showInfoDialog(
+        context,
+        title: s.versionLabel(_version),
+        message: '$copyright\n${s.allRightsReserved}',
+        closeLabel: s.close,
+      );
+      return;
+    }
 
     AdaptiveAlertDialog.show(
       context: context,

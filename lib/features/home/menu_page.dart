@@ -2,8 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
 import 'dart:math' as math;
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
+import '../../core/widgets/confirm_dialog.dart';
 import '../../core/widgets/fade_route.dart';
+import '../../core/widgets/floating_notch_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -158,10 +161,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   Future<void> _loadDashboardOverview() async {
-    if (!_hasFullAccess) {
-      if (mounted) setState(() => _dashOverviewLoading = false);
-      return;
-    }
     final cached = await _dashStorage.read(key: _kDashOverviewCacheKey);
     if (cached != null && mounted) {
       try {
@@ -269,11 +268,27 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     return groups.contains('AI_Permission');
   }
 
-  bool get _isPassOnly {
-    if (_hasFullAccess) return false;
-    final groups = _extractGroups(_parsedToken());
-    return groups.any(_passOnlyGroups.contains);
-  }
+  /// Группы, дающие доступ к магазину (см. shop/views.py и миграцию
+  /// 0737_shop_sale_pickup_groups на бэкенде).
+  static const _shopGroups = {'shop_sale', 'shop_pickup', 'shop_accounting'};
+
+  /// Суперпользователь и группы `full` / `AI_Permission` видят магазин целиком,
+  /// как и на бэкенде (`_has_full_shop_access`).
+  bool get _hasFullShopAccess =>
+      _hasFullAccess || _extractGroups(_parsedToken()).contains('full');
+
+  bool get _canSeeShop =>
+      _hasFullShopAccess ||
+      _extractGroups(_parsedToken()).any(_shopGroups.contains);
+
+  /// Группа `Podpis` на бэкенде даёт право подписывать заявки на закупку.
+  static const _signGroup = 'Podpis';
+
+  bool get _canSignRequests =>
+      _extractGroups(_parsedToken()).contains(_signGroup);
+
+  bool get _canSeePasses =>
+      _extractGroups(_parsedToken()).any(_passOnlyGroups.contains);
 
   Set<String> _extractGroups(Map<String, dynamic> body) {
     final user = body['user'];
@@ -304,6 +319,19 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         MaterialPageRoute(builder: (_) => const LoginPage()),
         (route) => false,
       );
+    }
+
+    if (!Platform.isIOS) {
+      showConfirmDialog(
+        context,
+        icon: Icons.logout_rounded,
+        title: s.logOut,
+        message: s.logOutConfirm,
+        cancelLabel: s.cancel,
+        confirmLabel: s.logOutBtn,
+        onConfirm: confirmLogout,
+      );
+      return;
     }
 
     // Native platform alert (real Liquid Glass chrome on iOS 26+) instead of
@@ -388,17 +416,45 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           onTap: _onTabTap,
           useNativeBottomBar: true,
           selectedItemColor: _gradientStart,
-          // Native tab bar now follows the app's real (light) theme instead
-          // of being forced dark — leave the unselected tint unset so it
-          // picks up the platform's own light-mode default.
+          // Native tab bar follows the app's real (light) theme; leave the
+          // unselected tint unset so it picks up the platform's own default.
           unselectedItemColor: null,
-          // Android has no native Liquid Glass UITabBar to fall back to, so
-          // it keeps our own hand-rolled bar. On iOS this is ignored by the
-          // package anyway, so skip building it — an unused CustomPaint +
-          // AnimatedBuilder tree sitting next to the real native tab bar's
-          // platform view is exactly the kind of thing that can confuse the
-          // semantics tree.
-          bottomNavigationBar: Platform.isIOS ? null : _buildBottomNav(s),
+          // Android has no native Liquid Glass UITabBar, so it gets the
+          // floating notch bar. On iOS the package ignores this anyway, so
+          // skip building it.
+          bottomNavigationBar: Platform.isIOS
+              ? null
+              : FloatingNotchBar(
+                  selected: _currentIndex,
+                  onSelected: _onTabTap,
+                  items: [
+                    NotchBarItem(
+                      CupertinoIcons.house,
+                      CupertinoIcons.house_fill,
+                      s.navHome,
+                    ),
+                    NotchBarItem(
+                      CupertinoIcons.checkmark_seal,
+                      CupertinoIcons.checkmark_seal_fill,
+                      s.navConfirmations,
+                    ),
+                    NotchBarItem(
+                      CupertinoIcons.cube_box,
+                      CupertinoIcons.cube_box_fill,
+                      s.navProduction,
+                    ),
+                    NotchBarItem(
+                      CupertinoIcons.cart,
+                      CupertinoIcons.cart_fill,
+                      s.navShop,
+                    ),
+                    NotchBarItem(
+                      CupertinoIcons.gear,
+                      CupertinoIcons.gear_solid,
+                      s.navSettings,
+                    ),
+                  ],
+                ),
         ),
       ),
     );
@@ -639,8 +695,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             s.paymentSystem,
             style: const TextStyle(color: Color(0xFF8A8A8E), fontSize: 13),
           ),
-          if (_hasFullAccess &&
-              !_dashOverviewUnavailable &&
+          if (!_dashOverviewUnavailable &&
               (_dashOverviewLoading || _dashOverviewLoaded)) ...[
             const SizedBox(height: 26),
             _dashSectionHeader(
@@ -1369,8 +1424,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   List<Widget> _buildMenuCards(S s) {
-    final passOnly = _isPassOnly;
-
     Widget passCard() => _MenuCard(
       icon: Icons.badge_rounded,
       label: s.menuPasses,
@@ -1381,12 +1434,27 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       ),
     );
 
-    if (passOnly) {
-      return [passCard()];
-    }
+    Widget signCard() => _MenuCard(
+      icon: Icons.draw_rounded,
+      label: s.menuSignRequests,
+      description: s.menuSignRequestsDesc,
+      onTap: () => Navigator.push(
+        context,
+        FadeRoute(builder: (_) => SignRequestsPage(jwtToken: widget.jwtToken)),
+      ),
+    );
 
     if (!_hasFullAccess) {
-      return [];
+      final cards = <Widget>[
+        if (_canSeePasses) passCard(),
+        if (_canSignRequests) signCard(),
+      ];
+      return [
+        for (var i = 0; i < cards.length; i++) ...[
+          if (i > 0) const SizedBox(height: 12),
+          cards[i],
+        ],
+      ];
     }
 
     return [
@@ -1402,17 +1470,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       const SizedBox(height: 12),
       passCard(),
       const SizedBox(height: 12),
-      _MenuCard(
-        icon: Icons.draw_rounded,
-        label: s.menuSignRequests,
-        description: s.menuSignRequestsDesc,
-        onTap: () => Navigator.push(
-          context,
-          FadeRoute(
-            builder: (_) => SignRequestsPage(jwtToken: widget.jwtToken),
-          ),
-        ),
-      ),
+      signCard(),
       const SizedBox(height: 12),
       _MenuCard(
         icon: Icons.card_giftcard_rounded,
@@ -1467,124 +1525,61 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         children: [
           _buildSectionTitle(s.navShop),
           const SizedBox(height: 20),
-          _MenuCard(
-            icon: Icons.storefront_rounded,
-            label: s.shopPickupTitle,
-            description: s.shopPickupDesc,
-            onTap: () => Navigator.push(
-              context,
-              FadeRoute(
-                builder: (_) => ShopPickupPage(jwtToken: widget.jwtToken),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _MenuCard(
-            icon: Icons.inventory_2_rounded,
-            label: s.shopStockTitle,
-            description: s.shopStockDesc,
-            onTap: () => Navigator.push(
-              context,
-              FadeRoute(
-                builder: (_) => ShopPvzStockPage(jwtToken: widget.jwtToken),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _MenuCard(
-            icon: Icons.insights_rounded,
-            label: s.shopAnalyticsTitle,
-            description: s.shopAnalyticsDesc,
-            onTap: () => Navigator.push(
-              context,
-              FadeRoute(
-                builder: (_) => ShopAnalyticsPage(jwtToken: widget.jwtToken),
-              ),
-            ),
-          ),
-          if (_hasFullAccess) ...[
-            const SizedBox(height: 12),
+          if (!_canSeeShop)
+            _NoAccessCard()
+          else ...[
             _MenuCard(
-              icon: Icons.fact_check_rounded,
-              label: s.shopIssuedTitle,
-              description: s.shopIssuedDesc,
+              icon: Icons.storefront_rounded,
+              label: s.shopPickupTitle,
+              description: s.shopPickupDesc,
               onTap: () => Navigator.push(
                 context,
                 FadeRoute(
-                  builder: (_) =>
-                      ShopIssuedReportPage(jwtToken: widget.jwtToken),
+                  builder: (_) => ShopPickupPage(jwtToken: widget.jwtToken),
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+            _MenuCard(
+              icon: Icons.inventory_2_rounded,
+              label: s.shopStockTitle,
+              description: s.shopStockDesc,
+              onTap: () => Navigator.push(
+                context,
+                FadeRoute(
+                  builder: (_) => ShopPvzStockPage(jwtToken: widget.jwtToken),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _MenuCard(
+              icon: Icons.insights_rounded,
+              label: s.shopAnalyticsTitle,
+              description: s.shopAnalyticsDesc,
+              onTap: () => Navigator.push(
+                context,
+                FadeRoute(
+                  builder: (_) => ShopAnalyticsPage(jwtToken: widget.jwtToken),
+                ),
+              ),
+            ),
+            if (_hasFullShopAccess) ...[
+              const SizedBox(height: 12),
+              _MenuCard(
+                icon: Icons.fact_check_rounded,
+                label: s.shopIssuedTitle,
+                description: s.shopIssuedDesc,
+                onTap: () => Navigator.push(
+                  context,
+                  FadeRoute(
+                    builder: (_) =>
+                        ShopIssuedReportPage(jwtToken: widget.jwtToken),
+                  ),
+                ),
+              ),
+            ],
           ],
         ],
-      ),
-    );
-  }
-
-  // ── Нижняя навигация ─────────────────────────────────
-
-  Widget _buildBottomNav(S s) {
-    // Icons chosen to mirror the iOS tab bar's SF Symbols 1:1 (house.fill,
-    // checkmark.seal.fill, shippingbox.fill, cart.fill, gear) so both
-    // platforms read as the same set rather than two unrelated icon packs.
-    final items = <_NavItemData>[
-      _NavItemData(Icons.home_rounded, s.navHome),
-      _NavItemData(Icons.verified_rounded, s.navConfirmations),
-      _NavItemData(Icons.inventory_2_rounded, s.navProduction),
-      _NavItemData(Icons.shopping_cart_rounded, s.navShop),
-      _NavItemData(Icons.settings_rounded, s.navSettings),
-    ];
-
-    const radius = 28.0;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return SafeArea(
-      top: false,
-      minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: Container(
-        height: 66,
-        decoration: BoxDecoration(
-          // A flat neutral slab (#1E1E1E) read as a generic, unrelated box
-          // sitting on top of the brand gradient. A warm dark gradient tying
-          // back into the header's own tones, plus a hairline light border,
-          // reads as an intentional "glass" panel instead — closer to the
-          // native iOS tab bar's frosted look.
-          gradient: isDark
-              ? const LinearGradient(
-                  colors: [Color(0xFF321406), Color(0xFF1A0500)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          color: isDark ? null : Colors.white,
-          borderRadius: BorderRadius.circular(radius),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.09)
-                : Colors.black.withOpacity(0.05),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.45 : 0.14),
-              blurRadius: 24,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        child: Row(
-          children: List.generate(items.length, (i) {
-            return Expanded(
-              child: _NavBarButton(
-                icon: items[i].icon,
-                label: items[i].label,
-                selected: i == _currentIndex,
-                onTap: () => _onTabTap(i),
-              ),
-            );
-          }),
-        ),
       ),
     );
   }
@@ -1655,77 +1650,6 @@ class _RingPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _RingPainter oldDelegate) =>
       oldDelegate.progress != progress || oldDelegate.colors != colors;
-}
-
-class _NavItemData {
-  final IconData icon;
-  final String label;
-
-  const _NavItemData(this.icon, this.label);
-}
-
-class _NavBarButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _NavBarButton({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    // Icons-only bar: the label is kept as a Semantics annotation so
-    // TalkBack/VoiceOver users still hear what each tab is, even though it's
-    // no longer drawn.
-    return Semantics(
-      label: label,
-      button: true,
-      selected: selected,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOut,
-          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            gradient: selected
-                ? const LinearGradient(
-                    colors: [
-                      _MenuPageState._gradientStart,
-                      _MenuPageState._gradientEnd,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : null,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: _MenuPageState._gradientEnd.withOpacity(0.35),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Icon(
-            icon,
-            size: 22,
-            color: selected ? Colors.white : onSurface.withOpacity(0.42),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _MenuCard extends StatelessWidget {
