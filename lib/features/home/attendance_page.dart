@@ -97,7 +97,7 @@ class _AttendanceEntry {
 
 /// Окно посещаемости: кто сейчас на территории / кто пришёл сегодня.
 /// Данные отдаёт `/hr/mobile-attendance/`; доступ (суперпользователь,
-/// AI_Permission/full или группа `attendance_view`) проверяется на бэкенде,
+/// AI_Permission/full или группа `mobile_hr`) проверяется на бэкенде,
 /// а на главной странице блок «На территории» кликабелен только для этих групп.
 class AttendancePage extends StatefulWidget {
   final String jwtToken;

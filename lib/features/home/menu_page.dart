@@ -288,9 +288,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   bool get _canSignRequests =>
       _extractGroups(_parsedToken()).contains(_signGroup);
 
-  /// Группа `attendance_view` на бэкенде (hr.views.MobileAttendanceView)
+  /// Группа `mobile_hr` на бэкенде (hr.views.MobileAttendanceView)
   /// открывает окно посещаемости; полный доступ видит его целиком.
-  static const _attendanceGroup = 'attendance_view';
+  static const _attendanceGroup = 'mobile_hr';
 
   bool get _canSeeAttendance =>
       _hasFullShopAccess ||

@@ -20,6 +20,20 @@ class _ProMobile extends State<PROApp> {
   final storage = AppStorage();
   late final Future<String> _jwtFuture;
 
+  // The App Store lookup is made per storefront, and by default `upgrader`
+  // takes the country from the device region. The app is only published in
+  // some storefronts (UZ, US — RU and KZ return an empty result), so anyone
+  // whose phone region is e.g. Russia or Kazakhstan never saw the update
+  // prompt. Pin the lookup to the Uzbek storefront instead.
+  //
+  // After the user taps "Later" the prompt is held back for
+  // `durationUntilAlertAgain` (3 days by default, which looked like "no
+  // update prompt" to testers) — keep it short.
+  final Upgrader _upgrader = Upgrader(
+    countryCode: 'UZ',
+    durationUntilAlertAgain: const Duration(hours: 4),
+  );
+
   @override
   void initState() {
     super.initState();
@@ -66,7 +80,7 @@ class _ProMobile extends State<PROApp> {
           ],
           supportedLocales: const [Locale('ru'), Locale('en'), Locale('uz')],
           home: UpgradeAlert(
-            upgrader: Upgrader(),
+            upgrader: _upgrader,
             showIgnore: false,
             showLater: true,
             dialogStyle: UpgradeDialogStyle.cupertino,
