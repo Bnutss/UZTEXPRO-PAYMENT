@@ -15,6 +15,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'main_page.dart';
+import 'attendance_page.dart';
 import '../passes/passes_page.dart';
 import '../sign_requests/sign_requests_page.dart';
 import '../bonuses/bonuses_page.dart';
@@ -286,6 +287,21 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
   bool get _canSignRequests =>
       _extractGroups(_parsedToken()).contains(_signGroup);
+
+  /// Группа `attendance_view` на бэкенде (hr.views.MobileAttendanceView)
+  /// открывает окно посещаемости; полный доступ видит его целиком.
+  static const _attendanceGroup = 'attendance_view';
+
+  bool get _canSeeAttendance =>
+      _hasFullShopAccess ||
+      _extractGroups(_parsedToken()).contains(_attendanceGroup);
+
+  void _openAttendance() {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(
+      FadeRoute(builder: (_) => AttendancePage(jwtToken: widget.jwtToken)),
+    );
+  }
 
   bool get _canSeePasses =>
       _extractGroups(_parsedToken()).any(_passOnlyGroups.contains);
@@ -888,7 +904,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     required double attendance,
   }) {
     final reduceMotion = MediaQuery.of(context).disableAnimations;
-    return Container(
+    final card = Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: _cardDecoration(
@@ -1036,6 +1052,12 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           ),
         ],
       ),
+    );
+    if (!_canSeeAttendance) return card;
+    return _TappableHeroCard(
+      label: s.attendanceTitle,
+      onTap: _openAttendance,
+      child: card,
     );
   }
 
@@ -1813,6 +1835,107 @@ class _NoAccessCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+
+/// Marks the hero card as tappable: a round chevron button in the corner
+/// that nudges sideways a few times on first show (skipped with
+/// reduced motion), plus a subtle press-scale with haptic feedback.
+class _TappableHeroCard extends StatefulWidget {
+  final Widget child;
+  final String label;
+  final VoidCallback onTap;
+
+  const _TappableHeroCard({
+    required this.child,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  State<_TappableHeroCard> createState() => _TappableHeroCardState();
+}
+
+class _TappableHeroCardState extends State<_TappableHeroCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _nudge = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 650),
+  );
+  bool _pressed = false;
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    if (MediaQuery.of(context).disableAnimations) return;
+    Future<void>.delayed(const Duration(milliseconds: 900), () async {
+      for (var i = 0; i < 3 && mounted; i++) {
+        await _nudge.forward(from: 0);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _nudge.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: widget.label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: () {
+          setState(() => _pressed = false);
+          widget.onTap();
+        },
+        child: AnimatedScale(
+          scale: _pressed ? 0.975 : 1,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          child: Stack(
+            children: [
+              widget.child,
+              Positioned(top: 12, right: 12, child: _pill()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pill() {
+    // Icon-only on purpose: a text pill would collide with the "НА
+    // ТЕРРИТОРИИ" caption on narrow phones.
+    return Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: _MenuPageState._gradientStart.withOpacity(0.14),
+      ),
+      child: AnimatedBuilder(
+        animation: _nudge,
+        builder: (_, child) => Transform.translate(
+          offset: Offset(math.sin(_nudge.value * math.pi) * 3, 0),
+          child: child,
+        ),
+        child: const Icon(
+          Icons.chevron_right_rounded,
+          size: 22,
+          color: _MenuPageState._gradientEnd,
+        ),
       ),
     );
   }

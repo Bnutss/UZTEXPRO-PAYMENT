@@ -91,6 +91,47 @@ class S {
   String get dashboardInTerritory =>
       _t({'ru': 'На территории', 'en': 'On-site', 'uz': 'Hududda'});
 
+  String get attendanceTitle =>
+      _t({'ru': 'Посещаемость', 'en': 'Attendance', 'uz': 'Davomat'});
+  String get attendanceCameToday =>
+      _t({'ru': 'Пришли сегодня', 'en': 'Came today', 'uz': 'Bugun kelganlar'});
+  String get attendanceSearchHint =>
+      _t({'ru': 'Поиск по ФИО', 'en': 'Search by name', 'uz': 'FIO bo\'yicha qidirish'});
+  String get attendanceAllFactories =>
+      _t({'ru': 'Все фабрики', 'en': 'All factories', 'uz': 'Barcha fabrikalar'});
+  String get attendanceEmpty =>
+      _t({'ru': 'Никого нет', 'en': 'Nobody here', 'uz': 'Hech kim yo\'q'});
+  String get attendanceTotalEmployees =>
+      _t({'ru': 'Всего сотрудников', 'en': 'Total employees', 'uz': 'Jami xodimlar'});
+  String get attendanceNoAccess =>
+      _t({'ru': 'Недостаточно прав', 'en': 'Access denied', 'uz': 'Ruxsat yo\'q'});
+  String get attendanceFilterFactory =>
+      _t({'ru': 'Фабрика', 'en': 'Factory', 'uz': 'Fabrika'});
+  String get attendanceStatusOut =>
+      _t({'ru': 'Вне территории', 'en': 'Off-site', 'uz': 'Hududdan tashqarida'});
+  String get attendanceFirstIn =>
+      _t({'ru': 'Первый вход', 'en': 'First entry', 'uz': 'Birinchi kirish'});
+  String get attendanceLastMark => _t({
+    'ru': 'Последняя отметка',
+    'en': 'Last check-in',
+    'uz': 'Oxirgi belgi',
+  });
+  String get attendanceTabel =>
+      _t({'ru': 'Табель №', 'en': 'Employee no.', 'uz': 'Tabel №'});
+  String get attendancePhone =>
+      _t({'ru': 'Телефон', 'en': 'Phone', 'uz': 'Telefon'});
+  String get attendanceHired =>
+      _t({'ru': 'Дата приёма', 'en': 'Hired on', 'uz': 'Qabul sanasi'});
+  String get attendanceDepartment =>
+      _t({'ru': 'Отдел', 'en': 'Department', 'uz': "Bo'lim"});
+  String get attendancePosition =>
+      _t({'ru': 'Должность', 'en': 'Position', 'uz': 'Lavozim'});
+  String get attendanceLoadError => _t({
+    'ru': 'Не удалось загрузить данные',
+    'en': 'Failed to load data',
+    'uz': "Ma'lumotlarni yuklab bo'lmadi",
+  });
+
   String dashboardOutOf(int total) => _t({
     'ru': 'из $total чел.',
     'en': 'out of $total',
