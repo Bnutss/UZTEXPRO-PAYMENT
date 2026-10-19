@@ -289,11 +289,11 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       _extractGroups(_parsedToken()).contains(_signGroup);
 
   /// Группа `mobile_hr` на бэкенде (hr.views.MobileAttendanceView)
-  /// открывает окно посещаемости; полный доступ видит его целиком.
+  /// открывает окно посещаемости. Суперпользователям и полному доступу
+  /// без этой группы переход недоступен.
   static const _attendanceGroup = 'mobile_hr';
 
   bool get _canSeeAttendance =>
-      _hasFullShopAccess ||
       _extractGroups(_parsedToken()).contains(_attendanceGroup);
 
   void _openAttendance() {
@@ -384,6 +384,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         statusBarBrightness: Brightness.light,
       ),
       child: AdaptiveScaffold(
+        minimizeBehavior: TabBarMinimizeBehavior.never,
         body: SafeArea(
           bottom: false,
           child: FadeTransition(
