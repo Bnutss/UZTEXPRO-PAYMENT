@@ -23,7 +23,6 @@ dependencies:
   shimmer: ^3.0.0
   intl: ^0.20.2
   package_info_plus: ^8.1.0
-  upgrader: ^11.4.0
   cached_network_image: ^3.4.1
   open_filex: ^4.7.0
   path_provider: ^2.1.6
@@ -47,4 +46,5 @@ flutter:
     - assets/icon/uztexpro.png
     - assets/icon/uztexpro.png
     - assets/icon/logo.png
+    - assets/models/logo3d.glb
   uses-material-design: true

@@ -4,12 +4,14 @@ import 'package:http/http.dart' as http;
 
 import '../../main.dart';
 
-/// A newer Android build published on our own server (self-hosted
-/// distribution, outside Google Play) — see `app_update` on the backend.
+/// A newer build: either an Android APK published on our own server
+/// (self-hosted distribution, outside Google Play — see `app_update` on the
+/// backend) or an iOS release in the App Store ([storeUrl]).
 class AppUpdateInfo {
   final String versionName;
   final int versionCode;
   final String? apkUrl;
+  final String? storeUrl;
   final String changelog;
   final bool isCritical;
 
@@ -17,6 +19,7 @@ class AppUpdateInfo {
     required this.versionName,
     required this.versionCode,
     required this.apkUrl,
+    this.storeUrl,
     required this.changelog,
     required this.isCritical,
   });

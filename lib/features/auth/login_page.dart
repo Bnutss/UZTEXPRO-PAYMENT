@@ -15,6 +15,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_segmented_control.dart';
 import 'widgets/brand_transition_screen.dart';
 import 'widgets/ios_notification_banner.dart';
+import '../../core/widgets/logo_3d.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -357,27 +358,16 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     // Shrinks while the keyboard is up so the fields and the button stay on
     // screen on small phones.
     final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
-    final size = keyboardOpen ? 64.0 : 100.0;
+    // The 3D model needs a little more room than the flat logo did: the camera
+    // frames the whole spin, not just the front face.
+    final size = keyboardOpen ? 90.0 : 160.0;
     return Center(
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOutCubic,
         width: size,
         height: size,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(size * 0.23),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(size * 0.23),
-          child: Image.asset('assets/icon/logo.png', fit: BoxFit.cover),
-        ),
+        child: const Logo3D(interactive: true),
       ),
     );
   }

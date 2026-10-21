@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../core/widgets/confirm_dialog.dart';
 import '../../core/widgets/fade_route.dart';
 import '../../core/widgets/floating_notch_bar.dart';
+import '../../core/widgets/logo_3d.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -32,6 +33,7 @@ import '../../core/localization/locale_notifier.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/stagger_in.dart';
+import '../update/app_store_update_api.dart';
 import '../update/app_update_api.dart';
 import '../update/app_update_sheet.dart';
 import 'package:uztexpro_payment/main.dart';
@@ -45,7 +47,8 @@ class MenuPage extends StatefulWidget {
   _MenuPageState createState() => _MenuPageState();
 }
 
-class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
+class _MenuPageState extends State<MenuPage>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   static const Color _gradientStart = AppColors.brandOrange;
   static const Color _gradientEnd = AppColors.brandRed;
 
@@ -106,19 +109,41 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     localeNotifier.addListener(_onLocaleChanged);
     _fetchRates();
     _loadDashboardOverview();
-    // iOS ships through the App Store (handled by UpgradeAlert further up
-    // the widget tree) — this self-hosted check/download/install flow only
-    // applies to the sideloaded Android build.
-    if (Platform.isAndroid) _checkForAppUpdate();
+    WidgetsBinding.instance.addObserver(this);
+    _checkForAppUpdate();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // iOS rarely cold-starts the app — it comes back from the background
+    // instead — so a check on open alone would miss most releases. (Android
+    // updates can be optional; re-asking on every resume would nag.)
+    if (state == AppLifecycleState.resumed && Platform.isIOS) {
+      _checkForAppUpdate();
+    }
+  }
+
+  bool _updateSheetShown = false;
+
   Future<void> _checkForAppUpdate() async {
+    // The sheet for a mandatory update can't be closed, so once it's up
+    // there's nothing more to check.
+    if (_updateSheetShown) return;
     try {
-      final packageInfo = await PackageInfo.fromPlatform();
-      final versionCode = int.tryParse(packageInfo.buildNumber) ?? 0;
-      final update = await AppUpdateApi.check(versionCode);
-      if (update == null || !mounted) return;
-      showAppUpdateSheet(context, update);
+      // iOS updates come from the App Store; the sideloaded Android build
+      // checks our own server.
+      final AppUpdateInfo? update;
+      if (Platform.isIOS) {
+        update = await AppStoreUpdateApi.check();
+      } else {
+        final packageInfo = await PackageInfo.fromPlatform();
+        final versionCode = int.tryParse(packageInfo.buildNumber) ?? 0;
+        update = await AppUpdateApi.check(versionCode);
+      }
+      if (update == null || !mounted || _updateSheetShown) return;
+      _updateSheetShown = true;
+      await showAppUpdateSheet(context, update);
+      _updateSheetShown = false;
     } catch (_) {
       // Update check is a best-effort background convenience — never worth
       // interrupting app startup over.
@@ -241,6 +266,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _animationController.dispose();
     localeNotifier.removeListener(_onLocaleChanged);
     super.dispose();
@@ -483,15 +509,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Image.asset(
-              'assets/icon/logo.png',
-              width: 36,
-              height: 36,
-              fit: BoxFit.cover,
-            ),
-          ),
+          const SizedBox(width: 44, height: 44, child: Logo3D()),
           const SizedBox(width: 10),
           Expanded(
             child: Column(

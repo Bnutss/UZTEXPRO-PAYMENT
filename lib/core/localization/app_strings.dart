@@ -1940,6 +1940,15 @@ class S {
   String get appUpdateDownloadButton =>
       _t({'ru': 'Скачать и установить', 'en': 'Download & install', 'uz': "Yuklab olish va o'rnatish"});
 
+  String get appUpdateOpenStoreButton =>
+      _t({'ru': 'Обновить', 'en': 'Update', 'uz': 'Yangilash'});
+
+  String get appUpdateStoreOpenFailed => _t({
+    'ru': 'Не удалось открыть App Store. Обновите приложение в App Store вручную',
+    'en': 'Could not open the App Store. Please update the app there manually',
+    'uz': "App Store'ni ochib bo'lmadi. Ilovani App Store'da qo'lda yangilang",
+  });
+
   String get appUpdateDownloadFailed => _t({
     'ru': 'Не удалось скачать обновление. Проверьте подключение к интернету',
     'en': 'Failed to download the update. Check your internet connection',

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'package:uztexpro_payment/app/pro_app.dart';
 import 'core/storage/app_storage.dart';
+import 'core/widgets/logo_3d.dart';
 
 const API = 'https://pro.uztex.uz/api/v1';
 final storage = AppStorage();
@@ -14,6 +15,9 @@ void main() {
     statusBarIconBrightness: Brightness.light,
     statusBarBrightness: Brightness.dark,
   ));
+  // Parsed in the background while the app starts, so the 3D logo is ready
+  // by the time the login or main page first paints.
+  Logo3DModel.preload();
 
   // Known debug-only Flutter framework assertion triggered by native
   // platform views (adaptive_platform_ui's Liquid Glass tab bar/buttons)

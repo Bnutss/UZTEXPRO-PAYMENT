@@ -4,7 +4,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'dart:convert' show json, base64, ascii, jsonDecode;
-import 'package:upgrader/upgrader.dart';
 import 'package:uztexpro_payment/features/auth/login_page.dart';
 import 'package:uztexpro_payment/features/home/menu_page.dart';
 import '../core/storage/app_storage.dart';
@@ -19,20 +18,6 @@ class PROApp extends StatefulWidget {
 class _ProMobile extends State<PROApp> {
   final storage = AppStorage();
   late final Future<String> _jwtFuture;
-
-  // The App Store lookup is made per storefront, and by default `upgrader`
-  // takes the country from the device region. The app is only published in
-  // some storefronts (UZ, US — RU and KZ return an empty result), so anyone
-  // whose phone region is e.g. Russia or Kazakhstan never saw the update
-  // prompt. Pin the lookup to the Uzbek storefront instead.
-  //
-  // After the user taps "Later" the prompt is held back for
-  // `durationUntilAlertAgain` (3 days by default, which looked like "no
-  // update prompt" to testers) — keep it short.
-  final Upgrader _upgrader = Upgrader(
-    countryCode: 'UZ',
-    durationUntilAlertAgain: const Duration(hours: 4),
-  );
 
   @override
   void initState() {
@@ -79,45 +64,39 @@ class _ProMobile extends State<PROApp> {
             GlobalCupertinoLocalizations.delegate,
           ],
           supportedLocales: const [Locale('ru'), Locale('en'), Locale('uz')],
-          home: UpgradeAlert(
-            upgrader: _upgrader,
-            showIgnore: false,
-            showLater: true,
-            dialogStyle: UpgradeDialogStyle.cupertino,
-            child: FutureBuilder<String>(
-              future: _jwtFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
+          home: FutureBuilder<String>(
+            future: _jwtFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snapshot.hasError) {
+                return Scaffold(
+                  body: Center(child: Text("Ошибка: ${snapshot.error}")),
+                );
+              }
+              if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                final stored = snapshot.data!;
+                try {
+                  final body = jsonDecode(stored) as Map<String, dynamic>;
+                  final rawToken = body['token'] as String?;
+                  if (rawToken == null) return LoginPage();
+                  final parts = rawToken.split('.');
+                  if (parts.length != 3) return LoginPage();
+                  final payload = json.decode(
+                    ascii.decode(base64.decode(base64.normalize(parts[1]))),
                   );
-                }
-                if (snapshot.hasError) {
-                  return Scaffold(
-                    body: Center(child: Text("Ошибка: ${snapshot.error}")),
-                  );
-                }
-                if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                  final stored = snapshot.data!;
-                  try {
-                    final body = jsonDecode(stored) as Map<String, dynamic>;
-                    final rawToken = body['token'] as String?;
-                    if (rawToken == null) return LoginPage();
-                    final parts = rawToken.split('.');
-                    if (parts.length != 3) return LoginPage();
-                    final payload = json.decode(
-                      ascii.decode(base64.decode(base64.normalize(parts[1]))),
-                    );
-                    final exp = DateTime.fromMillisecondsSinceEpoch(
-                        payload['exp'] * 1000);
-                    if (exp.isAfter(DateTime.now())) {
-                      return MenuPage(jwtToken: stored);
-                    }
-                  } catch (_) {}
-                }
-                return LoginPage();
-              },
-            ),
+                  final exp = DateTime.fromMillisecondsSinceEpoch(
+                      payload['exp'] * 1000);
+                  if (exp.isAfter(DateTime.now())) {
+                    return MenuPage(jwtToken: stored);
+                  }
+                } catch (_) {}
+              }
+              return LoginPage();
+            },
           ),
         );
       },

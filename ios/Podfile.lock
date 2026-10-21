@@ -1,8 +1,6 @@
 PODS:
   - adaptive_platform_ui (0.1.0):
     - Flutter
-  - device_info_plus (0.0.1):
-    - Flutter
   - Flutter (1.0.0)
   - flutter_secure_storage_darwin (10.0.0):
     - Flutter
@@ -25,7 +23,6 @@ PODS:
 
 DEPENDENCIES:
   - adaptive_platform_ui (from `.symlinks/plugins/adaptive_platform_ui/ios`)
-  - device_info_plus (from `.symlinks/plugins/device_info_plus/ios`)
   - Flutter (from `Flutter`)
   - flutter_secure_storage_darwin (from `.symlinks/plugins/flutter_secure_storage_darwin/darwin`)
   - local_auth_darwin (from `.symlinks/plugins/local_auth_darwin/darwin`)
@@ -38,8 +35,6 @@ DEPENDENCIES:
 EXTERNAL SOURCES:
   adaptive_platform_ui:
     :path: ".symlinks/plugins/adaptive_platform_ui/ios"
-  device_info_plus:
-    :path: ".symlinks/plugins/device_info_plus/ios"
   Flutter:
     :path: Flutter
   flutter_secure_storage_darwin:
@@ -59,7 +54,6 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   adaptive_platform_ui: dcd588cb59eb4c5bd1a430158b00b98b0493b3f0
-  device_info_plus: bf2e3232933866d73fe290f2942f2156cdd10342
   Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
   flutter_secure_storage_darwin: 557817588b80e60213cbecb573c45c76b788018d
   local_auth_darwin: 63c73d6d28cc3e239be2b6aa460ea6e317cd5100

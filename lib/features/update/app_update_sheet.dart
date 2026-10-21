@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/localization/app_strings.dart';
 import 'app_update_api.dart';
@@ -78,6 +79,18 @@ class _AppUpdateSheetState extends State<_AppUpdateSheet> {
         _downloading = false;
         _error = S.of(context).appUpdateDownloadFailed;
       });
+    }
+  }
+
+  /// App Store releases install through the store itself. The sheet stays
+  /// up, so coming back without updating still lands on it.
+  Future<void> _openStore() async {
+    final url = widget.info.storeUrl;
+    if (url == null) return;
+    HapticFeedback.mediumImpact();
+    final opened = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      setState(() => _error = S.of(context).appUpdateStoreOpenFailed);
     }
   }
 
@@ -189,9 +202,12 @@ class _AppUpdateSheetState extends State<_AppUpdateSheet> {
                 height: 50,
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _download,
-                  icon: const Icon(Icons.download_rounded, size: 20),
-                  label: Text(s.appUpdateDownloadButton, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  onPressed: info.storeUrl != null ? _openStore : _download,
+                  icon: Icon(info.storeUrl != null ? Icons.system_update_rounded : Icons.download_rounded, size: 20),
+                  label: Text(
+                    info.storeUrl != null ? s.appUpdateOpenStoreButton : s.appUpdateDownloadButton,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _g2,
                     foregroundColor: Colors.white,
