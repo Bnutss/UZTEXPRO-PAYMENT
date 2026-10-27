@@ -17,6 +17,7 @@ import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'main_page.dart';
 import 'attendance_page.dart';
+import 'my_timesheet_page.dart';
 import '../passes/passes_page.dart';
 import '../sign_requests/sign_requests_page.dart';
 import '../bonuses/bonuses_page.dart';
@@ -545,8 +546,7 @@ class _MenuPageState extends State<MenuPage>
             ),
           ),
           const SizedBox(width: 10),
-          if (_hasFullAccess) ...[_buildAiButton(), const SizedBox(width: 8)],
-          _buildLogoutButton(),
+          _buildHeaderMenu(s),
         ],
       ),
     );
@@ -560,48 +560,56 @@ class _MenuPageState extends State<MenuPage>
     );
   }
 
-  Widget _buildAiButton() {
-    if (Platform.isIOS) {
-      return SizedBox(
-        width: 46,
-        height: 46,
-        child: AdaptiveButton.icon(
-          onPressed: _openAiAssistant,
-          icon: Icons.auto_awesome_rounded,
-          iconColor: const Color(0xFF1C1C1E),
-          color: const Color(0xFF1C1C1E),
-          style: AdaptiveButtonStyle.glass,
-          size: AdaptiveButtonSize.medium,
-          useSmoothRectangleBorder: false,
-          minSize: const Size(46, 46),
-        ),
-      );
-    }
+  void _openTimesheet() {
+    HapticFeedback.selectionClick();
+    Navigator.push(
+      context,
+      FadeRoute(builder: (_) => MyTimesheetPage(jwtToken: widget.jwtToken)),
+    );
+  }
 
-    // Android has no native Liquid Glass material, so this approximates it:
-    // a neutral frosted-looking circle with a standard dark glyph — same
-    // visual language as the real glass button (neutral material, no color).
-    return Material(
-      color: Colors.transparent,
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: _openAiAssistant,
-        child: Container(
-          width: 46,
-          height: 46,
-          alignment: Alignment.center,
-          decoration: const BoxDecoration(
-            color: Color(0xFFF2F2F2),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.auto_awesome_rounded,
-            color: Color(0xFF1C1C1E),
-            size: 22,
-          ),
-        ),
+  /// One round glass button with a native menu (adaptive_platform_ui). Items
+  /// are built per access: timesheet and logout for everyone, AI assistant
+  /// only with full access.
+  Widget _buildHeaderMenu(S s) {
+    final native = PlatformInfo.isIOS26OrHigher();
+    dynamic ic(String sf, IconData material) => native ? sf : material;
+
+    final items = <AdaptivePopupMenuItem<String>>[
+      AdaptivePopupMenuItem<String>(
+        label: s.timesheetTitle,
+        icon: ic('calendar', Icons.calendar_month_rounded),
+        value: 'timesheet',
       ),
+      if (_hasFullAccess)
+        AdaptivePopupMenuItem<String>(
+          label: s.aiAssistantTitle,
+          icon: ic('sparkles', Icons.auto_awesome_rounded),
+          value: 'ai',
+        ),
+      AdaptivePopupMenuItem<String>(
+        label: s.logOut,
+        icon: ic('rectangle.portrait.and.arrow.right', Icons.logout_rounded),
+        value: 'logout',
+      ),
+    ];
+
+    return AdaptivePopupMenuButton.icon<String>(
+      icon: ic('ellipsis', Icons.more_horiz_rounded),
+      size: 46,
+      tint: const Color(0xFF1C1C1E),
+      items: items,
+      onSelected: (index, item) {
+        switch (item.value) {
+          case 'timesheet':
+            _openTimesheet();
+          case 'ai':
+            _openAiAssistant();
+          case 'logout':
+            HapticFeedback.lightImpact();
+            _showLogoutDialog();
+        }
+      },
     );
   }
 
@@ -648,53 +656,6 @@ class _MenuPageState extends State<MenuPage>
           color: trendColor,
         ),
       ],
-    );
-  }
-
-  Widget _buildLogoutButton() {
-    void onPressed() {
-      HapticFeedback.lightImpact();
-      _showLogoutDialog();
-    }
-
-    if (Platform.isIOS) {
-      return SizedBox(
-        width: 46,
-        height: 46,
-        child: AdaptiveButton.icon(
-          onPressed: onPressed,
-          icon: Icons.logout_rounded,
-          iconColor: const Color(0xFF1C1C1E),
-          color: const Color(0xFF1C1C1E),
-          style: AdaptiveButtonStyle.glass,
-          size: AdaptiveButtonSize.medium,
-          useSmoothRectangleBorder: false,
-          minSize: const Size(46, 46),
-        ),
-      );
-    }
-
-    return Material(
-      color: Colors.transparent,
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onPressed,
-        child: Container(
-          width: 46,
-          height: 46,
-          alignment: Alignment.center,
-          decoration: const BoxDecoration(
-            color: Color(0xFFF2F2F2),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.logout_rounded,
-            color: Color(0xFF1C1C1E),
-            size: 22,
-          ),
-        ),
-      ),
     );
   }
 

@@ -1966,4 +1966,72 @@ class S {
     'en': 'Failed to start the installation',
     'uz': "O'rnatishni boshlab bo'lmadi",
   });
+
+  // My timesheet (individual attendance calendar)
+  String get timesheetTitle =>
+      _t({'ru': 'Мой табель', 'en': 'My timesheet', 'uz': 'Mening tabelim'});
+  String get timesheetDesc => _t({
+    'ru': 'Отработанные часы и дни по месяцам',
+    'en': 'Worked hours and days by month',
+    'uz': 'Oylar kesimida ishlangan soat va kunlar',
+  });
+  String get timesheetHours =>
+      _t({'ru': 'Часов', 'en': 'Hours', 'uz': 'Soat'});
+  String get timesheetDays =>
+      _t({'ru': 'Дней', 'en': 'Days', 'uz': 'Kun'});
+  String get timesheetAbsent =>
+      _t({'ru': 'Прогулы', 'en': 'Absences', 'uz': 'Kelmagan kunlar'});
+  String get timesheetLegendWorked =>
+      _t({'ru': 'Отработано', 'en': 'Worked', 'uz': 'Ishlangan'});
+  String get timesheetLegendPresent => _t({
+    'ru': 'Нет выхода',
+    'en': 'No exit mark',
+    'uz': 'Chiqish belgisi yo\'q',
+  });
+  String get timesheetLegendAbsent =>
+      _t({'ru': 'Нет отметок', 'en': 'No marks', 'uz': 'Belgi yo\'q'});
+  String get timesheetLegendOff =>
+      _t({'ru': 'Выходной', 'en': 'Day off', 'uz': 'Dam olish'});
+  String get timesheetEntry =>
+      _t({'ru': 'Вход', 'en': 'In', 'uz': 'Kirish'});
+  String get timesheetExit =>
+      _t({'ru': 'Выход', 'en': 'Out', 'uz': 'Chiqish'});
+  String get timesheetNight =>
+      _t({'ru': 'Ночных', 'en': 'Night', 'uz': 'Tungi'});
+  String get timesheetDayShift =>
+      _t({'ru': 'Дневных', 'en': 'Day', 'uz': 'Kunduzgi'});
+  String get timesheetNoEmployee => _t({
+    'ru': 'Ваш пользователь не привязан к сотруднику',
+    'en': 'Your user is not linked to an employee',
+    'uz': 'Foydalanuvchingiz xodimga biriktirilmagan',
+  });
+  static const _monthsRu = [
+    'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
+  ];
+  static const _monthsEn = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  static const _monthsUz = [
+    'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
+    'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr',
+  ];
+  static const _weekdaysRu = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  static const _weekdaysEn = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+  static const _weekdaysUz = ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'];
+
+  /// [month] is 1-based.
+  String monthName(int month) => _t({
+    'ru': _monthsRu[month - 1],
+    'en': _monthsEn[month - 1],
+    'uz': _monthsUz[month - 1],
+  });
+
+  /// [weekday] is 0-based, Monday first.
+  String weekdayShort(int weekday) => _t({
+    'ru': _weekdaysRu[weekday],
+    'en': _weekdaysEn[weekday],
+    'uz': _weekdaysUz[weekday],
+  });
 }
