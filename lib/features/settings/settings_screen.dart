@@ -10,6 +10,9 @@ import '../../core/localization/locale_notifier.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/confirm_dialog.dart';
+import '../../core/widgets/fade_route.dart';
+import 'face_id_tile.dart';
+import 'privacy_policy_page.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -38,6 +41,7 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   static const Color _gradientStart = AppColors.brandOrange;
   static const Color _gradientEnd = AppColors.brandRed;
+  static const double _tile = 38;
 
   final List<Map<String, String>> _languages = [
     {'code': 'ru', 'name': 'Русский', 'desc': 'Русский язык'},
@@ -95,7 +99,21 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (mounted) setState(() => _useBiometrics = useBiometrics == 'true');
   }
 
+  /// Turning it on first checks the user, so it can't be switched on by
+  /// someone who only holds an unlocked phone.
   Future<void> _toggleBiometricPreference(bool value) async {
+    if (value) {
+      try {
+        final ok = await _auth.authenticate(
+          localizedReason: S.of(context).authLoginReason,
+          biometricOnly: true,
+        );
+        if (!ok) return;
+      } catch (_) {
+        return;
+      }
+    }
+    if (!mounted) return;
     setState(() => _useBiometrics = value);
     await _storage.write(key: 'useBiometrics', value: value.toString());
   }
@@ -158,15 +176,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
               children: [
-                _buildProfileCard(s),
-                const SizedBox(height: 28),
-                _buildSectionHeader(s.generalSettings),
-                const SizedBox(height: 10),
-                _buildLanguageSelector(s),
-                if (_canCheckBiometrics) ...[
-                  const SizedBox(height: 12),
-                  _buildBiometricToggle(s),
-                ],
+                _buildSettingsCard(s),
                 const SizedBox(height: 36),
                 _buildVersionInfo(s),
               ],
@@ -191,7 +201,26 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildProfileCard(S s) {
+  /// Profile, language and biometrics in one card, set apart by thin lines.
+  Widget _buildSettingsCard(S s) {
+    return _GlassCard(
+      child: Column(
+        children: [
+          _buildProfileSection(s),
+          const _CardDivider(),
+          _buildLanguageSection(s),
+          if (_canCheckBiometrics) ...[
+            const _CardDivider(),
+            _buildBiometricSection(s),
+          ],
+          const _CardDivider(),
+          _buildPrivacySection(s),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileSection(S s) {
     final initials = _displayName.isNotEmpty
         ? _displayName
               .split(' ')
@@ -201,141 +230,111 @@ class _SettingsScreenState extends State<SettingsScreen>
               .toUpperCase()
         : 'U';
 
-    return _GlassCard(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _gradientStart.withOpacity(0.12),
-              ),
-              child: Center(
-                child: Text(
-                  initials,
-                  style: const TextStyle(
-                    color: _gradientStart,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 28,
-                    letterSpacing: 1,
-                  ),
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _gradientStart.withOpacity(0.12),
+            ),
+            child: Center(
+              child: Text(
+                initials,
+                style: const TextStyle(
+                  color: _gradientStart,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 28,
+                  letterSpacing: 1,
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              _displayName.isNotEmpty ? _displayName : 'UZTEXPRO',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFF1C1C1E),
-                fontWeight: FontWeight.bold,
-                fontSize: 22,
-                letterSpacing: 0.3,
-              ),
-            ),
-            if (_email.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.email_outlined,
-                    color: Color(0xFF8A8A8E),
-                    size: 14,
-                  ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      _email,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Color(0xFF8A8A8E),
-                        fontSize: 13,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            if (_login.isNotEmpty && _login != _displayName) ...[
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.person_outline,
-                    color: Color(0xFFB0B0B5),
-                    size: 13,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    _login,
-                    style: const TextStyle(
-                      color: Color(0xFFB0B0B5),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-              decoration: BoxDecoration(
-                color: _gradientStart.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.business_center_outlined,
-                    color: _gradientEnd,
-                    size: 13,
-                  ),
-                  const SizedBox(width: 7),
-                  Text(
-                    s.paymentSystem,
-                    style: const TextStyle(
-                      color: _gradientEnd,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Row(
-        children: [
-          Container(
-            width: 3,
-            height: 16,
-            decoration: BoxDecoration(
-              color: _gradientStart,
-              borderRadius: BorderRadius.circular(2),
-            ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(height: 16),
           Text(
-            title,
+            _displayName.isNotEmpty ? _displayName : 'UZTEXPRO',
+            textAlign: TextAlign.center,
             style: const TextStyle(
               color: Color(0xFF1C1C1E),
               fontWeight: FontWeight.bold,
-              fontSize: 14,
-              letterSpacing: 0.4,
+              fontSize: 22,
+              letterSpacing: 0.3,
+            ),
+          ),
+          if (_email.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.email_outlined,
+                  color: Color(0xFF8A8A8E),
+                  size: 14,
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    _email,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFF8A8A8E),
+                      fontSize: 13,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (_login.isNotEmpty && _login != _displayName) ...[
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.person_outline,
+                  color: Color(0xFFB0B0B5),
+                  size: 13,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _login,
+                  style: const TextStyle(
+                    color: Color(0xFFB0B0B5),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+            decoration: BoxDecoration(
+              color: _gradientStart.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.business_center_outlined,
+                  color: _gradientEnd,
+                  size: 13,
+                ),
+                const SizedBox(width: 7),
+                Text(
+                  s.paymentSystem,
+                  style: const TextStyle(
+                    color: _gradientEnd,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -343,63 +342,61 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildLanguageSelector(S s) {
+  Widget _buildLanguageSection(S s) {
     final currentCode = localeNotifier.value.languageCode;
     final selectedIndex = _languages
         .indexWhere((lang) => lang['code'] == currentCode)
         .clamp(0, _languages.length - 1);
 
-    return _GlassCard(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: _gradientStart.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.language_rounded,
-                    color: _gradientStart,
-                    size: 22,
-                  ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: _tile,
+                height: _tile,
+                decoration: BoxDecoration(
+                  color: _gradientStart.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        s.language,
-                        style: const TextStyle(
-                          color: Color(0xFF1C1C1E),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        s.languageDesc,
-                        style: const TextStyle(
-                          color: Color(0xFF8A8A8E),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
+                child: const Icon(
+                  Icons.language_rounded,
+                  color: _gradientStart,
+                  size: 20,
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            _buildLanguageControl(selectedIndex),
-          ],
-        ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      s.language,
+                      style: const TextStyle(
+                        color: Color(0xFF1C1C1E),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      s.languageDesc,
+                      style: const TextStyle(
+                        color: Color(0xFF8A8A8E),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _buildLanguageControl(selectedIndex),
+        ],
       ),
     );
   }
@@ -412,7 +409,9 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Widget _buildLanguageControl(int selectedIndex) {
-    final labels = _languages.map((lang) => lang['code']!.toUpperCase()).toList();
+    final labels = _languages
+        .map((lang) => lang['code']!.toUpperCase())
+        .toList();
 
     // AdaptiveSegmentedControl renders a Material 3 SegmentedButton on
     // Android, but the app theme has useMaterial3 disabled — that mismatch
@@ -434,61 +433,129 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildBiometricToggle(S s) {
-    final isFaceId = _biometricType == BiometricType.face;
-    final icon = isFaceId ? Icons.face_rounded : Icons.fingerprint;
+  Widget _buildBiometricSection(S s) {
+    // An iPhone is always Face ID, even while it reports nothing (a simulator,
+    // or Face ID not set up yet); other devices show what they report.
+    final isFaceId =
+        _biometricType == BiometricType.face ||
+        (_biometricType == null && Platform.isIOS);
     final description = isFaceId ? s.useFaceId : s.useFingerprint;
 
-    return _GlassCard(
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: () => _toggleBiometricPreference(!_useBiometrics),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _toggleBiometricPreference(!_useBiometrics),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              if (isFaceId)
+                const FaceIdTile(size: _tile)
+              else
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: _tile,
+                  height: _tile,
                   decoration: BoxDecoration(
                     color: _gradientStart.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, color: _gradientStart, size: 22),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        s.biometricAuth,
-                        style: const TextStyle(
-                          color: Color(0xFF1C1C1E),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        description,
-                        style: const TextStyle(
-                          color: Color(0xFF8A8A8E),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+                  child: const Icon(
+                    Icons.fingerprint,
+                    color: _gradientStart,
+                    size: 20,
                   ),
                 ),
-                AdaptiveSwitch(
-                  value: _useBiometrics,
-                  onChanged: _toggleBiometricPreference,
-                  activeColor: _gradientStart,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      s.biometricAuth,
+                      style: const TextStyle(
+                        color: Color(0xFF1C1C1E),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      description,
+                      style: const TextStyle(
+                        color: Color(0xFF8A8A8E),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              AdaptiveSwitch(
+                value: _useBiometrics,
+                onChanged: _toggleBiometricPreference,
+                activeColor: _gradientStart,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrivacySection(S s) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          Navigator.push(
+            context,
+            FadeRoute(builder: (_) => const PrivacyPolicyPage()),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: _tile,
+                height: _tile,
+                decoration: BoxDecoration(
+                  color: _gradientStart.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.shield_outlined,
+                  color: _gradientStart,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      s.privacyPolicy,
+                      style: const TextStyle(
+                        color: Color(0xFF1C1C1E),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      s.privacyPolicyDesc,
+                      style: const TextStyle(
+                        color: Color(0xFF8A8A8E),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFFB0B0B5)),
+            ],
           ),
         ),
       ),
@@ -627,6 +694,19 @@ class _SettingsScreenState extends State<SettingsScreen>
       ],
     );
   }
+}
+
+class _CardDivider extends StatelessWidget {
+  const _CardDivider();
+
+  @override
+  Widget build(BuildContext context) => const Divider(
+    height: 1,
+    thickness: 1,
+    indent: 16,
+    endIndent: 16,
+    color: Color(0xFFF0F0F0),
+  );
 }
 
 // ── Reusable card ────────────────────────────────────────────────────────────

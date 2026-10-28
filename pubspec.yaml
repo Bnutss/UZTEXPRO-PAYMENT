@@ -18,6 +18,7 @@ dependencies:
   flutter_secure_storage: ^10.3.1
   http: ^1.6.0
   local_auth: ^3.0.1
+  flutter_svg: ^2.3.0
   shared_preferences: ^2.4.0
   url_launcher: ^6.3.2
   shimmer: ^3.0.0
@@ -47,4 +48,5 @@ flutter:
     - assets/icon/uztexpro.png
     - assets/icon/logo.png
     - assets/models/logo3d.glb
+    - assets/icons/face_id.svg
   uses-material-design: true

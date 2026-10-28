@@ -95,20 +95,35 @@ class S {
       _t({'ru': 'Посещаемость', 'en': 'Attendance', 'uz': 'Davomat'});
   String get attendanceCameToday =>
       _t({'ru': 'Пришли сегодня', 'en': 'Came today', 'uz': 'Bugun kelganlar'});
-  String get attendanceSearchHint =>
-      _t({'ru': 'Поиск по ФИО', 'en': 'Search by name', 'uz': 'FIO bo\'yicha qidirish'});
-  String get attendanceAllFactories =>
-      _t({'ru': 'Все фабрики', 'en': 'All factories', 'uz': 'Barcha fabrikalar'});
+  String get attendanceSearchHint => _t({
+    'ru': 'Поиск по ФИО',
+    'en': 'Search by name',
+    'uz': 'FIO bo\'yicha qidirish',
+  });
+  String get attendanceAllFactories => _t({
+    'ru': 'Все фабрики',
+    'en': 'All factories',
+    'uz': 'Barcha fabrikalar',
+  });
   String get attendanceEmpty =>
       _t({'ru': 'Никого нет', 'en': 'Nobody here', 'uz': 'Hech kim yo\'q'});
-  String get attendanceTotalEmployees =>
-      _t({'ru': 'Всего сотрудников', 'en': 'Total employees', 'uz': 'Jami xodimlar'});
-  String get attendanceNoAccess =>
-      _t({'ru': 'Недостаточно прав', 'en': 'Access denied', 'uz': 'Ruxsat yo\'q'});
+  String get attendanceTotalEmployees => _t({
+    'ru': 'Всего сотрудников',
+    'en': 'Total employees',
+    'uz': 'Jami xodimlar',
+  });
+  String get attendanceNoAccess => _t({
+    'ru': 'Недостаточно прав',
+    'en': 'Access denied',
+    'uz': 'Ruxsat yo\'q',
+  });
   String get attendanceFilterFactory =>
       _t({'ru': 'Фабрика', 'en': 'Factory', 'uz': 'Fabrika'});
-  String get attendanceStatusOut =>
-      _t({'ru': 'Вне территории', 'en': 'Off-site', 'uz': 'Hududdan tashqarida'});
+  String get attendanceStatusOut => _t({
+    'ru': 'Вне территории',
+    'en': 'Off-site',
+    'uz': 'Hududdan tashqarida',
+  });
   String get attendanceFirstIn =>
       _t({'ru': 'Первый вход', 'en': 'First entry', 'uz': 'Birinchi kirish'});
   String get attendanceLastMark => _t({
@@ -217,20 +232,14 @@ class S {
   String get shopPickupBuyer =>
       _t({'ru': 'Покупатель', 'en': 'Buyer', 'uz': 'Xaridor'});
 
-  String shopPickupOrderTitle(int id) => _t({
-    'ru': 'Заказ №$id',
-    'en': 'Order №$id',
-    'uz': 'Buyurtma №$id',
-  });
+  String shopPickupOrderTitle(int id) =>
+      _t({'ru': 'Заказ №$id', 'en': 'Order №$id', 'uz': 'Buyurtma №$id'});
 
   String get shopPickupItemsHeader =>
       _t({'ru': 'Товары', 'en': 'Items', 'uz': 'Tovarlar'});
 
-  String get shopPickupTotalLabel => _t({
-    'ru': 'Общая сумма',
-    'en': 'Total amount',
-    'uz': 'Umumiy summa',
-  });
+  String get shopPickupTotalLabel =>
+      _t({'ru': 'Общая сумма', 'en': 'Total amount', 'uz': 'Umumiy summa'});
 
   String get shopPickupSalaryLabel => _t({
     'ru': 'Зарплата продавца',
@@ -274,8 +283,7 @@ class S {
   String get shopIssuedWeek =>
       _t({'ru': 'Неделя', 'en': 'Week', 'uz': 'Hafta'});
 
-  String get shopIssuedMonth =>
-      _t({'ru': 'Месяц', 'en': 'Month', 'uz': 'Oy'});
+  String get shopIssuedMonth => _t({'ru': 'Месяц', 'en': 'Month', 'uz': 'Oy'});
 
   String get shopIssuedCustomPeriod =>
       _t({'ru': 'Свой период', 'en': 'Custom period', 'uz': "O'zi tanlagan"});
@@ -296,11 +304,8 @@ class S {
   String get shopIssuedApply =>
       _t({'ru': 'Применить', 'en': 'Apply', 'uz': "Qo'llash"});
 
-  String get shopIssuedStatusIssued => _t({
-    'ru': 'Выданные',
-    'en': 'Issued',
-    'uz': 'Topshirilgan',
-  });
+  String get shopIssuedStatusIssued =>
+      _t({'ru': 'Выданные', 'en': 'Issued', 'uz': 'Topshirilgan'});
 
   String get shopIssuedStatusPending => _t({
     'ru': 'Ожидают выдачи',
@@ -308,11 +313,8 @@ class S {
     'uz': 'Topshirish kutilmoqda',
   });
 
-  String get shopIssuedBadgeIssued => _t({
-    'ru': 'Выдан',
-    'en': 'Issued',
-    'uz': 'Topshirilgan',
-  });
+  String get shopIssuedBadgeIssued =>
+      _t({'ru': 'Выдан', 'en': 'Issued', 'uz': 'Topshirilgan'});
 
   String get shopIssuedWaitingBadge => _t({
     'ru': 'Ожидает выдачи',
@@ -320,11 +322,8 @@ class S {
     'uz': 'Topshirish kutilmoqda',
   });
 
-  String get shopIssuedConfirmedAt => _t({
-    'ru': 'Подтверждён',
-    'en': 'Confirmed',
-    'uz': 'Tasdiqlangan',
-  });
+  String get shopIssuedConfirmedAt =>
+      _t({'ru': 'Подтверждён', 'en': 'Confirmed', 'uz': 'Tasdiqlangan'});
 
   String get shopAnalyticsTitle => _t({
     'ru': 'Аналитика товаров',
@@ -338,41 +337,23 @@ class S {
     'uz': "Qoldiqlar, eng ko'p sotilganlar, do'konlar va xaridorlar",
   });
 
-  String get shopAnalyticsTabProducts => _t({
-    'ru': 'Товары',
-    'en': 'Products',
-    'uz': 'Mahsulotlar',
-  });
+  String get shopAnalyticsTabProducts =>
+      _t({'ru': 'Товары', 'en': 'Products', 'uz': 'Mahsulotlar'});
 
-  String get shopAnalyticsTabShops => _t({
-    'ru': 'Магазины',
-    'en': 'Shops',
-    'uz': "Do'konlar",
-  });
+  String get shopAnalyticsTabShops =>
+      _t({'ru': 'Магазины', 'en': 'Shops', 'uz': "Do'konlar"});
 
-  String get shopAnalyticsTabBuyers => _t({
-    'ru': 'Покупатели',
-    'en': 'Buyers',
-    'uz': 'Xaridorlar',
-  });
+  String get shopAnalyticsTabBuyers =>
+      _t({'ru': 'Покупатели', 'en': 'Buyers', 'uz': 'Xaridorlar'});
 
-  String get shopAnalyticsTabStock => _t({
-    'ru': 'Остатки',
-    'en': 'Stock',
-    'uz': 'Qoldiqlar',
-  });
+  String get shopAnalyticsTabStock =>
+      _t({'ru': 'Остатки', 'en': 'Stock', 'uz': 'Qoldiqlar'});
 
-  String get shopAnalyticsSoldSum => _t({
-    'ru': 'Сумма продаж',
-    'en': 'Sales amount',
-    'uz': 'Sotuv summasi',
-  });
+  String get shopAnalyticsSoldSum =>
+      _t({'ru': 'Сумма продаж', 'en': 'Sales amount', 'uz': 'Sotuv summasi'});
 
-  String get shopAnalyticsStockQty => _t({
-    'ru': 'На складе, шт',
-    'en': 'In stock, pcs',
-    'uz': 'Omborda, dona',
-  });
+  String get shopAnalyticsStockQty =>
+      _t({'ru': 'На складе, шт', 'en': 'In stock, pcs', 'uz': 'Omborda, dona'});
 
   String get shopAnalyticsStockValue => _t({
     'ru': 'Стоимость остатков',
@@ -398,11 +379,7 @@ class S {
     'uz': 'Xaridor, buyurtma №, mahsulot',
   });
 
-  String get shopAnalyticsPcs => _t({
-    'ru': 'шт',
-    'en': 'pcs',
-    'uz': 'dona',
-  });
+  String get shopAnalyticsPcs => _t({'ru': 'шт', 'en': 'pcs', 'uz': 'dona'});
 
   String get shopStockAllPeriod =>
       _t({'ru': 'Весь период', 'en': 'All time', 'uz': 'Barcha davr'});
@@ -431,8 +408,11 @@ class S {
     'uz': 'Faqat muddati o\'tganlar',
   });
 
-  String get shopStockOrdersLabel =>
-      _t({'ru': 'Заказов ожидает', 'en': 'Orders pending', 'uz': 'Kutilayotgan buyurtmalar'});
+  String get shopStockOrdersLabel => _t({
+    'ru': 'Заказов ожидает',
+    'en': 'Orders pending',
+    'uz': 'Kutilayotgan buyurtmalar',
+  });
 
   String get shopStockQtyLabel =>
       _t({'ru': 'Товаров, шт', 'en': 'Items, pcs', 'uz': 'Tovarlar, dona'});
@@ -440,8 +420,11 @@ class S {
   String get shopStockOverdueLabel =>
       _t({'ru': 'Просрочено', 'en': 'Overdue', 'uz': "Muddati o'tgan"});
 
-  String get shopStockBuyersLabel =>
-      _t({'ru': 'Клиентов ожидает', 'en': 'Clients waiting', 'uz': 'Kutayotgan xaridorlar'});
+  String get shopStockBuyersLabel => _t({
+    'ru': 'Клиентов ожидает',
+    'en': 'Clients waiting',
+    'uz': 'Kutayotgan xaridorlar',
+  });
 
   String get shopStockWaitingSince =>
       _t({'ru': 'Ожидает с', 'en': 'Waiting since', 'uz': 'Kutmoqda'});
@@ -452,14 +435,20 @@ class S {
   String get shopStockStatusWaiting =>
       _t({'ru': 'В ожидании', 'en': 'Waiting', 'uz': 'Kutilmoqda'});
 
-  String get shopStockStatusSoon =>
-      _t({'ru': 'Скоро просрочка', 'en': 'Due soon', 'uz': "Tez orada muddati o'tadi"});
+  String get shopStockStatusSoon => _t({
+    'ru': 'Скоро просрочка',
+    'en': 'Due soon',
+    'uz': "Tez orada muddati o'tadi",
+  });
 
   String get shopStockStatusOverdue =>
       _t({'ru': 'Просрочено', 'en': 'Overdue', 'uz': "Muddati o'tgan"});
 
-  String get shopStockGroupBadge =>
-      _t({'ru': 'Есть просрочка', 'en': 'Has overdue', 'uz': "Muddati o'tgan bor"});
+  String get shopStockGroupBadge => _t({
+    'ru': 'Есть просрочка',
+    'en': 'Has overdue',
+    'uz': "Muddati o'tgan bor",
+  });
 
   String shopStockOrdersCount(int count) => _t({
     'ru': '$count заказ(ов)',
@@ -624,11 +613,8 @@ class S {
     'uz': 'Iltimos, kuting...',
   });
 
-  String get loginSuccessTitle => _t({
-    'ru': 'Вход выполнен',
-    'en': 'Signed in',
-    'uz': 'Kirish bajarildi',
-  });
+  String get loginSuccessTitle =>
+      _t({'ru': 'Вход выполнен', 'en': 'Signed in', 'uz': 'Kirish bajarildi'});
 
   String get loginSuccessSubtitle => _t({
     'ru': 'Загрузка рабочего пространства',
@@ -986,6 +972,18 @@ class S {
   String get privacyTitle =>
       _t({'ru': 'Конфиденциальность', 'en': 'Privacy', 'uz': 'Maxfiylik'});
 
+  String get privacyPolicy => _t({
+    'ru': 'Политика конфиденциальности',
+    'en': 'Privacy Policy',
+    'uz': 'Maxfiylik siyosati',
+  });
+
+  String get privacyPolicyDesc => _t({
+    'ru': 'Какие данные мы обрабатываем и как их защищаем',
+    'en': 'What data we process and how we protect it',
+    'uz': "Qanday ma'lumotlarni qayta ishlaymiz va himoyalaymiz",
+  });
+
   String get privacySettings => _t({
     'ru': 'Настройки конфиденциальности',
     'en': 'Privacy settings',
@@ -1319,8 +1317,7 @@ class S {
     'uz': "Materiallar ko'rsatilmagan",
   });
 
-  String get fabricLabel =>
-      _t({'ru': 'Полотно', 'en': 'Fabric', 'uz': 'Mato'});
+  String get fabricLabel => _t({'ru': 'Полотно', 'en': 'Fabric', 'uz': 'Mato'});
 
   String get fabricColorLabel =>
       _t({'ru': 'Цвет', 'en': 'Color', 'uz': 'Rang'});
@@ -1455,11 +1452,17 @@ class S {
   String get aiOtherFactory =>
       _t({'ru': 'Без фабрики', 'en': 'No factory', 'uz': "Fabrikasiz"});
 
-  String get aiAllFactories =>
-      _t({'ru': 'Все фабрики', 'en': 'All factories', 'uz': 'Barcha fabrikalar'});
+  String get aiAllFactories => _t({
+    'ru': 'Все фабрики',
+    'en': 'All factories',
+    'uz': 'Barcha fabrikalar',
+  });
 
-  String get aiPickWarehouseLabel =>
-      _t({'ru': 'Выбрать склад', 'en': 'Pick warehouse', 'uz': 'Omborni tanlash'});
+  String get aiPickWarehouseLabel => _t({
+    'ru': 'Выбрать склад',
+    'en': 'Pick warehouse',
+    'uz': 'Omborni tanlash',
+  });
 
   String get aiChooseFactoryTitle => _t({
     'ru': 'Выберите фабрику',
@@ -1932,19 +1935,26 @@ class S {
   });
 
   String get appUpdateCriticalNotice => _t({
-    'ru': 'Это обновление обязательно — без него дальнейшая работа с приложением невозможна',
-    'en': 'This update is mandatory — the app cannot be used further without it',
-    'uz': "Bu yangilanish majburiy — usiz ilova bilan ishlashni davom ettirib bo'lmaydi",
+    'ru':
+        'Это обновление обязательно — без него дальнейшая работа с приложением невозможна',
+    'en':
+        'This update is mandatory — the app cannot be used further without it',
+    'uz':
+        "Bu yangilanish majburiy — usiz ilova bilan ishlashni davom ettirib bo'lmaydi",
   });
 
-  String get appUpdateDownloadButton =>
-      _t({'ru': 'Скачать и установить', 'en': 'Download & install', 'uz': "Yuklab olish va o'rnatish"});
+  String get appUpdateDownloadButton => _t({
+    'ru': 'Скачать и установить',
+    'en': 'Download & install',
+    'uz': "Yuklab olish va o'rnatish",
+  });
 
   String get appUpdateOpenStoreButton =>
       _t({'ru': 'Обновить', 'en': 'Update', 'uz': 'Yangilash'});
 
   String get appUpdateStoreOpenFailed => _t({
-    'ru': 'Не удалось открыть App Store. Обновите приложение в App Store вручную',
+    'ru':
+        'Не удалось открыть App Store. Обновите приложение в App Store вручную',
     'en': 'Could not open the App Store. Please update the app there manually',
     'uz': "App Store'ni ochib bo'lmadi. Ilovani App Store'da qo'lda yangilang",
   });
@@ -1956,9 +1966,12 @@ class S {
   });
 
   String get appUpdateInstallPermissionDenied => _t({
-    'ru': 'Разрешите установку из этого источника в настройках телефона и попробуйте снова',
-    'en': 'Allow installs from this source in your phone settings and try again',
-    'uz': "Telefon sozlamalarida ushbu manbadan o'rnatishga ruxsat bering va qayta urinib ko'ring",
+    'ru':
+        'Разрешите установку из этого источника в настройках телефона и попробуйте снова',
+    'en':
+        'Allow installs from this source in your phone settings and try again',
+    'uz':
+        "Telefon sozlamalarida ushbu manbadan o'rnatishga ruxsat bering va qayta urinib ko'ring",
   });
 
   String get appUpdateInstallFailed => _t({
@@ -1975,10 +1988,8 @@ class S {
     'en': 'Worked hours and days by month',
     'uz': 'Oylar kesimida ishlangan soat va kunlar',
   });
-  String get timesheetHours =>
-      _t({'ru': 'Часов', 'en': 'Hours', 'uz': 'Soat'});
-  String get timesheetDays =>
-      _t({'ru': 'Дней', 'en': 'Days', 'uz': 'Kun'});
+  String get timesheetHours => _t({'ru': 'Часов', 'en': 'Hours', 'uz': 'Soat'});
+  String get timesheetDays => _t({'ru': 'Дней', 'en': 'Days', 'uz': 'Kun'});
   String get timesheetAbsent =>
       _t({'ru': 'Прогулы', 'en': 'Absences', 'uz': 'Kelmagan kunlar'});
   String get timesheetLegendWorked =>
@@ -1992,10 +2003,8 @@ class S {
       _t({'ru': 'Нет отметок', 'en': 'No marks', 'uz': 'Belgi yo\'q'});
   String get timesheetLegendOff =>
       _t({'ru': 'Выходной', 'en': 'Day off', 'uz': 'Dam olish'});
-  String get timesheetEntry =>
-      _t({'ru': 'Вход', 'en': 'In', 'uz': 'Kirish'});
-  String get timesheetExit =>
-      _t({'ru': 'Выход', 'en': 'Out', 'uz': 'Chiqish'});
+  String get timesheetEntry => _t({'ru': 'Вход', 'en': 'In', 'uz': 'Kirish'});
+  String get timesheetExit => _t({'ru': 'Выход', 'en': 'Out', 'uz': 'Chiqish'});
   String get timesheetNight =>
       _t({'ru': 'Ночных', 'en': 'Night', 'uz': 'Tungi'});
   String get timesheetDayShift =>
@@ -2006,16 +2015,46 @@ class S {
     'uz': 'Foydalanuvchingiz xodimga biriktirilmagan',
   });
   static const _monthsRu = [
-    'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
+    'Январь',
+    'Февраль',
+    'Март',
+    'Апрель',
+    'Май',
+    'Июнь',
+    'Июль',
+    'Август',
+    'Сентябрь',
+    'Октябрь',
+    'Ноябрь',
+    'Декабрь',
   ];
   static const _monthsEn = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
   static const _monthsUz = [
-    'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
-    'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr',
+    'Yanvar',
+    'Fevral',
+    'Mart',
+    'Aprel',
+    'May',
+    'Iyun',
+    'Iyul',
+    'Avgust',
+    'Sentabr',
+    'Oktabr',
+    'Noyabr',
+    'Dekabr',
   ];
   static const _weekdaysRu = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   static const _weekdaysEn = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
