@@ -86,6 +86,8 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
   List<_Day> _days = [];
   int? _selectedDay;
 
+  bool _canEdit = false;
+
   bool _loading = true;
   String? _error;
   int _requestSeq = 0;
@@ -214,9 +216,9 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
     try {
       final res = await http
           .get(
-            Uri.parse('$API/hr/mobile-timesheet/').replace(
-              queryParameters: {'year': '$_year', 'month': '$_month'},
-            ),
+            Uri.parse(
+              '$API/hr/mobile-timesheet/',
+            ).replace(queryParameters: {'year': '$_year', 'month': '$_month'}),
             headers: {'Authorization': 'Bearer $_apiToken'},
           )
           .timeout(const Duration(seconds: 20));
@@ -243,6 +245,7 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
         _totalHours = (body['total_hours'] as num?)?.toInt() ?? 0;
         _totalDays = (body['total_days'] as num?)?.toInt() ?? 0;
         _absentDays = (body['absent_days'] as num?)?.toInt() ?? 0;
+        _canEdit = body['can_edit'] == true;
         _days = ((body['days'] as List?) ?? const [])
             .whereType<Map>()
             .map((e) => _Day.fromJson(e.cast<String, dynamic>()))
@@ -255,6 +258,280 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
         _error = s.attendanceLoadError;
         _loading = false;
       });
+    }
+  }
+
+  static TimeOfDay? _parseHm(String? v) {
+    final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(v ?? '');
+    if (m == null) return null;
+    return TimeOfDay(
+      hour: int.parse(m.group(1)!),
+      minute: int.parse(m.group(2)!),
+    );
+  }
+
+  static String _fmt(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  static int _mins(TimeOfDay t) => t.hour * 60 + t.minute;
+
+  /// Strict HH:MM parser for typed input; null when incomplete/invalid.
+  static TimeOfDay? _parseTyped(String v) {
+    final m = RegExp(r'^(\d{2}):(\d{2})$').firstMatch(v);
+    if (m == null) return null;
+    final h = int.parse(m.group(1)!), mi = int.parse(m.group(2)!);
+    if (h > 23 || mi > 59) return null;
+    return TimeOfDay(hour: h, minute: mi);
+  }
+
+  /// Bottom sheet with entry/exit times for one day; saves both in one request.
+  Future<void> _openEditSheet(_Day d) async {
+    HapticFeedback.selectionClick();
+    final s = S.of(context);
+    final origIn = _parseHm(d.firstIn);
+    final origOut = _parseHm(d.lastOut);
+    var saving = false;
+    String? error;
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => _ControllersScope(
+        initialIn: origIn == null ? '' : _fmt(origIn),
+        initialOut: origOut == null ? '' : _fmt(origOut),
+        builder: (ctx, cIn, cOut) => StatefulBuilder(
+          builder: (ctx, setSheet) {
+            final tIn = _parseTyped(cIn.text);
+            final tOut = _parseTyped(cOut.text);
+            // a non-empty but incomplete field blocks saving
+            final partial =
+                (cIn.text.isNotEmpty && tIn == null) ||
+                (cOut.text.isNotEmpty && tOut == null);
+            bool same(TimeOfDay? a, TimeOfDay? b) =>
+                (a == null && b == null) ||
+                (a != null && b != null && _mins(a) == _mins(b));
+            final changed = !same(tIn, origIn) || !same(tOut, origOut);
+            final invalid =
+                tIn != null && tOut != null && _mins(tOut) <= _mins(tIn);
+            final canSave =
+                changed &&
+                !invalid &&
+                !partial &&
+                !saving &&
+                (tIn != null || tOut != null);
+
+            Widget tile(String label, TextEditingController c, IconData icon) {
+              return Expanded(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.groupedBackground,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(icon, size: 16, color: _kMuted),
+                          const SizedBox(width: 6),
+                          Text(
+                            label,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: _kMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                      TextField(
+                        controller: c,
+                        enabled: !saving,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [_TimeInputFormatter()],
+                        onChanged: (_) => setSheet(() => error = null),
+                        cursorColor: AppColors.brandRed,
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: _kInk,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: '--:--',
+                          hintStyle: TextStyle(color: _kMuted),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(vertical: 6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                12,
+                20,
+                20 + MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: _kOff,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    s.timesheetEditTitle,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: _kInk,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${d.day} ${s.monthName(_month)} $_year, ${s.weekdayShort(d.weekday)}',
+                    style: const TextStyle(fontSize: 13, color: _kMuted),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      tile(s.timesheetEntry, cIn, Icons.login_rounded),
+                      const SizedBox(width: 12),
+                      tile(s.timesheetExit, cOut, Icons.logout_rounded),
+                    ],
+                  ),
+                  if (invalid || partial || error != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      error ??
+                          (invalid
+                              ? s.timesheetExitBeforeEntry
+                              : s.timesheetTimeFormat),
+                      style: const TextStyle(fontSize: 12.5, color: _kAbsent),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.brandRed,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: !canSave
+                          ? null
+                          : () async {
+                              setSheet(() {
+                                saving = true;
+                                error = null;
+                              });
+                              final err = await _saveDay(
+                                d,
+                                tIn,
+                                tOut,
+                                origIn,
+                                origOut,
+                              );
+                              if (err == null) {
+                                if (ctx.mounted) Navigator.pop(ctx, true);
+                              } else {
+                                setSheet(() {
+                                  saving = false;
+                                  error = err;
+                                });
+                              }
+                            },
+                      child: saving
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              s.timesheetSave,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    if (saved == true && mounted) {
+      HapticFeedback.mediumImpact();
+      await _load();
+    }
+  }
+
+  /// Returns an error message, or null on success. Sends only changed marks.
+  Future<String?> _saveDay(
+    _Day d,
+    TimeOfDay? tIn,
+    TimeOfDay? tOut,
+    TimeOfDay? origIn,
+    TimeOfDay? origOut,
+  ) async {
+    final s = S.of(context);
+    final date =
+        '$_year-${_month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    bool diff(TimeOfDay? a, TimeOfDay? b) =>
+        a != null && (b == null || _mins(a) != _mins(b));
+    try {
+      final res = await http
+          .post(
+            Uri.parse('$API/hr/mobile-timesheet/edit/'),
+            headers: {
+              'Authorization': 'Bearer $_apiToken',
+              'Content-Type': 'application/json',
+            },
+            body: json.encode({
+              'date': date,
+              if (diff(tIn, origIn)) 'check_in': _fmt(tIn!),
+              if (diff(tOut, origOut)) 'check_out': _fmt(tOut!),
+            }),
+          )
+          .timeout(const Duration(seconds: 20));
+      if (res.statusCode == 200) return null;
+      try {
+        return json.decode(utf8.decode(res.bodyBytes))['error'] as String? ??
+            s.timesheetSaveError;
+      } catch (_) {
+        return s.timesheetSaveError;
+      }
+    } catch (_) {
+      return s.timesheetSaveError;
     }
   }
 
@@ -373,11 +650,8 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
       ),
     );
 
-    Widget divider() => Container(
-      width: 1,
-      height: 28,
-      color: _kInk.withOpacity(0.08),
-    );
+    Widget divider() =>
+        Container(width: 1, height: 28, color: _kInk.withOpacity(0.08));
 
     return BlockCard(
       padding: const EdgeInsets.all(16),
@@ -576,7 +850,7 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
               fontSize: 15,
               fontWeight: FontWeight.w700,
               color: _kInk,
-              fontFeatures: [FontFeature.tabularFigures()],
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ],
@@ -590,15 +864,35 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
         children: [
           const BlockDivider(gap: 0),
           const SizedBox(height: 12),
-          Text(
-            '${d.day} ${s.monthName(_month)}, ${s.weekdayShort(d.weekday)}',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: _kInk,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${d.day} ${s.monthName(_month)}, ${s.weekdayShort(d.weekday)}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: _kInk,
+                  ),
+                ),
+              ),
+              if (_canEdit)
+                TextButton.icon(
+                  onPressed: () => _openEditSheet(d),
+                  icon: const Icon(Icons.edit_rounded, size: 16),
+                  label: Text(s.timesheetEdit),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.brandRed,
+                    visualDensity: VisualDensity.compact,
+                    textStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           Row(
             children: [
               item(s.timesheetEntry, d.firstIn),
@@ -660,4 +954,62 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
       ],
     );
   }
+}
+
+/// Types digits only and inserts the colon: "905" -> "09:05" once complete.
+class _TimeInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final d = digits.length > 4 ? digits.substring(0, 4) : digits;
+    final text = d.length > 2 ? '${d.substring(0, 2)}:${d.substring(2)}' : d;
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+}
+
+/// Owns the two time controllers for the edit sheet so they are disposed
+/// only after the sheet's closing animation has finished.
+class _ControllersScope extends StatefulWidget {
+  const _ControllersScope({
+    required this.initialIn,
+    required this.initialOut,
+    required this.builder,
+  });
+
+  final String initialIn;
+  final String initialOut;
+  final Widget Function(
+    BuildContext context,
+    TextEditingController cIn,
+    TextEditingController cOut,
+  )
+  builder;
+
+  @override
+  State<_ControllersScope> createState() => _ControllersScopeState();
+}
+
+class _ControllersScopeState extends State<_ControllersScope> {
+  late final TextEditingController _in = TextEditingController(
+    text: widget.initialIn,
+  );
+  late final TextEditingController _out = TextEditingController(
+    text: widget.initialOut,
+  );
+
+  @override
+  void dispose() {
+    _in.dispose();
+    _out.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context, _in, _out);
 }

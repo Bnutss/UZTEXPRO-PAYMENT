@@ -2009,6 +2009,30 @@ class S {
       _t({'ru': 'Ночных', 'en': 'Night', 'uz': 'Tungi'});
   String get timesheetDayShift =>
       _t({'ru': 'Дневных', 'en': 'Day', 'uz': 'Kunduzgi'});
+  String get timesheetEdit =>
+      _t({'ru': 'Изменить', 'en': 'Edit', 'uz': 'Tahrirlash'});
+  String get timesheetSave =>
+      _t({'ru': 'Сохранить', 'en': 'Save', 'uz': 'Saqlash'});
+  String get timesheetEditTitle => _t({
+    'ru': 'Правка посещаемости',
+    'en': 'Edit attendance',
+    'uz': 'Davomatni tahrirlash',
+  });
+  String get timesheetExitBeforeEntry => _t({
+    'ru': 'Выход должен быть позже входа',
+    'en': 'Exit must be later than entry',
+    'uz': 'Chiqish kirishdan keyin bo‘lishi kerak',
+  });
+  String get timesheetTimeFormat => _t({
+    'ru': 'Введите время как ЧЧ:ММ, например 09:05',
+    'en': 'Enter time as HH:MM, e.g. 09:05',
+    'uz': 'Vaqtni SS:DD ko‘rinishida kiriting, masalan 09:05',
+  });
+  String get timesheetSaveError => _t({
+    'ru': 'Не удалось сохранить',
+    'en': 'Could not save',
+    'uz': 'Saqlab bo‘lmadi',
+  });
   String get timesheetNoEmployee => _t({
     'ru': 'Ваш пользователь не привязан к сотруднику',
     'en': 'Your user is not linked to an employee',
