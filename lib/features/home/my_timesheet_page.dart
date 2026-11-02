@@ -10,8 +10,8 @@ import 'package:uztexpro_payment/main.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/adaptive_back_button.dart';
 import '../../core/widgets/app_refresh.dart';
+import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/ui_blocks.dart';
 
 const _kInk = Color(0xFF1C1C1E);
@@ -540,57 +540,24 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
     final s = S.of(context);
     const bg = AppColors.groupedBackground;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        backgroundColor: bg,
-        appBar: AppBar(
-          leadingWidth: kBackButtonLeadingWidth,
-          leading: const AdaptiveBackButton(),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                s.timesheetTitle,
-                style: const TextStyle(
-                  color: _kInk,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-              Text(
-                '${s.monthName(_month)} $_year',
-                style: const TextStyle(
-                  color: AppColors.brandRed,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                  height: 1.2,
-                ),
-              ),
-            ],
-          ),
-          centerTitle: false,
-          backgroundColor: bg,
-          foregroundColor: _kInk,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-          actions: [_buildMonthMenu(s)],
-        ),
-        body: AppRefresh(onRefresh: _load, child: _buildBody(s)),
+    return FadingHeaderScaffold(
+      title: s.timesheetTitle,
+      subtitle: '${s.monthName(_month)} $_year',
+      background: bg,
+      // Month picker: the native calendar menu, left in the title row.
+      trailing: [_buildMonthMenu(s)],
+      body: (context, topInset) => AppRefresh(
+        topOffset: topInset,
+        onRefresh: _load,
+        child: _buildBody(s, topInset),
       ),
     );
   }
 
-  Widget _buildBody(S s) {
+  Widget _buildBody(S s, double topInset) {
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      padding: EdgeInsets.fromLTRB(16, topInset + 8, 16, 32),
       children: [
         if (_error != null)
           _buildError()

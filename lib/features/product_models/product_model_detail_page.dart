@@ -10,7 +10,7 @@ import 'package:uztexpro_payment/main.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/adaptive_back_button.dart';
+import '../../core/widgets/fading_header_scaffold.dart';
 import 'product_photo.dart';
 
 const _kDetailPath = 'sewing/product-model-list';
@@ -223,55 +223,37 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        backgroundColor: isDark
-            ? const Color(0xFF121212)
-            : AppColors.groupedBackground,
-        appBar: AppBar(
-          leadingWidth: kBackButtonLeadingWidth,
-          leading: const AdaptiveBackButton(),
-          title: Text(
-            _model?['vendor_code']?.toString() ??
-                S.of(context).productModelDetailTitle,
-            style: const TextStyle(
-              color: Color(0xFF1C1C1E),
-              fontWeight: FontWeight.bold,
-              fontSize: 17,
-            ),
+    final bg = isDark ? const Color(0xFF121212) : AppColors.groupedBackground;
+    final showBar = !_isLoading && _error == null && widget.canConfirm;
+    final clear = showBar ? FloatingBottomBar.clearance(context) : 0.0;
+
+    return FadingHeaderScaffold(
+      title:
+          _model?['vendor_code']?.toString() ??
+          S.of(context).productModelDetailTitle,
+      background: bg,
+      body: (context, topInset) => Stack(
+        children: [
+          Positioned.fill(
+            child: _isLoading
+                ? _buildShimmer(isDark, topInset)
+                : _error != null
+                ? _buildError(isDark, topInset)
+                : _buildContent(isDark, topInset, clear),
           ),
-          centerTitle: false,
-          backgroundColor: isDark
-              ? const Color(0xFF121212)
-              : AppColors.groupedBackground,
-          foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-        ),
-        bottomNavigationBar:
-            (!_isLoading && _error == null && widget.canConfirm)
-            ? _buildBottomBar(isDark)
-            : null,
-        body: _isLoading
-            ? _buildShimmer(isDark)
-            : _error != null
-            ? _buildError(isDark)
-            : _buildContent(isDark),
+          if (showBar)
+            FloatingBottomBar(background: bg, child: _buildBottomBar(isDark)),
+        ],
       ),
     );
   }
 
-  Widget _buildShimmer(bool isDark) {
+  Widget _buildShimmer(bool isDark, double topInset) {
     final base = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
     final hi = isDark ? Colors.grey.shade700 : Colors.grey.shade100;
     return Column(
       children: [
+        SizedBox(height: topInset),
         Container(
           height: 150,
           color: isDark ? const Color(0xFF121212) : AppColors.groupedBackground,
@@ -311,10 +293,10 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
     );
   }
 
-  Widget _buildError(bool isDark) {
+  Widget _buildError(bool isDark, double topInset) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: EdgeInsets.fromLTRB(32, 32 + topInset, 32, 32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -374,7 +356,7 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
     );
   }
 
-  Widget _buildContent(bool isDark) {
+  Widget _buildContent(bool isDark, double topInset, double bottomClear) {
     final s = S.of(context);
     final model = _model!;
     final onSurface = Theme.of(context).colorScheme.onSurface;
@@ -388,9 +370,12 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
     return SingleChildScrollView(
       child: Column(
         children: [
+          SizedBox(height: topInset),
           // ── Status header ───────────────────────────────────────────────
           Container(
-            color: isDark ? const Color(0xFF121212) : AppColors.groupedBackground,
+            color: isDark
+                ? const Color(0xFF121212)
+                : AppColors.groupedBackground,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 22),
               child: Column(
@@ -472,7 +457,7 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
 
           // ── Cards area ────────────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 28),
+            padding: EdgeInsets.fromLTRB(14, 14, 14, 28 + bottomClear),
             child: Column(
               children: [
                 _InfoCard(model: model, isDark: isDark, onSurface: onSurface),
@@ -514,10 +499,6 @@ class _ProductModelDetailPageState extends State<ProductModelDetailPage> {
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        color: isDark
-            ? const Color(0xFF121212)
-            : AppColors.groupedBackground,
         child: _busy
             ? const Center(
                 child: SizedBox(

@@ -11,10 +11,8 @@ import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/adaptive_back_button.dart';
 import '../../core/widgets/app_refresh.dart';
-import '../../core/widgets/app_segmented_control.dart';
-import '../../core/widgets/search_toggle.dart';
+import '../../core/widgets/fading_header_scaffold.dart';
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -1120,11 +1118,11 @@ class _MainPageScreenState extends State<MainPageScreen>
 
   // ── Shimmer ───────────────────────────────────────────────────────────────────
 
-  Widget _shimmer(bool isDark) {
+  Widget _shimmer(bool isDark, double topInset) {
     final base = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
     final hi = isDark ? Colors.grey.shade700 : Colors.grey.shade100;
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 32),
+      padding: EdgeInsets.fromLTRB(12, topInset + 4, 12, 32),
       itemCount: 6,
       itemBuilder: (_, __) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -1254,121 +1252,92 @@ class _MainPageScreenState extends State<MainPageScreen>
     final surface = Theme.of(context).colorScheme.surface;
     final listBg = isDark ? surface : AppColors.groupedBackground;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        appBar: AppBar(
-          leadingWidth: kBackButtonLeadingWidth,
-          leading: const AdaptiveBackButton(),
-          title: Text(
-            s.paymentAgreements,
-            style: const TextStyle(
-              color: Color(0xFF1C1C1E),
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
-          ),
-          centerTitle: false,
-          backgroundColor: listBg,
-          foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-          actions: [
-            if (!isLoading)
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Center(
-                  child: _PayCountBadge(
-                    shown: _filteredReports.length,
-                    total: paymentReports.length,
-                  ),
-                ),
+    // Status filter: a menu button next to search. Users without approval
+    // groups get an empty status list from the backend (payment-raport-status),
+    // so the filters are built from the reports themselves then.
+    final allStatuses = statuses.isNotEmpty ? statuses : _statusesFromReports();
+    final usedIds = paymentReports.map<int>((r) => r['status'] as int).toSet();
+    final activeStatuses = allStatuses
+        .where((st) => usedIds.contains(st['id'] as int))
+        .toList();
+    final filterIds = <int?>[
+      null,
+      for (final st in activeStatuses) st['id'] as int,
+    ];
+
+    return Scaffold(
+      backgroundColor: listBg,
+      floatingActionButton: _showBackToTopButton
+          ? AdaptiveFloatingActionButton(
+              onPressed: () => _scrollController.animateTo(
+                0,
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeInOut,
               ),
-            SearchToggleButton(active: _searching, onPressed: _toggleSearch),
-          ],
-        ),
-        body: Column(
-          children: [
-            // ── Search bar ──────────────────────────────────────────────────
-            AnimatedSearchSlot(
-              open: _searching,
-              child: Container(
-                color: isDark
-                    ? Theme.of(context).colorScheme.surface
-                    : AppColors.groupedBackground,
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-                child: _PaySearchBar(
-                  controller: _searchController,
-                  hint: s.paymentSearchHint,
-                  isDark: isDark,
-                ),
+              backgroundColor: Colors.white,
+              foregroundColor: _gradientStart,
+              mini: true,
+              elevation: 6,
+              child: const Icon(Icons.arrow_upward),
+            )
+          : null,
+      body: FadingHeaderScaffold(
+        title: s.paymentAgreements,
+        background: listBg,
+        trailing: [
+          if (!isLoading)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: _PayCountBadge(
+                shown: _filteredReports.length,
+                total: paymentReports.length,
               ),
             ),
-            // ── Status filter ───────────────────────────────────────────────
-            Container(
-              color: listBg,
-              padding: const EdgeInsets.only(top: 6, bottom: 8),
-              child: _PayFilterRow(
-                // Пользователям без групп утверждения бэкенд отдаёт пустой
-                // список статусов (payment-raport-status) — тогда фильтры
-                // строим из самих заявок (status + status_name).
-                statuses: statuses.isNotEmpty
-                    ? statuses
-                    : _statusesFromReports(),
-                usedIds: paymentReports
-                    .map<int>((r) => r['status'] as int)
-                    .toSet(),
-                selected: _selectedStatusFilterId,
-                isDark: isDark,
-                allLabel: s.filterAll,
-                onSelect: (id) => setState(
-                  () => _selectedStatusFilterId = _selectedStatusFilterId == id
-                      ? null
-                      : id,
-                ),
-              ),
-            ),
-            // ── List ────────────────────────────────────────────────────────
-            Expanded(
-              child: Container(color: listBg, child: _buildBody(isDark, s)),
-            ),
-          ],
-        ),
-        floatingActionButton: _showBackToTopButton
-            ? AdaptiveFloatingActionButton(
-                onPressed: () => _scrollController.animateTo(
-                  0,
-                  duration: const Duration(milliseconds: 500),
-                  curve: Curves.easeInOut,
-                ),
-                backgroundColor: Colors.white,
-                foregroundColor: _gradientStart,
-                mini: true,
-                elevation: 6,
-                child: const Icon(Icons.arrow_upward),
-              )
-            : null,
+        ],
+        searching: _searching,
+        onToggleSearch: _toggleSearch,
+        searchController: _searchController,
+        searchHint: s.paymentSearchHint,
+        filterLabels: activeStatuses.isEmpty
+            ? null
+            : [
+                s.filterAll,
+                for (final st in activeStatuses) st['name'] as String,
+              ],
+        filterSelected: filterIds
+            .indexOf(_selectedStatusFilterId)
+            .clamp(0, filterIds.length - 1),
+        filterActive: _selectedStatusFilterId != null,
+        onFilterSelected: (i) =>
+            setState(() => _selectedStatusFilterId = filterIds[i]),
+        body: (context, topInset) => _buildBody(isDark, s, topInset),
       ),
     );
   }
 
-  Widget _buildBody(bool isDark, S s) {
-    if (isLoading) return _shimmer(isDark);
-    if (paymentReports.isEmpty) return _emptyState(s, isDark);
-    if (_filteredReports.isEmpty) return _noResultsState(s, isDark);
+  Widget _buildBody(bool isDark, S s, double topInset) {
+    if (isLoading) return _shimmer(isDark, topInset);
+    if (paymentReports.isEmpty) {
+      return Padding(
+        padding: EdgeInsets.only(top: topInset),
+        child: _emptyState(s, isDark),
+      );
+    }
+    if (_filteredReports.isEmpty) {
+      return Padding(
+        padding: EdgeInsets.only(top: topInset),
+        child: _noResultsState(s, isDark),
+      );
+    }
 
     return AppRefresh(
+      topOffset: topInset,
       onRefresh: _refreshData,
       child: FadeTransition(
         opacity: _animation,
         child: ListView.builder(
           controller: _scrollController,
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 32),
+          padding: EdgeInsets.fromLTRB(12, topInset + 4, 12, 32),
           itemCount: _filteredReports.length,
           itemBuilder: (_, i) {
             final report = _filteredReports[i];
@@ -1697,119 +1666,7 @@ class _PayCard extends StatelessWidget {
 
 // ─── Search bar ───────────────────────────────────────────────────────────────
 
-class _PaySearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  final bool isDark;
-
-  const _PaySearchBar({
-    required this.controller,
-    required this.hint,
-    required this.isDark,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    return Container(
-      height: 46,
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.07) : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDark ? Colors.white12 : Colors.grey.shade200,
-        ),
-        boxShadow: isDark
-            ? []
-            : [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-      ),
-      child: TextField(
-        autofocus: true,
-        controller: controller,
-        style: TextStyle(color: onSurface, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: '$hint...',
-          hintStyle: TextStyle(
-            color: onSurface.withOpacity(0.38),
-            fontSize: 14,
-          ),
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            color: onSurface.withOpacity(0.38),
-            size: 20,
-          ),
-          suffixIcon: ValueListenableBuilder<TextEditingValue>(
-            valueListenable: controller,
-            builder: (_, v, __) => v.text.isEmpty
-                ? const SizedBox.shrink()
-                : IconButton(
-                    icon: Icon(
-                      Icons.clear_rounded,
-                      size: 18,
-                      color: onSurface.withOpacity(0.4),
-                    ),
-                    onPressed: controller.clear,
-                  ),
-          ),
-          // Without this the TextField inherits `filled: true` +
-          // `fillColor` from the app's global InputDecorationTheme and
-          // paints its own sharp-cornered fill rectangle on top of this
-          // widget's already-rounded outer Container — that mismatched
-          // rectangle is exactly the "sharp corners" poking out at the
-          // edges of an otherwise rounded search bar.
-          filled: false,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 14),
-        ),
-      ),
-    );
-  }
-}
-
 // ─── Status filter chips ──────────────────────────────────────────────────────
-
-class _PayFilterRow extends StatelessWidget {
-  final List<dynamic> statuses;
-  final Set<int> usedIds;
-  final int? selected;
-  final bool isDark;
-  final String allLabel;
-  final ValueChanged<int?> onSelect;
-
-  const _PayFilterRow({
-    required this.statuses,
-    required this.usedIds,
-    required this.selected,
-    required this.isDark,
-    required this.allLabel,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (statuses.isEmpty) return const SizedBox.shrink();
-    final active = statuses
-        .where((st) => usedIds.contains(st['id'] as int))
-        .toList();
-    if (active.isEmpty) return const SizedBox.shrink();
-
-    final labels = [allLabel, for (final st in active) st['name'] as String];
-    final ids = <int?>[null, for (final st in active) st['id'] as int];
-    final index = ids.indexOf(selected).clamp(0, ids.length - 1);
-
-    return AppSegmentedControl(
-      labels: labels,
-      selectedIndex: index,
-      onChanged: (i) => onSelect(ids[i]),
-    );
-  }
-}
 
 // ─── Count badge ──────────────────────────────────────────────────────────────
 

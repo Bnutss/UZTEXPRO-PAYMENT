@@ -9,7 +9,6 @@ import '../../core/storage/app_storage.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/confirm_dialog.dart';
 import '../../core/widgets/fade_route.dart';
 import 'face_id_tile.dart';
 import 'privacy_policy_page.dart';
@@ -175,11 +174,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           Expanded(
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
-              children: [
-                _buildSettingsCard(s),
-                const SizedBox(height: 36),
-                _buildVersionInfo(s),
-              ],
+              children: [_buildSettingsCard(s)],
             ),
           ),
         ],
@@ -215,6 +210,8 @@ class _SettingsScreenState extends State<SettingsScreen>
           ],
           const _CardDivider(),
           _buildPrivacySection(s),
+          const _CardDivider(),
+          _buildVersionSection(s),
         ],
       ),
     );
@@ -505,7 +502,6 @@ class _SettingsScreenState extends State<SettingsScreen>
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
         onTap: () {
           HapticFeedback.selectionClick();
           Navigator.push(
@@ -562,136 +558,55 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  static const TextStyle _versionTextStyle = TextStyle(
-    color: Color(0xFF8A8A8E),
-    fontSize: 12,
-    decoration: TextDecoration.none,
-  );
-
-  Widget _buildVersionInfo(S s) {
-    final label = s.appVersionLabel(_version);
-    if (!Platform.isIOS) return _buildAndroidVersionInfo(label, s);
-    // The real native iOS 26 button (no minSize) has no way to report its
-    // UIKit-rendered content size back to Flutter's layout, so inside a
-    // Center it just expands to the full available width instead of
-    // hugging the icon+label like the old Flutter-drawn fallback did.
-    // Measure the label ourselves and pass that as an explicit width.
-    final textPainter = TextPainter(
-      text: TextSpan(text: label, style: _versionTextStyle),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    const iconWidth = 14.0;
-    const iconGap = 7.0;
-    const horizontalPadding = 18.0 * 2;
-    final width = iconWidth + iconGap + textPainter.width + horizontalPadding;
-
-    return Center(
-      child: AdaptiveButton.child(
-        onPressed: () => _showAboutDialog(s),
-        style: AdaptiveButtonStyle.glass,
-        size: AdaptiveButtonSize.small,
-        color: const Color(0xFF1C1C1E),
-        borderRadius: BorderRadius.circular(30),
-        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 18),
-        minSize: Size(width, 0),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.info_outline,
-              size: iconWidth,
-              color: Color(0xFF8A8A8E),
-            ),
-            const SizedBox(width: iconGap),
-            Text(label, style: _versionTextStyle),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Android: белая «таблетка» в стиле карточек приложения с логотипом
-  /// и номером версии, по нажатию открывается окно «О приложении».
-  Widget _buildAndroidVersionInfo(String label, S s) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    return Center(
-      child: Material(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(30),
-        elevation: 0,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(30),
-          onTap: () => _showAboutDialog(s),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(8, 8, 18, 8),
+  /// App version as the last row of the settings card. Plain information:
+  /// nothing opens on tap, so no dialog route / overlay is involved and the
+  /// native tab bar and toolbar never disappear.
+  Widget _buildVersionSection(S s) {
+    final year = DateTime.now().year;
+    final copyright = year > 2026 ? '© 2026–$year UztexPro' : '© 2026 UztexPro';
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            width: _tile,
+            height: _tile,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: onSurface.withOpacity(0.08)),
+              color: _gradientStart.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+            child: const Icon(
+              Icons.info_outline_rounded,
+              color: _gradientStart,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
-                    'assets/icon/logo.png',
-                    width: 26,
-                    height: 26,
-                    fit: BoxFit.cover,
+                Text(
+                  s.appVersionLabel(_version),
+                  style: const TextStyle(
+                    color: Color(0xFF1C1C1E),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(height: 3),
                 Text(
-                  label,
-                  style: TextStyle(
-                    color: onSurface.withOpacity(0.6),
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
+                  copyright,
+                  style: const TextStyle(
+                    color: Color(0xFF8A8A8E),
+                    fontSize: 12,
                   ),
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
-    );
-  }
-
-  // Native AdaptiveAlertDialog instead of a hand-rolled dark glass card: now
-  // that the app is a standard light theme there's no bespoke look left to
-  // preserve, and the native alert gets correct light/dark text for free.
-  void _showAboutDialog(S s) {
-    final copyright = DateTime.now().year > 2026
-        ? '© 2026–${DateTime.now().year} UztexPro.'
-        : '© 2026 UztexPro.';
-
-    if (!Platform.isIOS) {
-      showInfoDialog(
-        context,
-        title: s.versionLabel(_version),
-        message: '$copyright\n${s.allRightsReserved}',
-        closeLabel: s.close,
-      );
-      return;
-    }
-
-    AdaptiveAlertDialog.show(
-      context: context,
-      title: s.versionLabel(_version),
-      message: '$copyright\n${s.allRightsReserved}',
-      icon: PlatformInfo.isIOS26OrHigher()
-          ? 'info.circle.fill'
-          : Icons.info_outline_rounded,
-      iconColor: AppColors.brandOrange,
-      actions: [
-        AlertAction(
-          title: s.close,
-          // `primary` makes the native iOS 26 alert force systemBlue as its
-          // tint; a default action keeps the app's orange tint.
-          style: AlertActionStyle.defaultAction,
-          onPressed: () {},
-        ),
-      ],
     );
   }
 }

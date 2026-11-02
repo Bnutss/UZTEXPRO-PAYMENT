@@ -10,8 +10,8 @@ import 'package:uztexpro_payment/main.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/adaptive_back_button.dart';
 import '../../core/widgets/app_refresh.dart';
+import '../../core/widgets/fading_header_scaffold.dart';
 
 const _kDetailPath = 'texmansys/material-purchase-application';
 
@@ -46,9 +46,9 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
   }
 
   Map<String, String> get _headers => {
-        'Authorization': 'Bearer $_token',
-        'Content-Type': 'application/json',
-      };
+    'Authorization': 'Bearer $_token',
+    'Content-Type': 'application/json',
+  };
 
   @override
   void initState() {
@@ -169,9 +169,11 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
           ? Uri.parse('$API/$_kDetailPath/${widget.appId}/reject/')
           : Uri.parse('$API/$_kDetailPath/${widget.appId}/');
       final resp = await http
-          .patch(uri,
-              headers: _headers,
-              body: json.encode({'signed_details': ids}))
+          .patch(
+            uri,
+            headers: _headers,
+            body: json.encode({'signed_details': ids}),
+          )
           .timeout(const Duration(seconds: 15));
       if (!mounted) return;
       if (resp.statusCode == 200 || resp.statusCode == 201) {
@@ -213,51 +215,38 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
     final hasPending =
         !_isLoading && _error == null && _pendingDetails.isNotEmpty;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        backgroundColor: isDark
-            ? Theme.of(context).colorScheme.surface
-            : AppColors.groupedBackground,
-        appBar: AppBar(
-          leadingWidth: kBackButtonLeadingWidth,
-          leading: const AdaptiveBackButton(),
-          title: Text(
-            '${s.requestNumber}${widget.appId}',
-            style: const TextStyle(
-                color: Color(0xFF1C1C1E),
-                fontWeight: FontWeight.bold,
-                fontSize: 18),
+    final bg = isDark
+        ? Theme.of(context).colorScheme.surface
+        : AppColors.groupedBackground;
+    final clear = hasPending ? FloatingBottomBar.clearance(context) : 0.0;
+
+    return FadingHeaderScaffold(
+      title: '${s.requestNumber}${widget.appId}',
+      background: bg,
+      body: (context, topInset) => Stack(
+        children: [
+          Positioned.fill(
+            child: _isLoading
+                ? _buildShimmer(isDark, topInset)
+                : _error != null
+                ? _buildError(s, isDark, topInset)
+                : _buildContent(s, isDark, topInset, clear),
           ),
-          centerTitle: false,
-          backgroundColor: isDark
-              ? Theme.of(context).colorScheme.surface
-              : AppColors.groupedBackground,
-          foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-        ),
-        bottomNavigationBar: hasPending ? _buildBottomBar(s, isDark) : null,
-        body: _isLoading
-            ? _buildShimmer(isDark)
-            : _error != null
-                ? _buildError(s, isDark)
-                : _buildContent(s, isDark),
+          if (hasPending)
+            FloatingBottomBar(
+              background: bg,
+              child: _buildBottomBar(s, isDark),
+            ),
+        ],
       ),
     );
   }
 
-  Widget _buildShimmer(bool isDark) {
+  Widget _buildShimmer(bool isDark, double topInset) {
     final base = isDark ? Colors.grey.shade800 : Colors.grey.shade300;
-    final highlight =
-        isDark ? Colors.grey.shade700 : Colors.grey.shade100;
+    final highlight = isDark ? Colors.grey.shade700 : Colors.grey.shade100;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: EdgeInsets.fromLTRB(16, topInset + 8, 16, 24),
       children: [
         Shimmer.fromColors(
           baseColor: base,
@@ -265,7 +254,9 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
           child: Container(
             height: 200,
             decoration: BoxDecoration(
-                color: base, borderRadius: BorderRadius.circular(16)),
+              color: base,
+              borderRadius: BorderRadius.circular(16),
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -279,8 +270,9 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
               child: Container(
                 height: 88,
                 decoration: BoxDecoration(
-                    color: base,
-                    borderRadius: BorderRadius.circular(14)),
+                  color: base,
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
             ),
           ),
@@ -289,24 +281,27 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
     );
   }
 
-  Widget _buildError(S s, bool isDark) {
+  Widget _buildError(S s, bool isDark, double topInset) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: EdgeInsets.fromLTRB(32, 32 + topInset, 32, 32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.wifi_off_rounded,
-                size: 56,
-                color: isDark ? Colors.white54 : Colors.grey.shade400),
+            Icon(
+              Icons.wifi_off_rounded,
+              size: 56,
+              color: isDark ? Colors.white54 : Colors.grey.shade400,
+            ),
             const SizedBox(height: 16),
-            Text(_error!,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: isDark
-                        ? Colors.white70
-                        : Colors.grey.shade600,
-                    fontSize: 14)),
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.grey.shade600,
+                fontSize: 14,
+              ),
+            ),
             const SizedBox(height: 20),
             // minSize is required: the real native iOS 26 button has no way
             // to report its content size back to Flutter's layout.
@@ -328,7 +323,10 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
                       color: Colors.white,
                     ),
                     const SizedBox(width: 8),
-                    Text(s.refresh, style: const TextStyle(color: Colors.white)),
+                    Text(
+                      s.refresh,
+                      style: const TextStyle(color: Colors.white),
+                    ),
                   ],
                 ),
               ),
@@ -339,11 +337,12 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
     );
   }
 
-  Widget _buildContent(S s, bool isDark) {
+  Widget _buildContent(S s, bool isDark, double topInset, double bottomClear) {
     final data = _data!;
     final details = data['details'] as List? ?? [];
-    final pendingCount =
-        details.where((d) => d['status'] == 0 || d['status'] == 1).length;
+    final pendingCount = details
+        .where((d) => d['status'] == 0 || d['status'] == 1)
+        .length;
 
     final factory = data['factory_name']?.toString() ?? '—';
     final warehouse = data['warehouse_name']?.toString() ?? '—';
@@ -356,167 +355,170 @@ class _SignRequestDetailPageState extends State<SignRequestDetailPage> {
     final onSurface = theme.colorScheme.onSurface;
 
     return AppRefresh(
+      topOffset: topInset,
       onRefresh: _load,
       child: ListView(
-      physics: const BouncingScrollPhysics(
-        parent: AlwaysScrollableScrollPhysics(),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      children: [
-        _SectionCard(
-          icon: Icons.assignment_rounded,
-          iconColor: _g1,
-          title: S.of(context).requestInfo,
-          isDark: isDark,
-          child: Column(
-            children: [
-              _InfoRow(
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
+        padding: EdgeInsets.fromLTRB(16, topInset + 8, 16, 24 + bottomClear),
+        children: [
+          _SectionCard(
+            icon: Icons.assignment_rounded,
+            iconColor: _g1,
+            title: S.of(context).requestInfo,
+            isDark: isDark,
+            child: Column(
+              children: [
+                _InfoRow(
                   icon: Icons.person_rounded,
                   iconColor: const Color(0xFF6366F1),
                   label: S.of(context).requestApplicant,
                   value: applicant,
-                  onSurface: onSurface),
-              _divider(onSurface),
-              _InfoRow(
+                  onSurface: onSurface,
+                ),
+                _divider(onSurface),
+                _InfoRow(
                   icon: Icons.account_tree_rounded,
                   iconColor: const Color(0xFF0EA5E9),
                   label: S.of(context).requestDepartment,
                   value: dept,
-                  onSurface: onSurface),
-              _divider(onSurface),
-              _InfoRow(
+                  onSurface: onSurface,
+                ),
+                _divider(onSurface),
+                _InfoRow(
                   icon: Icons.factory_rounded,
                   iconColor: const Color(0xFFF59E0B),
                   label: S.of(context).factoryLabel2,
                   value: factory,
-                  onSurface: onSurface),
-              _divider(onSurface),
-              _InfoRow(
+                  onSurface: onSurface,
+                ),
+                _divider(onSurface),
+                _InfoRow(
                   icon: Icons.warehouse_rounded,
                   iconColor: const Color(0xFF10B981),
                   label: S.of(context).warehouseLabel,
                   value: warehouse,
-                  onSurface: onSurface),
-              _divider(onSurface),
-              _InfoRow(
+                  onSurface: onSurface,
+                ),
+                _divider(onSurface),
+                _InfoRow(
                   icon: Icons.event_rounded,
                   iconColor: const Color(0xFFEC4899),
                   label: S.of(context).arrivalDate,
                   value: arriving,
-                  onSurface: onSurface),
-              if (notes.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.amber.withOpacity(0.12)
-                        : Colors.amber.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
+                  onSurface: onSurface,
+                ),
+                if (notes.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.amber.withOpacity(0.12)
+                          : Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
                         color: isDark
                             ? Colors.amber.withOpacity(0.3)
-                            : Colors.amber.shade200),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.sticky_note_2_outlined,
-                          size: 15, color: Colors.amber.shade700),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          notes,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontStyle: FontStyle.italic,
-                            color: isDark
-                                ? Colors.amber.shade200
-                                : Colors.amber.shade900,
+                            : Colors.amber.shade200,
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.sticky_note_2_outlined,
+                          size: 15,
+                          color: Colors.amber.shade700,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            notes,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontStyle: FontStyle.italic,
+                              color: isDark
+                                  ? Colors.amber.shade200
+                                  : Colors.amber.shade900,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Materials section header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _g1.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.inventory_2_outlined, color: _g1, size: 17),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                s.materials,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.grey.shade800,
+                ),
+              ),
+              const SizedBox(width: 8),
+              _CountBadge(
+                count: details.length,
+                label: S.of(context).positions,
+                color: _g1,
+                isDark: isDark,
+              ),
+              if (pendingCount > 0) ...[
+                const SizedBox(width: 6),
+                _CountBadge(
+                  count: pendingCount,
+                  label: S.of(context).awaitingLabel,
+                  color: Colors.amber.shade700,
+                  isDark: isDark,
                 ),
               ],
             ],
           ),
-        ),
-        const SizedBox(height: 16),
-        // Materials section header
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: _g1.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(Icons.inventory_2_outlined,
-                  color: _g1, size: 17),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              s.materials,
-              style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: isDark
-                      ? Colors.white
-                      : Colors.grey.shade800),
-            ),
-            const SizedBox(width: 8),
-            _CountBadge(
-                count: details.length,
-                label: S.of(context).positions,
-                color: _g1,
-                isDark: isDark),
-            if (pendingCount > 0) ...[
-              const SizedBox(width: 6),
-              _CountBadge(
-                  count: pendingCount,
-                  label: S.of(context).awaitingLabel,
-                  color: Colors.amber.shade700,
-                  isDark: isDark),
-            ],
-          ],
-        ),
-        const SizedBox(height: 10),
-        ...details.asMap().entries.map((e) => _DetailItemCard(
-              item: e.value,
-              index: e.key,
-              isDark: isDark,
-            )),
-        const SizedBox(height: 80),
-      ],
+          const SizedBox(height: 10),
+          ...details.asMap().entries.map(
+            (e) => _DetailItemCard(item: e.value, index: e.key, isDark: isDark),
+          ),
+          const SizedBox(height: 80),
+        ],
       ),
     );
   }
 
-  Widget _divider(Color onSurface) => Divider(
-        height: 16,
-        thickness: 0.5,
-        color: onSurface.withOpacity(0.08),
-      );
+  Widget _divider(Color onSurface) =>
+      Divider(height: 16, thickness: 0.5, color: onSurface.withOpacity(0.08));
 
   Widget _buildBottomBar(S s, bool isDark) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-      color: isDark
-          ? Theme.of(context).colorScheme.surface
-          : AppColors.groupedBackground,
       child: _busy
           ? const Center(
               child: SizedBox(
                 width: 26,
                 height: 26,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor:
-                        AlwaysStoppedAnimation(Color(0xFFFF8C00))),
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation(Color(0xFFFF8C00)),
+                ),
               ),
             )
           : Row(
@@ -576,9 +578,10 @@ class _SectionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.22 : 0.07),
-              blurRadius: 12,
-              offset: const Offset(0, 4)),
+            color: Colors.black.withOpacity(isDark ? 0.22 : 0.07),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
@@ -597,22 +600,23 @@ class _SectionCard extends StatelessWidget {
                   child: Icon(icon, color: iconColor, size: 16),
                 ),
                 const SizedBox(width: 10),
-                Text(title,
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: onSurface)),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: onSurface,
+                  ),
+                ),
               ],
             ),
           ),
           Divider(
-              height: 1,
-              thickness: 0.5,
-              color: onSurface.withOpacity(0.08)),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: child,
+            height: 1,
+            thickness: 0.5,
+            color: onSurface.withOpacity(0.08),
           ),
+          Padding(padding: const EdgeInsets.all(16), child: child),
         ],
       ),
     );
@@ -654,19 +658,25 @@ class _InfoRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: onSurface.withOpacity(0.45),
-                      letterSpacing: 0.2)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: onSurface.withOpacity(0.45),
+                  letterSpacing: 0.2,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text(value,
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: onSurface),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: onSurface,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),
@@ -696,15 +706,15 @@ class _CountBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? color.withOpacity(0.18) : color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: color.withOpacity(isDark ? 0.4 : 0.3)),
+        border: Border.all(color: color.withOpacity(isDark ? 0.4 : 0.3)),
       ),
       child: Text(
         '$count $label',
         style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: isDark ? color.withOpacity(0.9) : color),
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: isDark ? color.withOpacity(0.9) : color,
+        ),
       ),
     );
   }
@@ -771,14 +781,13 @@ class _DetailItemCard extends StatelessWidget {
     final signTime = _fmtDateTime(item['sign_time']?.toString());
     final rejectedTime = _fmtDateTime(item['rejected_time']?.toString());
 
-    final cfg = _statusConfig[status] ??
-        const _StatusCfg(
-            'Ожидает', 0xFFF59E0B, Icons.hourglass_empty_rounded);
+    final cfg =
+        _statusConfig[status] ??
+        const _StatusCfg('Ожидает', 0xFFF59E0B, Icons.hourglass_empty_rounded);
     final statusColor = Color(cfg.colorValue);
-    final statusLabel =
-        item['status_title']?.toString().isNotEmpty == true
-            ? item['status_title'].toString()
-            : cfg.label;
+    final statusLabel = item['status_title']?.toString().isNotEmpty == true
+        ? item['status_title'].toString()
+        : cfg.label;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -788,9 +797,10 @@ class _DetailItemCard extends StatelessWidget {
         border: Border(left: BorderSide(color: statusColor, width: 4)),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.2 : 0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 3)),
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
         ],
       ),
       child: Padding(
@@ -813,9 +823,10 @@ class _DetailItemCard extends StatelessWidget {
                     child: Text(
                       '${index + 1}',
                       style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: _g1),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: _g1,
+                      ),
                     ),
                   ),
                 ),
@@ -824,22 +835,26 @@ class _DetailItemCard extends StatelessWidget {
                   child: Text(
                     materialName,
                     style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: onSurface,
-                        height: 1.3),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: onSurface,
+                      height: 1.3,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 4),
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                        color: statusColor.withOpacity(0.4),
-                        width: 1),
+                      color: statusColor.withOpacity(0.4),
+                      width: 1,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -849,9 +864,10 @@ class _DetailItemCard extends StatelessWidget {
                       Text(
                         statusLabel,
                         style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: statusColor),
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: statusColor,
+                        ),
                       ),
                     ],
                   ),
@@ -862,31 +878,35 @@ class _DetailItemCard extends StatelessWidget {
             // Color badge
             if (colorName.isNotEmpty) ...[
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: isDark
                       ? Colors.purple.withOpacity(0.15)
                       : Colors.purple.shade50,
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                      color: isDark
-                          ? Colors.purple.withOpacity(0.35)
-                          : Colors.purple.shade200),
+                    color: isDark
+                        ? Colors.purple.withOpacity(0.35)
+                        : Colors.purple.shade200,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.palette_outlined,
-                        size: 11, color: Colors.purple.shade600),
+                    Icon(
+                      Icons.palette_outlined,
+                      size: 11,
+                      color: Colors.purple.shade600,
+                    ),
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(
                         colorName,
                         style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.purple.shade700,
-                            fontWeight: FontWeight.w500),
+                          fontSize: 11,
+                          color: Colors.purple.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -898,17 +918,17 @@ class _DetailItemCard extends StatelessWidget {
             ],
             // Amount + cost
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 10, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               decoration: BoxDecoration(
                 color: isDark
                     ? Colors.white.withOpacity(0.05)
                     : const Color(0xFFF8F9FB),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                    color: isDark
-                        ? Colors.white.withOpacity(0.08)
-                        : Colors.grey.shade200),
+                  color: isDark
+                      ? Colors.white.withOpacity(0.08)
+                      : Colors.grey.shade200,
+                ),
               ),
               child: Row(
                 children: [
@@ -918,8 +938,7 @@ class _DetailItemCard extends StatelessWidget {
                       iconColor: const Color(0xFF0EA5E9),
                       label: S.of(context).quantity,
                       value: amount != null
-                          ? '${_fmtNum(amount, allowZero: true)} $unit'
-                              .trim()
+                          ? '${_fmtNum(amount, allowZero: true)} $unit'.trim()
                           : '—',
                       onSurface: onSurface,
                     ),
@@ -930,8 +949,7 @@ class _DetailItemCard extends StatelessWidget {
                     color: isDark
                         ? Colors.white.withOpacity(0.1)
                         : Colors.grey.shade200,
-                    margin:
-                        const EdgeInsets.symmetric(horizontal: 8),
+                    margin: const EdgeInsets.symmetric(horizontal: 8),
                   ),
                   Expanded(
                     child: _DataCell(
@@ -951,22 +969,28 @@ class _DetailItemCard extends StatelessWidget {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 7),
+                  horizontal: 10,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
                   color: isDark
                       ? Colors.amber.withOpacity(0.1)
                       : Colors.amber.shade50,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: isDark
-                          ? Colors.amber.withOpacity(0.25)
-                          : Colors.amber.shade200),
+                    color: isDark
+                        ? Colors.amber.withOpacity(0.25)
+                        : Colors.amber.shade200,
+                  ),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.notes_rounded,
-                        size: 13, color: Colors.amber.shade700),
+                    Icon(
+                      Icons.notes_rounded,
+                      size: 13,
+                      color: Colors.amber.shade700,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -1055,17 +1079,23 @@ class _DataCell extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 10,
-                      color: onSurface.withOpacity(0.45))),
-              Text(value,
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: onSurface),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: onSurface.withOpacity(0.45),
+                ),
+              ),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: onSurface,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),
@@ -1097,8 +1127,7 @@ class _ActionInfo extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? color.withOpacity(0.1) : color.withOpacity(0.06),
         borderRadius: BorderRadius.circular(8),
-        border:
-            Border.all(color: color.withOpacity(isDark ? 0.3 : 0.2)),
+        border: Border.all(color: color.withOpacity(isDark ? 0.3 : 0.2)),
       ),
       child: Row(
         children: [
@@ -1108,17 +1137,19 @@ class _ActionInfo extends StatelessWidget {
             child: Text(
               name,
               style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: color),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
           if (time.isNotEmpty) ...[
             const SizedBox(width: 6),
-            Text(time,
-                style: TextStyle(
-                    fontSize: 10, color: color.withOpacity(0.7))),
+            Text(
+              time,
+              style: TextStyle(fontSize: 10, color: color.withOpacity(0.7)),
+            ),
           ],
         ],
       ),
@@ -1163,7 +1194,10 @@ class _BottomActionBtn extends StatelessWidget {
                 label,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                    color: color, fontSize: 14, fontWeight: FontWeight.bold),
+                  color: color,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],

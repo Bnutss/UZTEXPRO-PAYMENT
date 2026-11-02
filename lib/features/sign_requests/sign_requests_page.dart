@@ -12,10 +12,9 @@ import 'package:uztexpro_payment/main.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/adaptive_back_button.dart';
 import '../../core/widgets/app_refresh.dart';
 import '../../core/widgets/app_segmented_control.dart';
-import '../../core/widgets/search_toggle.dart';
+import '../../core/widgets/fading_header_scaffold.dart';
 import 'sign_request_detail_page.dart';
 
 const _kPath = 'texmansys/material-purchase-application';
@@ -356,127 +355,79 @@ class _SignRequestsPageState extends State<SignRequestsPage>
     final s = S.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        appBar: AppBar(
-          leadingWidth: kBackButtonLeadingWidth,
-          leading: const AdaptiveBackButton(),
-          title: Text(
-            s.signRequestsTitle,
-            style: const TextStyle(
-              color: Color(0xFF1C1C1E),
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
+    final bg = isDark
+        ? Theme.of(context).colorScheme.surface
+        : AppColors.groupedBackground;
+
+    return FadingHeaderScaffold(
+      title: s.signRequestsTitle,
+      background: bg,
+      trailing: [
+        // Refreshing indicator only — refresh itself happens via
+        // pull-to-refresh on the list below.
+        if (_refreshing)
+          const Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation(Color(0xFF8A8A8E)),
+              ),
             ),
           ),
-          centerTitle: false,
-          backgroundColor: isDark
-              ? Theme.of(context).colorScheme.surface
-              : AppColors.groupedBackground,
-          foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-          actions: [
-            // Refreshing indicator only — refresh itself happens via
-            // pull-to-refresh on the list below.
-            if (_refreshing)
-              const Padding(
-                padding: EdgeInsets.only(right: 16),
-                child: Center(
-                  child: SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(Color(0xFF8A8A8E)),
-                    ),
-                  ),
-                ),
+        if (!_isLoading && _error == null)
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _g1.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
               ),
-            if (!_isLoading && _error == null)
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _g1.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${_shown.length}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.brandRed,
-                      ),
-                    ),
-                  ),
+              child: Text(
+                '${_shown.length}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.brandRed,
                 ),
-              ),
-            SearchToggleButton(active: _searching, onPressed: _toggleSearch),
-          ],
-        ),
-        body: Column(
-          children: [
-            // Search bar
-            AnimatedSearchSlot(
-              open: _searching,
-              child: Container(
-                color: isDark
-                    ? Theme.of(context).colorScheme.surface
-                    : AppColors.groupedBackground,
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-                child: _SearchBar(controller: _searchCtrl, isDark: isDark),
               ),
             ),
-            // Filter chips
-            if (!_isLoading && _error == null)
-              Container(
-                color: isDark
-                    ? Theme.of(context).colorScheme.surface
-                    : AppColors.groupedBackground,
-                padding: const EdgeInsets.only(top: 6, bottom: 8),
-                child: _FilterBar(
-                  selected: _statusFilter,
-                  allCount: _all.length,
-                  pendingCount: _pendingCount,
-                  signingCount: _signingCount,
-                  isDark: isDark,
-                  onSelect: _setFilter,
-                ),
+          ),
+      ],
+      searching: _searching,
+      onToggleSearch: _toggleSearch,
+      searchController: _searchCtrl,
+      searchHint: s.searchHintSignRequests,
+      // Native segmented control (36) with its paddings, pinned under the
+      // title row.
+      bottomHeight: (!_isLoading && _error == null) ? 50 : 0,
+      bottom: (!_isLoading && _error == null)
+          ? Padding(
+              padding: const EdgeInsets.only(top: 6, bottom: 8),
+              child: _FilterBar(
+                selected: _statusFilter,
+                allCount: _all.length,
+                pendingCount: _pendingCount,
+                signingCount: _signingCount,
+                isDark: isDark,
+                onSelect: _setFilter,
               ),
-            // List
-            Expanded(
-              child: Container(
-                color: isDark
-                    ? Theme.of(context).colorScheme.surface
-                    : AppColors.groupedBackground,
-                child: _buildBody(s, isDark),
-              ),
-            ),
-          ],
-        ),
-      ),
+            )
+          : null,
+      body: (context, topInset) => _buildBody(s, isDark, topInset),
     );
   }
 
-  Widget _buildBody(S s, bool isDark) {
-    if (_isLoading) return _shimmer(isDark);
+  Widget _buildBody(S s, bool isDark, double topInset) {
+    if (_isLoading) return _shimmer(isDark, topInset);
 
     if (_error != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: EdgeInsets.fromLTRB(32, 32 + topInset, 32, 32),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -532,41 +483,44 @@ class _SignRequestsPageState extends State<SignRequestsPage>
     }
 
     if (_shown.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white12 : Colors.grey.shade100,
-                shape: BoxShape.circle,
+      return Padding(
+        padding: EdgeInsets.only(top: topInset),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white12 : Colors.grey.shade100,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.inbox_rounded,
+                  size: 40,
+                  color: isDark ? Colors.white54 : Colors.grey.shade400,
+                ),
               ),
-              child: Icon(
-                Icons.inbox_rounded,
-                size: 40,
-                color: isDark ? Colors.white54 : Colors.grey.shade400,
+              const SizedBox(height: 16),
+              Text(
+                s.signRequestsEmpty,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.grey.shade700,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              s.signRequestsEmpty,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.grey.shade700,
+              const SizedBox(height: 6),
+              Text(
+                s.signRequestsEmptyDesc,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? Colors.white54 : Colors.grey.shade500,
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              s.signRequestsEmptyDesc,
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? Colors.white54 : Colors.grey.shade500,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
@@ -574,9 +528,10 @@ class _SignRequestsPageState extends State<SignRequestsPage>
     return FadeTransition(
       opacity: _fadeAnim,
       child: AppRefresh(
+        topOffset: topInset,
         onRefresh: () => _load(forceRefresh: true),
         child: ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          padding: EdgeInsets.fromLTRB(16, topInset + 8, 16, 32),
           itemCount: _shown.length,
           itemBuilder: (_, i) => _AppCard(
             app: _shown[i],
@@ -598,11 +553,11 @@ class _SignRequestsPageState extends State<SignRequestsPage>
     );
   }
 
-  Widget _shimmer(bool isDark) {
+  Widget _shimmer(bool isDark, double topInset) {
     final base = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
     final highlight = isDark ? Colors.grey.shade700 : Colors.grey.shade100;
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      padding: EdgeInsets.fromLTRB(16, topInset + 8, 16, 32),
       itemCount: 5,
       itemBuilder: (_, __) => Padding(
         padding: const EdgeInsets.only(bottom: 10),
@@ -616,75 +571,6 @@ class _SignRequestsPageState extends State<SignRequestsPage>
               borderRadius: BorderRadius.circular(14),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Search bar ───────────────────────────────────────────────────────────────
-class _SearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  final bool isDark;
-
-  const _SearchBar({required this.controller, required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    return Container(
-      height: 46,
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.07) : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDark ? Colors.white12 : Colors.grey.shade200,
-        ),
-        boxShadow: isDark
-            ? []
-            : [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-      ),
-      child: TextField(
-        autofocus: true,
-        controller: controller,
-        style: TextStyle(color: onSurface, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: S.of(context).searchHintSignRequests,
-          hintStyle: TextStyle(
-            color: onSurface.withOpacity(0.38),
-            fontSize: 14,
-          ),
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            color: onSurface.withOpacity(0.38),
-            size: 20,
-          ),
-          suffixIcon: ValueListenableBuilder<TextEditingValue>(
-            valueListenable: controller,
-            builder: (_, v, __) => v.text.isEmpty
-                ? const SizedBox.shrink()
-                : IconButton(
-                    icon: Icon(
-                      Icons.clear_rounded,
-                      size: 18,
-                      color: onSurface.withOpacity(0.4),
-                    ),
-                    onPressed: controller.clear,
-                  ),
-          ),
-          // Without this the field inherits filled+fillColor from the
-          // app's global InputDecorationTheme and paints its own
-          // sharp-cornered fill on top of this widget's rounded outer
-          // Container.
-          filled: false,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 14),
         ),
       ),
     );

@@ -12,10 +12,9 @@ import 'package:uztexpro_payment/main.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/adaptive_back_button.dart';
 import '../../core/widgets/app_refresh.dart';
 import '../../core/widgets/app_segmented_control.dart';
-import '../../core/widgets/search_toggle.dart';
+import '../../core/widgets/fading_header_scaffold.dart';
 import 'pass_detail_page.dart';
 
 const _kPassPath = 'common/pass';
@@ -560,103 +559,64 @@ class _PassesPageState extends State<PassesPage>
     final s = S.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        appBar: AppBar(
-          leadingWidth: kBackButtonLeadingWidth,
-          leading: const AdaptiveBackButton(),
-          title: Text(
-            s.menuPasses,
-            style: const TextStyle(
-              color: Color(0xFF1C1C1E),
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
+    final bg = isDark
+        ? Theme.of(context).colorScheme.surface
+        : AppColors.groupedBackground;
+
+    return FadingHeaderScaffold(
+      title: s.menuPasses,
+      background: bg,
+      trailing: [
+        if (!_isLoading && _error == null)
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: _CountBadge(count: _shown.length),
           ),
-          centerTitle: false,
-          backgroundColor: isDark
-              ? Theme.of(context).colorScheme.surface
-              : AppColors.groupedBackground,
-          foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-          actions: [
-            if (!_isLoading && _error == null)
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Center(child: _CountBadge(count: _shown.length)),
-              ),
-            SearchToggleButton(active: _searching, onPressed: _toggleSearch),
-          ],
-        ),
-        body: Column(
-          children: [
-            Container(
-              color: isDark
-                  ? Theme.of(context).colorScheme.surface
-                  : AppColors.groupedBackground,
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-              child: _ViewToggle(selected: _viewMode, onChanged: _switchView),
-            ),
-            AnimatedSearchSlot(
-              open: _searching,
-              child: Container(
-                color: isDark
-                    ? Theme.of(context).colorScheme.surface
-                    : AppColors.groupedBackground,
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-                child: _SearchBar(
-                  controller: _searchCtrl,
-                  hintText: s.passSearchHint,
-                  isDark: isDark,
-                ),
-              ),
-            ),
-            Container(
-              color: isDark
-                  ? Theme.of(context).colorScheme.surface
-                  : AppColors.groupedBackground,
-              padding: const EdgeInsets.only(top: 6, bottom: 8),
-              child: _StatusFilterRow(
-                selected: _statusFilter,
-                isDark: isDark,
-                allLabel: s.filterAll,
-                onSelect: (code) {
-                  setState(
-                    () => _statusFilter = _statusFilter == code ? null : code,
-                  );
-                  _filter();
-                },
-              ),
-            ),
-            Expanded(
-              child: Container(
-                color: isDark
-                    ? Theme.of(context).colorScheme.surface
-                    : AppColors.groupedBackground,
-                child: _buildBody(isDark),
-              ),
-            ),
-          ],
-        ),
-      ),
+      ],
+      searching: _searching,
+      onToggleSearch: _toggleSearch,
+      searchController: _searchCtrl,
+      searchHint: '${s.passSearchHint}...',
+      filterLabels: [
+        s.filterAll,
+        for (final code in _statusCodes.skip(1)) passStatusConfig(code!).short,
+      ],
+      filterSelected: _statusCodes.indexOf(_statusFilter).clamp(0, 6),
+      filterActive: _statusFilter != null,
+      onFilterSelected: (i) {
+        setState(() => _statusFilter = _statusCodes[i]);
+        _filter();
+      },
+      // View toggle (36) with its paddings.
+      bottomHeight: 46,
+      bottom: _filters(isDark),
+      body: (context, topInset) => _buildBody(isDark, topInset),
     );
   }
 
-  Widget _buildBody(bool isDark) {
+  static const _statusCodes = <int?>[null, 0, 1, 2, 3, 4, -1];
+
+  /// View toggle, pinned under the title row. The status filter lives in a
+  /// menu button next to search.
+  Widget _filters(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+      child: _ViewToggle(selected: _viewMode, onChanged: _switchView),
+    );
+  }
+
+  Widget _buildBody(bool isDark, double topInset) {
+    if (_isLoading) return _shimmer(isDark, topInset);
+    return _stateOrList(isDark, topInset);
+  }
+
+  Widget _stateOrList(bool isDark, double topInset) {
     final s = S.of(context);
-    if (_isLoading) return _shimmer(isDark);
 
     if (_error != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: EdgeInsets.fromLTRB(32, 32 + topInset, 32, 32),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -772,9 +732,10 @@ class _PassesPageState extends State<PassesPage>
     return FadeTransition(
       opacity: _fadeAnim,
       child: AppRefresh(
+        topOffset: topInset,
         onRefresh: () async => _invalidateAndLoad(),
         child: ListView.builder(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 32),
+          padding: EdgeInsets.fromLTRB(12, topInset + 4, 12, 32),
           itemCount: _shown.length,
           itemBuilder: (_, i) {
             final pass = _shown[i];
@@ -814,11 +775,11 @@ class _PassesPageState extends State<PassesPage>
     );
   }
 
-  Widget _shimmer(bool isDark) {
+  Widget _shimmer(bool isDark, double topInset) {
     final base = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
     final hi = isDark ? Colors.grey.shade700 : Colors.grey.shade100;
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 32),
+      padding: EdgeInsets.fromLTRB(12, topInset + 4, 12, 32),
       itemCount: 5,
       itemBuilder: (_, __) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -1364,108 +1325,7 @@ class _ViewToggle extends StatelessWidget {
   }
 }
 
-// ─── Status filter chips ──────────────────────────────────────────────────────
-
-class _StatusFilterRow extends StatelessWidget {
-  final int? selected;
-  final bool isDark;
-  final String allLabel;
-  final ValueChanged<int?> onSelect;
-  const _StatusFilterRow({
-    required this.selected,
-    required this.isDark,
-    required this.allLabel,
-    required this.onSelect,
-  });
-
-  static const _codes = <int?>[null, 0, 1, 2, 3, 4, -1];
-
-  @override
-  Widget build(BuildContext context) {
-    return AppSegmentedControl(
-      labels: [
-        allLabel,
-        for (final code in _codes.skip(1)) passStatusConfig(code!).short,
-      ],
-      selectedIndex: _codes.indexOf(selected).clamp(0, _codes.length - 1),
-      onChanged: (i) => onSelect(_codes[i]),
-    );
-  }
-}
-
 // ─── Micro widgets ────────────────────────────────────────────────────────────
-
-class _SearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  final String hintText;
-  final bool isDark;
-  const _SearchBar({
-    required this.controller,
-    required this.hintText,
-    required this.isDark,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    return Container(
-      height: 46,
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.07) : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDark ? Colors.white12 : Colors.grey.shade200,
-        ),
-        boxShadow: isDark
-            ? []
-            : [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-      ),
-      child: TextField(
-        autofocus: true,
-        controller: controller,
-        style: TextStyle(color: onSurface, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: '$hintText...',
-          hintStyle: TextStyle(
-            color: onSurface.withOpacity(0.38),
-            fontSize: 14,
-          ),
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            color: onSurface.withOpacity(0.38),
-            size: 20,
-          ),
-          suffixIcon: ValueListenableBuilder<TextEditingValue>(
-            valueListenable: controller,
-            builder: (_, v, __) => v.text.isEmpty
-                ? const SizedBox.shrink()
-                : IconButton(
-                    icon: Icon(
-                      Icons.clear_rounded,
-                      size: 18,
-                      color: onSurface.withOpacity(0.4),
-                    ),
-                    onPressed: controller.clear,
-                  ),
-          ),
-          // Without this the field inherits filled+fillColor from the
-          // app's global InputDecorationTheme and paints its own
-          // sharp-cornered fill on top of this widget's rounded outer
-          // Container.
-          filled: false,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 14),
-        ),
-      ),
-    );
-  }
-}
 
 class _CountBadge extends StatelessWidget {
   final int count;

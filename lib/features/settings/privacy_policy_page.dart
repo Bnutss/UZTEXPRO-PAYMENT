@@ -5,7 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/adaptive_back_button.dart';
+import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/stagger_in.dart';
 import 'privacy_policy_data.dart';
 
@@ -65,48 +65,24 @@ class _PrivacyPolicyPageState extends State<PrivacyPolicyPage> {
         kPrivacyPolicy['ru']!;
     const bg = AppColors.groupedBackground;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        backgroundColor: bg,
-        appBar: AppBar(
-          leadingWidth: kBackButtonLeadingWidth,
-          leading: const AdaptiveBackButton(),
-          title: Text(
-            s.privacyTitle,
-            style: const TextStyle(
-              color: _kInk,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
+    return FadingHeaderScaffold(
+      title: s.privacyTitle,
+      background: bg,
+      body: (context, topInset) => ListView(
+        padding: EdgeInsets.fromLTRB(16, topInset + 8, 16, 40),
+        children: [
+          StaggerIn(child: _Hero(doc: doc)),
+          const SizedBox(height: 14),
+          for (var i = 0; i < doc.clauses.length; i++) ...[
+            StaggerIn(
+              delay: Duration(milliseconds: 60 + (i < 6 ? i : 6) * 40),
+              child: _ClauseCard(index: i + 1, clause: doc.clauses[i]),
             ),
-          ),
-          centerTitle: false,
-          backgroundColor: bg,
-          foregroundColor: _kInk,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-        ),
-        body: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
-          children: [
-            StaggerIn(child: _Hero(doc: doc)),
-            const SizedBox(height: 14),
-            for (var i = 0; i < doc.clauses.length; i++) ...[
-              StaggerIn(
-                delay: Duration(milliseconds: 60 + (i < 6 ? i : 6) * 40),
-                child: _ClauseCard(index: i + 1, clause: doc.clauses[i]),
-              ),
-              const SizedBox(height: 12),
-            ],
-            const SizedBox(height: 4),
-            _ContactCard(label: doc.contactCta, onTap: _writeUs),
+            const SizedBox(height: 12),
           ],
-        ),
+          const SizedBox(height: 4),
+          _ContactCard(label: doc.contactCta, onTap: _writeUs),
+        ],
       ),
     );
   }

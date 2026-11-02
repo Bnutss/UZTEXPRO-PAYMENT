@@ -12,10 +12,9 @@ import 'package:uztexpro_payment/main.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/adaptive_back_button.dart';
 import '../../core/widgets/app_refresh.dart';
 import '../../core/widgets/app_segmented_control.dart';
-import '../../core/widgets/search_toggle.dart';
+import '../../core/widgets/fading_header_scaffold.dart';
 import 'product_model_detail_page.dart';
 import 'product_photo.dart';
 
@@ -477,29 +476,6 @@ class _ProductModelsPageState extends State<ProductModelsPage>
 
   // ── Filter pickers ───────────────────────────────────────────────────────────
 
-  Future<void> _showFirmPicker() async {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final s = S.of(context);
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _FirmPickerSheet(
-        isDark: isDark,
-        firms: _knownFirms.toList()..sort(),
-        selected: _query,
-        allLabel: s.filterAll,
-        title: s.selectCustomerTitle,
-        searchHint: s.searchCustomerHint,
-        emptyLabel: s.noCustomersFound,
-        onSelect: (firm) {
-          Navigator.pop(context);
-          _selectFirm(firm);
-        },
-      ),
-    );
-  }
-
   void _snack(String msg, bool ok) {
     AdaptiveSnackBar.show(
       context,
@@ -515,122 +491,78 @@ class _ProductModelsPageState extends State<ProductModelsPage>
     final s = S.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        appBar: AppBar(
-          leadingWidth: kBackButtonLeadingWidth,
-          leading: const AdaptiveBackButton(),
-          title: Text(
-            s.productModelsTitle,
-            style: const TextStyle(
-              color: Color(0xFF1C1C1E),
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
+    final bg = isDark
+        ? Theme.of(context).colorScheme.surface
+        : AppColors.groupedBackground;
+    final firmActive = _query.isNotEmpty && _knownFirms.contains(_query);
+    final hasFilters = _knownFirms.isNotEmpty;
+    final firms = _knownFirms.toList()..sort();
+
+    return FadingHeaderScaffold(
+      title: s.productModelsTitle,
+      background: bg,
+      trailing: [
+        // Refreshing indicator only — refresh itself happens via
+        // pull-to-refresh on the list below.
+        if (_refreshing)
+          const Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation(Color(0xFF8A8A8E)),
+              ),
             ),
           ),
-          centerTitle: false,
-          backgroundColor: isDark
-              ? Theme.of(context).colorScheme.surface
-              : AppColors.groupedBackground,
-          foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-          actions: [
-            // Refreshing indicator only — refresh itself happens via
-            // pull-to-refresh on the list below.
-            if (_refreshing)
-              const Padding(
-                padding: EdgeInsets.only(right: 16),
-                child: Center(
-                  child: SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(Color(0xFF8A8A8E)),
-                    ),
-                  ),
-                ),
+        if (!_isLoading && _error == null)
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: _CountBadge(count: _count),
+          ),
+      ],
+      searching: _searching,
+      onToggleSearch: _toggleSearch,
+      searchController: _searchCtrl,
+      searchHint: '${s.productModelSearchHint}...',
+      // Firm filter: a native menu next to search (check on the selected one).
+      filterLabels: hasFilters ? [s.filterAll, ...firms] : null,
+      filterSelected: firmActive ? firms.indexOf(_query) + 1 : 0,
+      filterActive: firmActive,
+      onFilterSelected: (i) => _selectFirm(i == 0 ? '' : firms[i - 1]),
+      // Native "All / Confirmed / Not confirmed" segmented control, pinned
+      // under the title row.
+      bottomHeight: hasFilters ? 46 : 0,
+      bottom: hasFilters
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
+              child: AppSegmentedControl(
+                labels: [s.filterAll, s.confirmedShort, s.notConfirmedShort],
+                selectedIndex: const <bool?>[
+                  null,
+                  true,
+                  false,
+                ].indexOf(_statusFilter),
+                onChanged: (i) =>
+                    _setStatusFilter(const <bool?>[null, true, false][i]),
+                minSegmentWidth: 0,
+                padding: EdgeInsets.zero,
               ),
-            if (!_isLoading && _error == null)
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Center(child: _CountBadge(count: _count)),
-              ),
-            SearchToggleButton(active: _searching, onPressed: _toggleSearch),
-          ],
-        ),
-        body: Column(
-          children: [
-            AnimatedSearchSlot(
-              open: _searching,
-              child: Container(
-                color: isDark
-                    ? Theme.of(context).colorScheme.surface
-                    : AppColors.groupedBackground,
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-                child: _SearchBar(
-                  controller: _searchCtrl,
-                  hintText: s.productModelSearchHint,
-                  isDark: isDark,
-                  autofocus: true,
-                ),
-              ),
-            ),
-            if (_knownFirms.isNotEmpty)
-              Container(
-                color: isDark
-                    ? Theme.of(context).colorScheme.surface
-                    : AppColors.groupedBackground,
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
-                child: Builder(
-                  builder: (_) {
-                    final firmActive =
-                        _query.isNotEmpty && _knownFirms.contains(_query);
-                    return _FilterBar(
-                      isDark: isDark,
-                      firmActive: firmActive,
-                      firmLabel: firmActive ? _query : s.firmLabel,
-                      statusFilter: _statusFilter,
-                      allLabel: s.filterAll,
-                      confirmedLabel: s.confirmedShort,
-                      notConfirmedLabel: s.notConfirmedShort,
-                      showReset: firmActive || _statusFilter != null,
-                      onFirmTap: _showFirmPicker,
-                      onStatusChanged: _setStatusFilter,
-                      onReset: _resetFilters,
-                    );
-                  },
-                ),
-              ),
-            Expanded(
-              child: Container(
-                color: isDark
-                    ? Theme.of(context).colorScheme.surface
-                    : AppColors.groupedBackground,
-                child: _buildBody(isDark),
-              ),
-            ),
-          ],
-        ),
-      ),
+            )
+          : null,
+      body: (context, topInset) => _buildBody(isDark, topInset),
     );
   }
 
-  Widget _buildBody(bool isDark) {
+  Widget _buildBody(bool isDark, double topInset) {
     final s = S.of(context);
-    if (_isLoading) return _shimmer(isDark);
+    if (_isLoading) return _shimmer(isDark, topInset);
 
     if (_error != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: EdgeInsets.fromLTRB(32, 32 + topInset, 32, 32),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -693,57 +625,66 @@ class _ProductModelsPageState extends State<ProductModelsPage>
     }
 
     if (_items.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white10 : Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: isDark
-                    ? []
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.06),
-                          blurRadius: 12,
-                        ),
-                      ],
+      return Padding(
+        padding: EdgeInsets.only(top: topInset),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white10 : Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: isDark
+                      ? []
+                      : [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 12,
+                          ),
+                        ],
+                ),
+                child: Icon(
+                  Icons.checkroom_rounded,
+                  size: 38,
+                  color: isDark ? Colors.white38 : Colors.grey.shade400,
+                ),
               ),
-              child: Icon(
-                Icons.checkroom_rounded,
-                size: 38,
-                color: isDark ? Colors.white38 : Colors.grey.shade400,
+              const SizedBox(height: 16),
+              Text(
+                s.productModelsEmpty,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white70 : Colors.grey.shade700,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              s.productModelsEmpty,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white70 : Colors.grey.shade700,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
 
     final filteredItems = _filteredItems;
     if (filteredItems.isEmpty && !_hasMore) {
-      return _buildFilterEmptyState(isDark);
+      return Padding(
+        padding: EdgeInsets.only(top: topInset),
+        child: _buildFilterEmptyState(isDark),
+      );
     }
     if (filteredItems.isEmpty && _hasMore) {
-      return const Center(
-        child: SizedBox(
-          width: 26,
-          height: 26,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.5,
-            valueColor: AlwaysStoppedAnimation(Color(0xFFFF8C00)),
+      return Padding(
+        padding: EdgeInsets.only(top: topInset),
+        child: const Center(
+          child: SizedBox(
+            width: 26,
+            height: 26,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              valueColor: AlwaysStoppedAnimation(Color(0xFFFF8C00)),
+            ),
           ),
         ),
       );
@@ -752,10 +693,11 @@ class _ProductModelsPageState extends State<ProductModelsPage>
     return FadeTransition(
       opacity: _fadeAnim,
       child: AppRefresh(
+        topOffset: topInset,
         onRefresh: _onRefresh,
         child: ListView.builder(
           controller: _scrollCtrl,
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 32),
+          padding: EdgeInsets.fromLTRB(12, topInset + 4, 12, 32),
           itemCount: filteredItems.length + (_hasMore ? 1 : 0),
           itemBuilder: (_, i) {
             if (i >= filteredItems.length) {
@@ -864,11 +806,11 @@ class _ProductModelsPageState extends State<ProductModelsPage>
     );
   }
 
-  Widget _shimmer(bool isDark) {
+  Widget _shimmer(bool isDark, double topInset) {
     final base = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
     final hi = isDark ? Colors.grey.shade700 : Colors.grey.shade100;
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 32),
+      padding: EdgeInsets.fromLTRB(12, topInset + 4, 12, 32),
       itemCount: 5,
       itemBuilder: (_, __) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -1244,81 +1186,6 @@ class _ActionBtn extends StatelessWidget {
 
 // ─── Search bar ───────────────────────────────────────────────────────────────
 
-class _SearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  final String hintText;
-  final bool isDark;
-  final bool autofocus;
-
-  const _SearchBar({
-    required this.controller,
-    required this.hintText,
-    required this.isDark,
-    this.autofocus = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    return Container(
-      height: 46,
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.07) : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDark ? Colors.white12 : Colors.grey.shade200,
-        ),
-        boxShadow: isDark
-            ? []
-            : [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-      ),
-      child: TextField(
-        autofocus: autofocus,
-        controller: controller,
-        style: TextStyle(color: onSurface, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: '$hintText...',
-          hintStyle: TextStyle(
-            color: onSurface.withOpacity(0.38),
-            fontSize: 14,
-          ),
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            color: onSurface.withOpacity(0.38),
-            size: 20,
-          ),
-          suffixIcon: ValueListenableBuilder<TextEditingValue>(
-            valueListenable: controller,
-            builder: (_, v, __) => v.text.isEmpty
-                ? const SizedBox.shrink()
-                : IconButton(
-                    icon: Icon(
-                      Icons.clear_rounded,
-                      size: 18,
-                      color: onSurface.withOpacity(0.4),
-                    ),
-                    onPressed: controller.clear,
-                  ),
-          ),
-          // Without this the field inherits filled+fillColor from the
-          // app's global InputDecorationTheme and paints its own
-          // sharp-cornered fill on top of this widget's rounded outer
-          // Container.
-          filled: false,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 14),
-        ),
-      ),
-    );
-  }
-}
-
 // ─── Count badge ──────────────────────────────────────────────────────────────
 
 class _CountBadge extends StatelessWidget {
@@ -1348,449 +1215,4 @@ class _CountBadge extends StatelessWidget {
 
 // ─── Filter bar (client / status dropdowns) ────────────────────────────────────
 
-class _FilterBar extends StatelessWidget {
-  final bool isDark;
-  final bool firmActive;
-  final String firmLabel;
-  final bool? statusFilter;
-  final String allLabel;
-  final String confirmedLabel;
-  final String notConfirmedLabel;
-  final bool showReset;
-  final VoidCallback onFirmTap;
-  final ValueChanged<bool?> onStatusChanged;
-  final VoidCallback onReset;
-
-  const _FilterBar({
-    required this.isDark,
-    required this.firmActive,
-    required this.firmLabel,
-    required this.statusFilter,
-    required this.allLabel,
-    required this.confirmedLabel,
-    required this.notConfirmedLabel,
-    required this.showReset,
-    required this.onFirmTap,
-    required this.onStatusChanged,
-    required this.onReset,
-  });
-
-  static const _values = <bool?>[null, true, false];
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        AppSegmentedControl(
-          labels: [allLabel, confirmedLabel, notConfirmedLabel],
-          selectedIndex: _values.indexOf(statusFilter),
-          onChanged: (i) => onStatusChanged(_values[i]),
-          minSegmentWidth: 0,
-          padding: EdgeInsets.zero,
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _FilterPill(
-                icon: Icons.storefront_outlined,
-                label: firmLabel,
-                active: firmActive,
-                isDark: isDark,
-                onTap: onFirmTap,
-              ),
-            ),
-            if (showReset) ...[
-              const SizedBox(width: 8),
-              _ResetFiltersButton(isDark: isDark, onTap: onReset),
-            ],
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _FilterPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool active;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  const _FilterPill({
-    required this.icon,
-    required this.label,
-    required this.active,
-    required this.isDark,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    const color = Color(0xFFFF8C00);
-    const color2 = Color(0xFFCC1500);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            gradient: active
-                ? const LinearGradient(
-                    colors: [color, color2],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : null,
-            color: active
-                ? null
-                : (isDark ? Colors.white.withOpacity(0.07) : Colors.white),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: active
-                  ? Colors.transparent
-                  : (isDark ? Colors.white12 : Colors.grey.shade200),
-            ),
-            boxShadow: active
-                ? [
-                    BoxShadow(
-                      color: color.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : [
-                    if (!isDark)
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                  ],
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: 14,
-                color: active
-                    ? Colors.white
-                    : (isDark ? Colors.white54 : Colors.grey.shade500),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: active
-                        ? Colors.white
-                        : (isDark ? Colors.white70 : Colors.grey.shade700),
-                  ),
-                ),
-              ),
-              Icon(
-                Icons.keyboard_arrow_down_rounded,
-                size: 16,
-                color: active
-                    ? Colors.white
-                    : (isDark ? Colors.white54 : Colors.grey.shade500),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ResetFiltersButton extends StatelessWidget {
-  final bool isDark;
-  final VoidCallback onTap;
-
-  const _ResetFiltersButton({required this.isDark, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: isDark
-                ? Colors.red.shade900.withOpacity(0.25)
-                : Colors.red.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isDark
-                  ? Colors.red.shade300.withOpacity(0.3)
-                  : Colors.red.shade100,
-            ),
-          ),
-          child: Icon(
-            Icons.filter_alt_off_rounded,
-            size: 17,
-            color: isDark ? Colors.red.shade300 : Colors.red.shade400,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 // ─── Filter picker bottom sheets ────────────────────────────────────────────────
-
-class _PickerSheet extends StatelessWidget {
-  final bool isDark;
-  final String title;
-  final Widget? search;
-  final List<Widget> children;
-
-  const _PickerSheet({
-    required this.isDark,
-    required this.title,
-    this.search,
-    required this.children,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
-      ),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white24 : Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.close_rounded,
-                      color: isDark ? Colors.white54 : Colors.grey.shade500,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            if (search != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: search!,
-              ),
-            Flexible(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
-                children: children,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PickerTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final bool isDark;
-  final Color accentColor;
-  final VoidCallback onTap;
-
-  const _PickerTile({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.isDark,
-    this.accentColor = const Color(0xFFFF8C00),
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 6),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            color: selected
-                ? accentColor.withOpacity(isDark ? 0.18 : 0.1)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: selected
-                  ? accentColor.withOpacity(0.4)
-                  : Colors.transparent,
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: selected
-                    ? accentColor
-                    : (isDark ? Colors.white38 : Colors.grey.shade400),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    color: selected
-                        ? accentColor
-                        : (isDark ? Colors.white70 : Colors.grey.shade800),
-                  ),
-                ),
-              ),
-              if (selected)
-                Icon(Icons.check_rounded, size: 18, color: accentColor),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FirmPickerSheet extends StatefulWidget {
-  final bool isDark;
-  final List<String> firms;
-  final String selected;
-  final String allLabel;
-  final String title;
-  final String searchHint;
-  final String emptyLabel;
-  final ValueChanged<String> onSelect;
-
-  const _FirmPickerSheet({
-    required this.isDark,
-    required this.firms,
-    required this.selected,
-    required this.allLabel,
-    required this.title,
-    required this.searchHint,
-    required this.emptyLabel,
-    required this.onSelect,
-  });
-
-  @override
-  State<_FirmPickerSheet> createState() => _FirmPickerSheetState();
-}
-
-class _FirmPickerSheetState extends State<_FirmPickerSheet> {
-  final _ctrl = TextEditingController();
-  String _q = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl.addListener(() => setState(() => _q = _ctrl.text.trim()));
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final filtered = _q.isEmpty
-        ? widget.firms
-        : widget.firms
-              .where((f) => f.toLowerCase().contains(_q.toLowerCase()))
-              .toList();
-    return _PickerSheet(
-      isDark: widget.isDark,
-      title: widget.title,
-      search: _SearchBar(
-        controller: _ctrl,
-        hintText: widget.searchHint,
-        isDark: widget.isDark,
-      ),
-      children: [
-        if (_q.isEmpty)
-          _PickerTile(
-            icon: Icons.apps_rounded,
-            label: widget.allLabel,
-            selected: widget.selected.isEmpty,
-            isDark: widget.isDark,
-            onTap: () => widget.onSelect(''),
-          ),
-        for (final f in filtered)
-          _PickerTile(
-            icon: Icons.storefront_outlined,
-            label: f,
-            selected: widget.selected == f,
-            isDark: widget.isDark,
-            onTap: () => widget.onSelect(f),
-          ),
-        if (filtered.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 30),
-            child: Center(
-              child: Text(
-                widget.emptyLabel,
-                style: TextStyle(
-                  color: widget.isDark ? Colors.white38 : Colors.grey.shade400,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}

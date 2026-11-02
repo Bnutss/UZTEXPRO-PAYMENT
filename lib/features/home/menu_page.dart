@@ -419,6 +419,8 @@ class _MenuPageState extends State<MenuPage>
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
+    // iOS 26+: header lives in the package's native Liquid Glass toolbar.
+    final nativeBar = Platform.isIOS && PlatformInfo.isIOS26OrHigher();
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -428,6 +430,13 @@ class _MenuPageState extends State<MenuPage>
       ),
       child: AdaptiveScaffold(
         minimizeBehavior: TabBarMinimizeBehavior.never,
+        appBar: nativeBar ? _buildNativeAppBar(s) : null,
+        // The shared (fixed) toolbar host blends/dims the bar with every route
+        // transition and, since pages pushed from here register no toolbar of
+        // their own, dimmed it to 45% and then dropped it abruptly (visible
+        // flicker of the title/rates). Draw the bar as part of this page
+        // instead, so it is simply covered by the next page like any content.
+        useFixedToolbar: false,
         body: SafeArea(
           bottom: false,
           child: FadeTransition(
@@ -436,9 +445,13 @@ class _MenuPageState extends State<MenuPage>
               position: _slideAnimation,
               child: Column(
                 children: [
-                  const SizedBox(height: 16),
-                  _buildHeader(s),
-                  const SizedBox(height: 16),
+                  if (nativeBar)
+                    const SizedBox(height: 8)
+                  else ...[
+                    const SizedBox(height: 16),
+                    _buildHeader(s),
+                    const SizedBox(height: 16),
+                  ],
                   Expanded(
                     child: IndexedStack(
                       index: _currentIndex,
@@ -457,20 +470,20 @@ class _MenuPageState extends State<MenuPage>
           ),
         ),
         bottomNavigationBar: AdaptiveBottomNavigationBar(
-          // Labels intentionally empty: icons-only tab bar. adaptive_platform_ui's
-          // AdaptiveNavigationDestination.label is required and doubles as the
-          // native tab's accessibility label, so VoiceOver support is traded
-          // away here too — there's no separate visual/semantic label knob
-          // exposed by the plugin.
-          items: const [
-            AdaptiveNavigationDestination(icon: 'house.fill', label: ''),
+          // Labels double as the native tab's accessibility label, so VoiceOver
+          // reads them too.
+          items: [
+            AdaptiveNavigationDestination(icon: 'house.fill', label: s.navHome),
             AdaptiveNavigationDestination(
               icon: 'checkmark.seal.fill',
-              label: '',
+              label: s.navConfirmations,
             ),
-            AdaptiveNavigationDestination(icon: 'shippingbox.fill', label: ''),
-            AdaptiveNavigationDestination(icon: 'cart.fill', label: ''),
-            AdaptiveNavigationDestination(icon: 'gear', label: ''),
+            AdaptiveNavigationDestination(
+              icon: 'shippingbox.fill',
+              label: s.navProduction,
+            ),
+            AdaptiveNavigationDestination(icon: 'cart.fill', label: s.navShop),
+            AdaptiveNavigationDestination(icon: 'gear', label: s.navSettings),
           ],
           selectedIndex: _currentIndex,
           onTap: _onTabTap,
@@ -520,47 +533,49 @@ class _MenuPageState extends State<MenuPage>
     );
   }
 
-  Widget _buildHeader(S s) {
+  Widget _buildHeaderTitle(S s, CrossAxisAlignment align) {
     final showRates = _ratesLoaded && (_usdRate != null || _rubRate != null);
+    return Column(
+      crossAxisAlignment: align,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          'UztexPro',
+          style: TextStyle(
+            color: Color(0xFF1C1C1E),
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.2,
+          ),
+        ),
+        const SizedBox(height: 2),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 350),
+          child: showRates
+              ? _headerRateStrip(key: const ValueKey('rates'))
+              : Text(
+                  s.paymentSystem,
+                  key: const ValueKey('subtitle'),
+                  style: const TextStyle(
+                    color: Color(0xFF8A8A8E),
+                    fontSize: 11,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeader(S s) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
           const SizedBox(width: 44, height: 44, child: Logo3D()),
           const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'UztexPro',
-                  style: TextStyle(
-                    color: Color(0xFF1C1C1E),
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 350),
-                  child: showRates
-                      ? _headerRateStrip(key: const ValueKey('rates'))
-                      : Text(
-                          s.paymentSystem,
-                          key: const ValueKey('subtitle'),
-                          style: const TextStyle(
-                            color: Color(0xFF8A8A8E),
-                            fontSize: 11,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                ),
-              ],
-            ),
-          ),
+          Expanded(child: _buildHeaderTitle(s, CrossAxisAlignment.start)),
           const SizedBox(width: 10),
           _buildHeaderMenu(s),
         ],
@@ -584,183 +599,84 @@ class _MenuPageState extends State<MenuPage>
     );
   }
 
-  /// One round glass button with a native menu (adaptive_platform_ui). Items
-  /// are built per access: timesheet and logout for everyone, AI assistant
-  /// only with full access.
-  Widget _buildHeaderMenu(S s) {
-    // Android: собственное Material-меню (на iOS остаётся нативное ниже).
-    if (Platform.isAndroid) return _buildAndroidHeaderMenu(s);
-    final native = PlatformInfo.isIOS26OrHigher();
-    dynamic ic(String sf, IconData material) => native ? sf : material;
-
-    final items = <AdaptivePopupMenuItem<String>>[
-      AdaptivePopupMenuItem<String>(
-        label: s.timesheetTitle,
-        icon: ic('calendar', Icons.calendar_month_rounded),
-        value: 'timesheet',
-      ),
-      if (_hasFullAccess)
-        AdaptivePopupMenuItem<String>(
-          label: s.aiAssistantTitle,
-          icon: ic('sparkles', Icons.auto_awesome_rounded),
-          value: 'ai',
+  /// iOS 26+: native Liquid Glass toolbar from adaptive_platform_ui. The three
+  /// actions share one group, so the system draws them in a single glass
+  /// capsule (like the iOS Photos bar). AI is shown only with full access.
+  AdaptiveAppBar _buildNativeAppBar(S s) {
+    return AdaptiveAppBar(
+      useNativeToolbar: true,
+      tintColor: const Color(0xFF1C1C1E),
+      leading: const SizedBox(width: 36, height: 36, child: Logo3D()),
+      // The package centers titleWidget across the whole bar; stretch it and
+      // align left (after the logo, before the actions capsule). IgnorePointer
+      // keeps it from covering the native buttons.
+      titleWidget: IgnorePointer(
+        child: SizedBox(
+          width: double.infinity,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 62,
+              right: _hasFullAccess ? 170 : 125,
+            ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _buildHeaderTitle(s, CrossAxisAlignment.start),
+            ),
+          ),
         ),
-      AdaptivePopupMenuItem<String>(
-        label: s.logOut,
-        icon: ic('rectangle.portrait.and.arrow.right', Icons.logout_rounded),
-        value: 'logout',
       ),
-    ];
-
-    return AdaptivePopupMenuButton.icon<String>(
-      icon: ic('ellipsis', Icons.more_horiz_rounded),
-      size: 46,
-      tint: const Color(0xFF1C1C1E),
-      items: items,
-      onSelected: (index, item) {
-        switch (item.value) {
-          case 'timesheet':
-            _openTimesheet();
-          case 'ai':
-            _openAiAssistant();
-          case 'logout':
+      actions: [
+        AdaptiveAppBarAction(
+          iosSymbol: 'calendar',
+          icon: CupertinoIcons.calendar,
+          label: s.timesheetTitle,
+          onPressed: _openTimesheet,
+        ),
+        if (_hasFullAccess)
+          AdaptiveAppBarAction(
+            iosSymbol: 'sparkles',
+            icon: CupertinoIcons.sparkles,
+            label: s.aiAssistantTitle,
+            onPressed: _openAiAssistant,
+          ),
+        AdaptiveAppBarAction(
+          iosSymbol: 'rectangle.portrait.and.arrow.right',
+          icon: CupertinoIcons.square_arrow_right,
+          label: s.logOut,
+          onPressed: () {
             HapticFeedback.lightImpact();
             _showLogoutDialog();
-        }
-      },
+          },
+        ),
+      ],
     );
   }
 
-  void _onHeaderMenuSelected(String value) {
-    switch (value) {
-      case 'timesheet':
-        _openTimesheet();
-      case 'ai':
-        _openAiAssistant();
-      case 'logout':
-        HapticFeedback.lightImpact();
-        _showLogoutDialog();
-    }
-  }
-
-  /// Android-версия меню «⋯»: круглая кнопка с ripple, карточка со
-  /// скруглением и мягкой тенью, иконки в цветных плашках, «Выйти»
-  /// отделён разделителем и выделен красным. Размер строк ≥ 48dp.
-  Widget _buildAndroidHeaderMenu(S s) {
-    return Theme(
-      data: Theme.of(context).copyWith(
-        splashColor: const Color(0x14000000),
-        highlightColor: const Color(0x0D000000),
+  /// Android / iOS < 26: Material-style capsule with the same three buttons.
+  Widget _buildHeaderMenu(S s) {
+    final actions = <_CapsuleAction>[
+      _CapsuleAction(
+        icon: Icons.calendar_month_rounded,
+        label: s.timesheetTitle,
+        onTap: _openTimesheet,
       ),
-      child: PopupMenuButton<String>(
-        tooltip: '',
-        padding: EdgeInsets.zero,
-        offset: const Offset(0, 54),
-        elevation: 12,
-        color: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.black.withValues(alpha: 0.28),
-        constraints: const BoxConstraints(minWidth: 228),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: Color(0x0F000000)),
+      if (_hasFullAccess)
+        _CapsuleAction(
+          icon: Icons.auto_awesome_rounded,
+          label: s.aiAssistantTitle,
+          onTap: _openAiAssistant,
         ),
-        popUpAnimationStyle: AnimationStyle(
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
-          duration: const Duration(milliseconds: 220),
-          reverseDuration: const Duration(milliseconds: 140),
-        ),
-        onOpened: HapticFeedback.selectionClick,
-        onSelected: _onHeaderMenuSelected,
-        itemBuilder: (_) => [
-          _androidMenuItem(
-            'timesheet',
-            s.timesheetTitle,
-            Icons.calendar_month_rounded,
-            const Color(0xFF1976D2),
-          ),
-          if (_hasFullAccess)
-            _androidMenuItem(
-              'ai',
-              s.aiAssistantTitle,
-              Icons.auto_awesome_rounded,
-              const Color(0xFF7E57C2),
-            ),
-          const PopupMenuDivider(height: 8),
-          _androidMenuItem(
-            'logout',
-            s.logOut,
-            Icons.logout_rounded,
-            const Color(0xFFD32F2F),
-            destructive: true,
-          ),
-        ],
-        child: Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            border: Border.all(color: const Color(0x14000000)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x1A000000),
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.more_horiz_rounded,
-            size: 24,
-            color: Color(0xFF1C1C1E),
-          ),
-        ),
+      _CapsuleAction(
+        icon: Icons.logout_rounded,
+        label: s.logOut,
+        color: const Color(0xFFD32F2F),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          _showLogoutDialog();
+        },
       ),
-    );
-  }
-
-  PopupMenuItem<String> _androidMenuItem(
-    String value,
-    String label,
-    IconData icon,
-    Color accent, {
-    bool destructive = false,
-  }) {
-    return PopupMenuItem<String>(
-      value: value,
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(icon, size: 19, color: accent),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: destructive
-                    ? const Color(0xFFD32F2F)
-                    : const Color(0xFF1C1C1E),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    ];
+    return _HeaderGlassCapsule(actions: actions);
   }
 
   // Compact currency strip that swaps in for the header subtitle once rates
@@ -1973,7 +1889,6 @@ class _NoAccessCard extends StatelessWidget {
   }
 }
 
-
 /// Marks the hero card as tappable: a round chevron button in the corner
 /// that nudges sideways a few times on first show (skipped with
 /// reduced motion), plus a subtle press-scale with haptic feedback.
@@ -2068,6 +1983,74 @@ class _TappableHeroCardState extends State<_TappableHeroCard>
           Icons.chevron_right_rounded,
           size: 22,
           color: _MenuPageState._gradientEnd,
+        ),
+      ),
+    );
+  }
+}
+
+class _CapsuleAction {
+  const _CapsuleAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color = const Color(0xFF1C1C1E),
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color color;
+}
+
+/// Pill-shaped container with a row of icon buttons (non-native fallback).
+class _HeaderGlassCapsule extends StatelessWidget {
+  const _HeaderGlassCapsule({required this.actions});
+
+  final List<_CapsuleAction> actions;
+
+  static const double _height = 46;
+  static const double _buttonWidth = 44;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: actions.length * _buttonWidth + 12,
+      height: _height,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(_height / 2),
+        border: Border.all(color: const Color(0x14000000)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1A000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [for (final a in actions) _button(a)],
+      ),
+    );
+  }
+
+  Widget _button(_CapsuleAction a) {
+    return Semantics(
+      button: true,
+      label: a.label,
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: a.onTap,
+          child: SizedBox(
+            width: _buttonWidth,
+            height: _height,
+            child: Icon(a.icon, size: 22, color: a.color),
+          ),
         ),
       ),
     );

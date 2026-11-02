@@ -14,7 +14,15 @@ class AppRefresh extends StatefulWidget {
   final Future<void> Function() onRefresh;
   final Widget child;
 
-  const AppRefresh({super.key, required this.onRefresh, required this.child});
+  /// Space the spinner keeps clear at the top (e.g. a floating header).
+  final double topOffset;
+
+  const AppRefresh({
+    super.key,
+    required this.onRefresh,
+    required this.child,
+    this.topOffset = 0,
+  });
 
   @override
   State<AppRefresh> createState() => _AppRefreshState();
@@ -84,7 +92,7 @@ class _AppRefreshState extends State<AppRefresh>
   @override
   Widget build(BuildContext context) {
     final progress = _refreshing ? 1.0 : (_pull / _trigger).clamp(0.0, 1.0);
-    final top = -_size + (_size + 14) * progress;
+    final top = widget.topOffset - _size + (_size + 14) * progress;
 
     return Stack(
       clipBehavior: Clip.none,

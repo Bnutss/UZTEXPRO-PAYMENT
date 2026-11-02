@@ -6,12 +6,9 @@ import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/adaptive_back_button.dart';
 import '../../core/widgets/app_refresh.dart';
-import '../../core/widgets/block_search_field.dart';
-import '../../core/widgets/search_toggle.dart';
+import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/app_segmented_control.dart';
-import '../../core/widgets/choice_field.dart';
 import '../../core/widgets/ui_blocks.dart';
 import '../auth/widgets/logo_stroke_loader.dart';
 import 'shop_api.dart';
@@ -20,7 +17,8 @@ enum _RangePreset { today, week, month, custom }
 
 String _pad2(int v) => v.toString().padLeft(2, '0');
 String _formatDate(DateTime d) => '${_pad2(d.day)}.${_pad2(d.month)}.${d.year}';
-String _formatDateTime(DateTime d) => '${_formatDate(d)}, ${_pad2(d.hour)}:${_pad2(d.minute)}';
+String _formatDateTime(DateTime d) =>
+    '${_formatDate(d)}, ${_pad2(d.hour)}:${_pad2(d.minute)}';
 
 /// Management overview of orders handed over across all shops, with a
 /// date-range and per-shop filter and a running total.
@@ -33,8 +31,8 @@ class ShopIssuedReportPage extends StatefulWidget {
   State<ShopIssuedReportPage> createState() => _ShopIssuedReportPageState();
 }
 
-class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with SingleTickerProviderStateMixin {
-
+class _ShopIssuedReportPageState extends State<ShopIssuedReportPage>
+    with SingleTickerProviderStateMixin {
   final NumberFormat _numberFormat = NumberFormat('#,##0', 'ru');
 
   late final AnimationController _animCtrl;
@@ -52,7 +50,9 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
   // Buyer groups start collapsed; keyed by buyerId (-1 = unknown buyer).
   final Set<int> _expandedBuyers = {};
 
-  late final Map<String, String> _imgHeaders = PvzApi.imageHeaders(widget.jwtToken);
+  late final Map<String, String> _imgHeaders = PvzApi.imageHeaders(
+    widget.jwtToken,
+  );
   late DateTime _dateFrom;
   late DateTime _dateTo;
 
@@ -76,7 +76,10 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
   @override
   void initState() {
     super.initState();
-    _animCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
+    _animCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
     final now = DateTime.now();
     _dateFrom = DateTime(now.year, now.month, 1);
@@ -187,7 +190,9 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _CustomRangeSheet(initialRange: DateTimeRange(start: _dateFrom, end: _dateTo)),
+      builder: (_) => _CustomRangeSheet(
+        initialRange: DateTimeRange(start: _dateFrom, end: _dateTo),
+      ),
     );
     if (range == null) {
       setState(() => _segmentsEpoch++);
@@ -221,7 +226,8 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _IssuedOrderDetailSheet(order: order, numberFormat: _numberFormat),
+      builder: (_) =>
+          _IssuedOrderDetailSheet(order: order, numberFormat: _numberFormat),
     );
   }
 
@@ -229,185 +235,213 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
   Widget build(BuildContext context) {
     final s = S.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final listBg = isDark ? Theme.of(context).colorScheme.surface : AppColors.groupedBackground;
+    final listBg = isDark
+        ? Theme.of(context).colorScheme.surface
+        : AppColors.groupedBackground;
     final report = _report;
-    final visible = (report?.sales ?? const <PvzOrder>[]).where((o) {
-      switch (_statusFilter) {
-        case 'issued':
-          return o.isIssued;
-        case 'pending':
-          return !o.isIssued;
-        default:
-          return true;
-      }
-    }).where((o) {
-      final q = _searchCtrl.text.trim().toLowerCase();
-      if (q.isEmpty) return true;
-      final hay = StringBuffer('${o.buyerName} ${o.id}');
-      for (final it in o.items) {
-        hay.write(' ${it.article} ${it.productName} ${it.color}');
-      }
-      return hay.toString().toLowerCase().contains(q);
-    }).toList();
+    final visible = (report?.sales ?? const <PvzOrder>[])
+        .where((o) {
+          switch (_statusFilter) {
+            case 'issued':
+              return o.isIssued;
+            case 'pending':
+              return !o.isIssued;
+            default:
+              return true;
+          }
+        })
+        .where((o) {
+          final q = _searchCtrl.text.trim().toLowerCase();
+          if (q.isEmpty) return true;
+          final hay = StringBuffer('${o.buyerName} ${o.id}');
+          for (final it in o.items) {
+            hay.write(' ${it.article} ${it.productName} ${it.color}');
+          }
+          return hay.toString().toLowerCase().contains(q);
+        })
+        .toList();
     final groups = _groupByBuyer(visible);
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        appBar: AppBar(
-          leadingWidth: kBackButtonLeadingWidth,
-          leading: const AdaptiveBackButton(),
-          title: Text(s.shopIssuedTitle, style: const TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontSize: 18)),
-          centerTitle: false,
-          backgroundColor: isDark ? Theme.of(context).colorScheme.surface : AppColors.groupedBackground,
-          foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-          actions: [SearchToggleButton(active: _searching, onPressed: _toggleSearch)],
-        ),
-        // Filters live in a fixed header and only the list scrolls, same
-        // layout as the passes screen.
-        body: Column(
+    return FadingHeaderScaffold(
+      title: s.shopIssuedTitle,
+      background: listBg,
+      searching: _searching,
+      onToggleSearch: _toggleSearch,
+      searchController: _searchCtrl,
+      searchHint: s.shopIssuedSearchHint,
+      // Shop filter: a native menu next to search (check on the selected one).
+      filterLabels: _shops.isNotEmpty
+          ? [s.shopIssuedAllShops, for (final shop in _shops) shop.name]
+          : null,
+      filterSelected: _shopId == null
+          ? 0
+          : (_shops.indexWhere((shop) => shop.id == _shopId) + 1),
+      filterActive: _shopId != null,
+      onFilterSelected: (i) => _selectShop(i == 0 ? null : _shops[i - 1].id),
+      // Two native segmented controls (period, all / issued / pending),
+      // pinned under the title row.
+      bottomHeight: 92,
+      bottom: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              color: listBg,
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                BlockCard(
+            _buildDateFilterRow(s),
+            const SizedBox(height: 10),
+            AppSegmentedControl(
+              labels: [
+                s.filterAll,
+                s.shopIssuedStatusIssued,
+                s.shopIssuedStatusPending,
+              ],
+              selectedIndex: const [
+                'all',
+                'issued',
+                'pending',
+              ].indexOf(_statusFilter),
+              onChanged: (i) => setState(
+                () => _statusFilter = const ['all', 'issued', 'pending'][i],
+              ),
+              minSegmentWidth: 0,
+              padding: EdgeInsets.zero,
+            ),
+          ],
+        ),
+      ),
+      body: (context, topInset) => AppRefresh(
+        topOffset: topInset,
+        onRefresh: _load,
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(16, topInset + 8, 16, 28),
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Center(
+                child: Text(
+                  '${_formatDate(_dateFrom)} — ${_formatDate(_dateTo)}',
+                  style: const TextStyle(fontSize: 11.5, color: kInkMuted),
+                ),
+              ),
+            ),
+            if (_loading)
+              _skeleton(isDark)
+            else if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 60),
+                child: Center(
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(color: Color(0xFFD32F2F)),
+                  ),
+                ),
+              )
+            else if (report != null) ...[
+              FadeTransition(
+                opacity: _fadeAnim,
+                child: _buildSummary(s, visible),
+              ),
+              const SizedBox(height: 18),
+              if (visible.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 28),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.checklist_rtl_rounded,
+                          size: 40,
+                          color: kInkMuted.withOpacity(0.6),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          s.shopIssuedEmpty,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: kInkMuted,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                FadeTransition(
+                  opacity: _fadeAnim,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildDateFilterRow(s),
-                      const SizedBox(height: 6),
-                      Center(
-                        child: Text(
-                          '${_formatDate(_dateFrom)} — ${_formatDate(_dateTo)}',
-                          style: const TextStyle(fontSize: 11.5, color: kInkMuted),
+                      BlockCaption(
+                        s.shopAnalyticsTabBuyers,
+                        trailing: Text(
+                          '${groups.length}',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: kInkMuted,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                      if (_shops.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        BlockCaption(s.shopIssuedShopFilterTitle),
-                        _buildShopFilterRow(s, isDark),
-                      ],
-                      const SizedBox(height: 12),
-                      AppSegmentedControl(
-                        labels: [s.filterAll, s.shopIssuedStatusIssued, s.shopIssuedStatusPending],
-                        selectedIndex: const ['all', 'issued', 'pending'].indexOf(_statusFilter),
-                        onChanged: (i) => setState(() => _statusFilter = const ['all', 'issued', 'pending'][i]),
-                        minSegmentWidth: 0,
+                      BlockCard(
                         padding: EdgeInsets.zero,
-                      ),
-                    ],
-                  ),
-                ),
-                if (_searching) ...[
-                  const SizedBox(height: 10),
-                  BlockSearchField(controller: _searchCtrl, hint: s.shopIssuedSearchHint),
-                ],
-                ],
-              ),
-            ),
-            Expanded(
-              child: AppRefresh(
-                onRefresh: _load,
-                child: Container(
-                  color: listBg,
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-                    children: [
-                if (_loading)
-                  _skeleton(isDark)
-                else if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 60),
-                    child: Center(child: Text(_error!, style: const TextStyle(color: Color(0xFFD32F2F)))),
-                  )
-                else if (report != null) ...[
-                  FadeTransition(opacity: _fadeAnim, child: _buildSummary(s, visible)),
-                  const SizedBox(height: 18),
-                  if (visible.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 28),
-                      child: Center(
                         child: Column(
                           children: [
-                            Icon(Icons.checklist_rtl_rounded, size: 40, color: kInkMuted.withOpacity(0.6)),
-                            const SizedBox(height: 10),
-                            Text(s.shopIssuedEmpty, textAlign: TextAlign.center, style: const TextStyle(color: kInkMuted, fontSize: 13)),
+                            for (final (i, group) in groups.indexed) ...[
+                              if (i > 0)
+                                const Divider(
+                                  height: 1,
+                                  thickness: 0.6,
+                                  indent: 64,
+                                ),
+                              _IssuedBuyerHeader(
+                                group: group,
+                                imgHeaders: _imgHeaders,
+                                numberFormat: _numberFormat,
+                                s: s,
+                                expanded: _expandedBuyers.contains(group.key),
+                                onTap: () => _toggleBuyer(group.key),
+                              ),
+                              AnimatedSize(
+                                duration: const Duration(milliseconds: 220),
+                                curve: Curves.easeOutCubic,
+                                alignment: Alignment.topCenter,
+                                child: _expandedBuyers.contains(group.key)
+                                    ? Container(
+                                        color: kInk.withOpacity(0.025),
+                                        child: Column(
+                                          children: [
+                                            for (final (j, order)
+                                                in group.orders.indexed) ...[
+                                              if (j > 0)
+                                                const Divider(
+                                                  height: 1,
+                                                  thickness: 0.6,
+                                                  indent: 64,
+                                                ),
+                                              _IssuedOrderRow(
+                                                order: order,
+                                                imgHeaders: _imgHeaders,
+                                                numberFormat: _numberFormat,
+                                                s: s,
+                                                showShop:
+                                                    _shopId == null &&
+                                                    _shops.length > 1,
+                                                onTap: () => _openDetail(order),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      )
+                                    : const SizedBox(width: double.infinity),
+                              ),
+                            ],
                           ],
                         ),
                       ),
-                    )
-                  else
-                    FadeTransition(
-                      opacity: _fadeAnim,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          BlockCaption(
-                            s.shopAnalyticsTabBuyers,
-                            trailing: Text('${groups.length}', style: const TextStyle(fontSize: 11.5, color: kInkMuted, fontWeight: FontWeight.w600)),
-                          ),
-                          BlockCard(
-                            padding: EdgeInsets.zero,
-                            child: Column(
-                              children: [
-                                for (final (i, group) in groups.indexed) ...[
-                                  if (i > 0) const Divider(height: 1, thickness: 0.6, indent: 64),
-                                  _IssuedBuyerHeader(
-                                    group: group,
-                                    imgHeaders: _imgHeaders,
-                                    numberFormat: _numberFormat,
-                                    s: s,
-                                    expanded: _expandedBuyers.contains(group.key),
-                                    onTap: () => _toggleBuyer(group.key),
-                                  ),
-                                  AnimatedSize(
-                                    duration: const Duration(milliseconds: 220),
-                                    curve: Curves.easeOutCubic,
-                                    alignment: Alignment.topCenter,
-                                    child: _expandedBuyers.contains(group.key)
-                                        ? Container(
-                                            color: kInk.withOpacity(0.025),
-                                            child: Column(
-                                              children: [
-                                                for (final (j, order) in group.orders.indexed) ...[
-                                                  if (j > 0) const Divider(height: 1, thickness: 0.6, indent: 64),
-                                                  _IssuedOrderRow(
-                                                    order: order,
-                                                    imgHeaders: _imgHeaders,
-                                                                    numberFormat: _numberFormat,
-                                                    s: s,
-                                                    showShop: _shopId == null && _shops.length > 1,
-                                                    onTap: () => _openDetail(order),
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                          )
-                                        : const SizedBox(width: double.infinity),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
                     ],
                   ),
                 ),
-              ),
-            ),
+            ],
           ],
         ),
       ),
@@ -428,20 +462,8 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
       onChanged: (i) => presets[i] == _RangePreset.custom
           ? _pickCustomRange()
           : _applyPreset(presets[i]),
-      minSegmentWidth: 80,
+      minSegmentWidth: 0,
       padding: EdgeInsets.zero,
-    );
-  }
-
-  Widget _buildShopFilterRow(S s, bool isDark) {
-    return ChoiceField<int?>(
-      title: s.shopIssuedShopFilterTitle,
-      options: [
-        ChoiceOption<int?>(null, s.shopIssuedAllShops),
-        for (final shop in _shops) ChoiceOption<int?>(shop.id, shop.name),
-      ],
-      selected: _shopId,
-      onChanged: _selectShop,
     );
   }
 
@@ -455,7 +477,10 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
             flex: const [2, 2, 3],
             metrics: [
               Metric(s.shopIssuedCountLabel, '${orders.length}'),
-              Metric(s.shopIssuedAmountLabel, _numberFormat.format(totalAmount)),
+              Metric(
+                s.shopIssuedAmountLabel,
+                _numberFormat.format(totalAmount),
+              ),
               Metric(s.shopIssuedValueLabel, _numberFormat.format(totalValue)),
             ],
           ),
@@ -465,14 +490,34 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage> with Single
               Container(
                 width: 28,
                 height: 28,
-                decoration: BoxDecoration(color: AppColors.brandRed.withOpacity(0.1), shape: BoxShape.circle),
-                child: const Icon(Icons.account_balance_wallet_rounded, size: 15, color: AppColors.brandRed),
+                decoration: BoxDecoration(
+                  color: AppColors.brandRed.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet_rounded,
+                  size: 15,
+                  color: AppColors.brandRed,
+                ),
               ),
               const SizedBox(width: 10),
-              Expanded(child: Text(s.shopPickupSalaryLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kInk))),
+              Expanded(
+                child: Text(
+                  s.shopPickupSalaryLabel,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: kInk,
+                  ),
+                ),
+              ),
               Text(
                 '${_numberFormat.format(pvzSellerSalary(totalValue))} сум',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.brandRed),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.brandRed,
+                ),
               ),
             ],
           ),
@@ -545,9 +590,14 @@ class _CustomRangeSheetState extends State<_CustomRangeSheet> {
     final onSurface = Theme.of(context).colorScheme.onSurface;
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: Container(
-        decoration: BoxDecoration(color: surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -558,7 +608,10 @@ class _CustomRangeSheetState extends State<_CustomRangeSheet> {
                 width: 40,
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 18),
-                decoration: BoxDecoration(color: onSurface.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+                decoration: BoxDecoration(
+                  color: onSurface.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
               ),
             ),
             Row(
@@ -567,17 +620,31 @@ class _CustomRangeSheetState extends State<_CustomRangeSheet> {
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [_ShopIssuedReportPageColors.g1, _ShopIssuedReportPageColors.g2],
+                      colors: [
+                        _ShopIssuedReportPageColors.g1,
+                        _ShopIssuedReportPageColors.g2,
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.date_range_rounded, color: Colors.white, size: 20),
+                  child: const Icon(
+                    Icons.date_range_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(s.shopIssuedCustomPeriod, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: onSurface)),
+                  child: Text(
+                    s.shopIssuedCustomPeriod,
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: onSurface,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -585,11 +652,19 @@ class _CustomRangeSheetState extends State<_CustomRangeSheet> {
             Row(
               children: [
                 Expanded(
-                  child: _DatePickerField(label: s.shopIssuedDateFrom, date: _from, onTap: _pickFrom),
+                  child: _DatePickerField(
+                    label: s.shopIssuedDateFrom,
+                    date: _from,
+                    onTap: _pickFrom,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: _DatePickerField(label: s.shopIssuedDateTo, date: _to, onTap: _pickTo),
+                  child: _DatePickerField(
+                    label: s.shopIssuedDateTo,
+                    date: _to,
+                    onTap: _pickTo,
+                  ),
                 ),
               ],
             ),
@@ -599,7 +674,9 @@ class _CustomRangeSheetState extends State<_CustomRangeSheet> {
               child: AdaptiveButton(
                 onPressed: () {
                   HapticFeedback.selectionClick();
-                  Navigator.of(context).pop(DateTimeRange(start: _from, end: _to));
+                  Navigator.of(
+                    context,
+                  ).pop(DateTimeRange(start: _from, end: _to));
                 },
                 label: s.shopIssuedApply,
                 style: AdaptiveButtonStyle.filled,
@@ -620,7 +697,11 @@ class _DatePickerField extends StatelessWidget {
   final DateTime date;
   final VoidCallback onTap;
 
-  const _DatePickerField({required this.label, required this.date, required this.onTap});
+  const _DatePickerField({
+    required this.label,
+    required this.date,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -643,13 +724,30 @@ class _DatePickerField extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Icon(Icons.calendar_today_rounded, size: 13, color: onSurface.withOpacity(0.4)),
+                  Icon(
+                    Icons.calendar_today_rounded,
+                    size: 13,
+                    color: onSurface.withOpacity(0.4),
+                  ),
                   const SizedBox(width: 6),
-                  Text(label, style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.55))),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: onSurface.withOpacity(0.55),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 6),
-              Text(_formatDate(date), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: onSurface)),
+              Text(
+                _formatDate(date),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: onSurface,
+                ),
+              ),
             ],
           ),
         ),
@@ -692,7 +790,8 @@ class _IssuedBuyerGroup {
         break;
       }
     }
-    if (key > 0) sources.add(PhotoSource(PvzApi.buyerFaceUrl(key), headers: imgHeaders));
+    if (key > 0)
+      sources.add(PhotoSource(PvzApi.buyerFaceUrl(key), headers: imgHeaders));
     return sources;
   }
 }
@@ -703,7 +802,10 @@ List<_IssuedBuyerGroup> _groupByBuyer(List<PvzOrder> orders) {
   final groups = <int, _IssuedBuyerGroup>{};
   for (final order in orders) {
     final key = order.buyerId ?? -1;
-    groups.putIfAbsent(key, () => _IssuedBuyerGroup(key, order.buyerName)).orders.add(order);
+    groups
+        .putIfAbsent(key, () => _IssuedBuyerGroup(key, order.buyerName))
+        .orders
+        .add(order);
   }
   return groups.values.toList();
 }
@@ -749,7 +851,11 @@ class _IssuedBuyerHeader extends StatelessWidget {
                       group.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: kInk,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -762,14 +868,21 @@ class _IssuedBuyerHeader extends StatelessWidget {
                 ),
               ),
               if (group.pendingCount > 0) ...[
-                StatusTag('${group.pendingCount}', color: const Color(0xFFE08A00)),
+                StatusTag(
+                  '${group.pendingCount}',
+                  color: const Color(0xFFE08A00),
+                ),
                 const SizedBox(width: 6),
               ],
               AnimatedRotation(
                 turns: expanded ? 0.5 : 0,
                 duration: const Duration(milliseconds: 220),
                 curve: Curves.easeOutCubic,
-                child: const Icon(Icons.keyboard_arrow_down_rounded, size: 22, color: kInkMuted),
+                child: const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 22,
+                  color: kInkMuted,
+                ),
               ),
             ],
           ),
@@ -807,20 +920,27 @@ class _IssuedOrderRow extends StatelessWidget {
     final when = order.isIssued ? order.issuedAt : order.confirmedAt;
 
     Widget placeholder() => _thumbPlaceholder(
-          order.isIssued ? Icons.person_rounded : Icons.hourglass_top_rounded,
-          order.isIssued ? kInkMuted : pendingColor,
-          order.isIssued ? kInk.withOpacity(0.06) : pendingColor.withOpacity(0.12),
-        );
+      order.isIssued ? Icons.person_rounded : Icons.hourglass_top_rounded,
+      order.isIssued ? kInkMuted : pendingColor,
+      order.isIssued ? kInk.withOpacity(0.06) : pendingColor.withOpacity(0.12),
+    );
 
     // Profile photo, then the hand-over snapshot, then the access photo.
     Widget photo() {
       final sources = <PhotoSource>[
         if (order.buyerAvatarUrl != null) PhotoSource(order.buyerAvatarUrl!),
-        if (order.isIssued && order.buyerPhotoUrl != null) PhotoSource(order.buyerPhotoUrl!),
-        if (order.buyerId != null) PhotoSource(PvzApi.buyerFaceUrl(order.buyerId!), headers: imgHeaders),
+        if (order.isIssued && order.buyerPhotoUrl != null)
+          PhotoSource(order.buyerPhotoUrl!),
+        if (order.buyerId != null)
+          PhotoSource(PvzApi.buyerFaceUrl(order.buyerId!), headers: imgHeaders),
       ];
       if (sources.isEmpty) return placeholder();
-      return FallbackNetworkImage(sources: sources, width: 40, height: 40, placeholder: placeholder);
+      return FallbackNetworkImage(
+        sources: sources,
+        width: 40,
+        height: 40,
+        placeholder: placeholder,
+      );
     }
 
     return Material(
@@ -833,11 +953,7 @@ class _IssuedOrderRow extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(9),
-                child: SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: photo(),
-                ),
+                child: SizedBox(width: 40, height: 40, child: photo()),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -848,12 +964,21 @@ class _IssuedOrderRow extends StatelessWidget {
                       '№${order.id}${when != null ? ' · ${_formatDateTime(when)}' : ''}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kInk),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: kInk,
+                      ),
                     ),
                     const SizedBox(height: 3),
                     Row(
                       children: [
-                        StatusTag(order.isIssued ? s.shopIssuedBadgeIssued : s.shopIssuedWaitingBadge, color: color),
+                        StatusTag(
+                          order.isIssued
+                              ? s.shopIssuedBadgeIssued
+                              : s.shopIssuedWaitingBadge,
+                          color: color,
+                        ),
                         if (showShop && order.shopName.isNotEmpty) ...[
                           const SizedBox(width: 6),
                           Flexible(
@@ -861,7 +986,10 @@ class _IssuedOrderRow extends StatelessWidget {
                               order.shopName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 11, color: kInkMuted),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: kInkMuted,
+                              ),
                             ),
                           ),
                         ],
@@ -873,7 +1001,11 @@ class _IssuedOrderRow extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 '${numberFormat.format(order.totalValue)} сум',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kInk),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: kInk,
+                ),
               ),
             ],
           ),
@@ -884,15 +1016,18 @@ class _IssuedOrderRow extends StatelessWidget {
 }
 
 Widget _thumbPlaceholder(IconData icon, Color iconColor, Color bg) => Container(
-      color: bg,
-      alignment: Alignment.center,
-      child: Icon(icon, size: 20, color: iconColor),
-    );
+  color: bg,
+  alignment: Alignment.center,
+  child: Icon(icon, size: 20, color: iconColor),
+);
 
 // ─── Order detail sheet ────────────────────────────────────────────────
 
 class _IssuedOrderDetailSheet extends StatelessWidget {
-  const _IssuedOrderDetailSheet({required this.order, required this.numberFormat});
+  const _IssuedOrderDetailSheet({
+    required this.order,
+    required this.numberFormat,
+  });
 
   final PvzOrder order;
   final NumberFormat numberFormat;
@@ -911,7 +1046,10 @@ class _IssuedOrderDetailSheet extends StatelessWidget {
       expand: false,
       builder: (context, scrollController) {
         return Container(
-          decoration: BoxDecoration(color: surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -921,28 +1059,50 @@ class _IssuedOrderDetailSheet extends StatelessWidget {
                   width: 40,
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 18),
-                  decoration: BoxDecoration(color: onSurface.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+                  decoration: BoxDecoration(
+                    color: onSurface.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
                 ),
               ),
-              if (order.isIssued && order.buyerPhotoUrl != null) _PhotoPreview(photoUrl: order.buyerPhotoUrl!, heroTag: 'issued_order_photo_${order.id}'),
+              if (order.isIssued && order.buyerPhotoUrl != null)
+                _PhotoPreview(
+                  photoUrl: order.buyerPhotoUrl!,
+                  heroTag: 'issued_order_photo_${order.id}',
+                ),
               const SizedBox(height: 16),
               Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: (order.isIssued ? const Color(0xFF2E7D32) : const Color(0xFFE08A00)).withOpacity(0.12),
+                      color:
+                          (order.isIssued
+                                  ? const Color(0xFF2E7D32)
+                                  : const Color(0xFFE08A00))
+                              .withOpacity(0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
-                      order.isIssued ? Icons.check_circle_rounded : Icons.hourglass_top_rounded,
-                      color: order.isIssued ? const Color(0xFF2E7D32) : const Color(0xFFE08A00),
+                      order.isIssued
+                          ? Icons.check_circle_rounded
+                          : Icons.hourglass_top_rounded,
+                      color: order.isIssued
+                          ? const Color(0xFF2E7D32)
+                          : const Color(0xFFE08A00),
                       size: 20,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(s.shopPickupOrderTitle(order.id), style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: onSurface)),
+                    child: Text(
+                      s.shopPickupOrderTitle(order.id),
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: onSurface,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -956,48 +1116,97 @@ class _IssuedOrderDetailSheet extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    _DetailRow(icon: Icons.person_outline_rounded, label: s.shopPickupBuyer, value: order.buyerName, onSurface: onSurface),
+                    _DetailRow(
+                      icon: Icons.person_outline_rounded,
+                      label: s.shopPickupBuyer,
+                      value: order.buyerName,
+                      onSurface: onSurface,
+                    ),
                     const SizedBox(height: 8),
-                    _DetailRow(icon: Icons.badge_outlined, label: s.shopPickupSeller, value: order.sellerName, onSurface: onSurface),
+                    _DetailRow(
+                      icon: Icons.badge_outlined,
+                      label: s.shopPickupSeller,
+                      value: order.sellerName,
+                      onSurface: onSurface,
+                    ),
                     const SizedBox(height: 8),
-                    _DetailRow(icon: Icons.storefront_outlined, label: s.shopIssuedShopFilterTitle, value: order.shopName, onSurface: onSurface),
+                    _DetailRow(
+                      icon: Icons.storefront_outlined,
+                      label: s.shopIssuedShopFilterTitle,
+                      value: order.shopName,
+                      onSurface: onSurface,
+                    ),
                     if (order.issuedByName != null) ...[
                       const SizedBox(height: 8),
-                      _DetailRow(icon: Icons.how_to_reg_rounded, label: s.shopIssuedIssuedBy, value: order.issuedByName!, onSurface: onSurface),
+                      _DetailRow(
+                        icon: Icons.how_to_reg_rounded,
+                        label: s.shopIssuedIssuedBy,
+                        value: order.issuedByName!,
+                        onSurface: onSurface,
+                      ),
                     ],
                     if (order.issuedAt != null) ...[
                       const SizedBox(height: 8),
-                      _DetailRow(icon: Icons.event_available_rounded, label: s.shopIssuedIssuedAt, value: _formatDateTime(order.issuedAt!), onSurface: onSurface),
+                      _DetailRow(
+                        icon: Icons.event_available_rounded,
+                        label: s.shopIssuedIssuedAt,
+                        value: _formatDateTime(order.issuedAt!),
+                        onSurface: onSurface,
+                      ),
                     ],
                   ],
                 ),
               ),
               const SizedBox(height: 18),
-              Text(s.shopPickupItemsHeader, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: onSurface)),
+              Text(
+                s.shopPickupItemsHeader,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: onSurface,
+                ),
+              ),
               const SizedBox(height: 10),
               ...order.items.map(
                 (item) => Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: onSurface.withOpacity(0.04), borderRadius: BorderRadius.circular(12)),
+                  decoration: BoxDecoration(
+                    color: onSurface.withOpacity(0.04),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: Row(
                     children: [
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('${item.article} — ${item.productName}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: onSurface)),
+                            Text(
+                              '${item.article} — ${item.productName}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: onSurface,
+                              ),
+                            ),
                             const SizedBox(height: 2),
                             Text(
                               '${item.color} · Размер ${item.sizeName} · ${numberFormat.format(item.amount)} шт',
-                              style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.55)),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: onSurface.withOpacity(0.55),
+                              ),
                             ),
                           ],
                         ),
                       ),
                       Text(
                         '${numberFormat.format(item.subtotal)} сум',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _ShopIssuedReportPageColors.g2),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _ShopIssuedReportPageColors.g2,
+                        ),
                       ),
                     ],
                   ),
@@ -1007,17 +1216,38 @@ class _IssuedOrderDetailSheet extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [_ShopIssuedReportPageColors.g1, _ShopIssuedReportPageColors.g2]),
+                  gradient: const LinearGradient(
+                    colors: [
+                      _ShopIssuedReportPageColors.g1,
+                      _ShopIssuedReportPageColors.g2,
+                    ],
+                  ),
                   borderRadius: BorderRadius.circular(14),
-                  boxShadow: [BoxShadow(color: _ShopIssuedReportPageColors.g2.withOpacity(0.3), blurRadius: 14, offset: const Offset(0, 6))],
+                  boxShadow: [
+                    BoxShadow(
+                      color: _ShopIssuedReportPageColors.g2.withOpacity(0.3),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(s.totalLabel, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    Text(
+                      s.totalLabel,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     Text(
                       '${numberFormat.format(order.totalValue)} сум',
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ],
                 ),
@@ -1036,7 +1266,12 @@ class _DetailRow extends StatelessWidget {
   final String value;
   final Color onSurface;
 
-  const _DetailRow({required this.icon, required this.label, required this.value, required this.onSurface});
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onSurface,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1045,7 +1280,10 @@ class _DetailRow extends StatelessWidget {
       children: [
         Icon(icon, size: 15, color: onSurface.withOpacity(0.4)),
         const SizedBox(width: 8),
-        Text(label, style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.55))),
+        Text(
+          label,
+          style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.55)),
+        ),
         const SizedBox(width: 4),
         Expanded(
           child: Text(
@@ -1053,7 +1291,11 @@ class _DetailRow extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.right,
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: onSurface),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: onSurface,
+            ),
           ),
         ),
       ],
@@ -1074,7 +1316,11 @@ class _PhotoPreview extends StatelessWidget {
     return Center(
       child: GestureDetector(
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => _FullScreenPhotoView(photoUrl: photoUrl, heroTag: heroTag), fullscreenDialog: true),
+          MaterialPageRoute(
+            builder: (_) =>
+                _FullScreenPhotoView(photoUrl: photoUrl, heroTag: heroTag),
+            fullscreenDialog: true,
+          ),
         ),
         child: Container(
           width: 128,
@@ -1082,22 +1328,38 @@ class _PhotoPreview extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: Colors.black.withOpacity(0.08)),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 12, offset: const Offset(0, 4))],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.12),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Stack(
             fit: StackFit.expand,
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(13),
-                child: Hero(tag: heroTag, child: Image.network(photoUrl, fit: BoxFit.cover)),
+                child: Hero(
+                  tag: heroTag,
+                  child: Image.network(photoUrl, fit: BoxFit.cover),
+                ),
               ),
               Positioned(
                 right: 6,
                 bottom: 6,
                 child: Container(
                   padding: const EdgeInsets.all(5),
-                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.5), shape: BoxShape.circle),
-                  child: const Icon(Icons.zoom_in_rounded, color: Colors.white, size: 15),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.zoom_in_rounded,
+                    color: Colors.white,
+                    size: 15,
+                  ),
                 ),
               ),
             ],
@@ -1118,7 +1380,11 @@ class _FullScreenPhotoView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white, elevation: 0),
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
       body: Center(
         child: InteractiveViewer(
           minScale: 0.8,

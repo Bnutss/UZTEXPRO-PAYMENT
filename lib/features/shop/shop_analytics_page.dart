@@ -6,12 +6,9 @@ import 'package:intl/intl.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/adaptive_back_button.dart';
 import '../../core/widgets/app_refresh.dart';
-import '../../core/widgets/block_search_field.dart';
 import '../../core/widgets/app_segmented_control.dart';
-import '../../core/widgets/choice_field.dart';
-import '../../core/widgets/search_toggle.dart';
+import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/ui_blocks.dart';
 import '../auth/widgets/logo_stroke_loader.dart';
 import 'shop_api.dart';
@@ -180,7 +177,9 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
       context: context,
       firstDate: from,
       lastDate: now,
-      initialDate: (_dateTo != null && !_dateTo!.isBefore(from)) ? _dateTo! : from,
+      initialDate: (_dateTo != null && !_dateTo!.isBefore(from))
+          ? _dateTo!
+          : from,
     );
     if (to == null || !mounted) {
       setState(() => _segmentsEpoch++);
@@ -218,73 +217,34 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
   Widget build(BuildContext context) {
     final s = S.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final listBg = isDark ? Theme.of(context).colorScheme.surface : AppColors.groupedBackground;
+    final listBg = isDark
+        ? Theme.of(context).colorScheme.surface
+        : AppColors.groupedBackground;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        appBar: AppBar(
-          leadingWidth: kBackButtonLeadingWidth,
-          leading: const AdaptiveBackButton(),
-          title: Text(
-            s.shopAnalyticsTitle,
-            style: const TextStyle(color: kInk, fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-          centerTitle: false,
-          backgroundColor: isDark ? Theme.of(context).colorScheme.surface : AppColors.groupedBackground,
-          foregroundColor: kInk,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-          actions: [
-            SearchToggleButton(active: _searching, onPressed: _toggleSearch),
-          ],
-        ),
-        // Filters and tabs live in a fixed header and only the results scroll,
-        // same layout as the passes screen.
-        body: Column(
-          children: [
-            Container(
-              color: listBg,
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: _fixedHeader(s),
-              ),
-            ),
-            Expanded(
-              child: AppRefresh(
-                onRefresh: _load,
-                child: Container(
-                  color: listBg,
-                  child: CustomScrollView(
-                    slivers: [
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                        sliver: SliverList(delegate: SliverChildListDelegate(_metricsBlock(s))),
-                      ),
-                      ..._content(s, isDark),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _fixedHeader(S s) {
     const presets = _RangePreset.values;
-    return [
-      BlockCard(
+
+    return FadingHeaderScaffold(
+      title: s.shopAnalyticsTitle,
+      background: listBg,
+      searching: _searching,
+      onToggleSearch: _toggleSearch,
+      searchController: _searchCtrl,
+      searchHint: s.shopAnalyticsSearchHint,
+      // Shop filter: a native menu next to search (check on the selected one).
+      filterLabels: _shops.isNotEmpty
+          ? [s.shopIssuedAllShops, for (final shop in _shops) shop.name]
+          : null,
+      filterSelected: _shopId == null
+          ? 0
+          : (_shops.indexWhere((shop) => shop.id == _shopId) + 1),
+      filterActive: _shopId != null,
+      onFilterSelected: (i) => _selectShop(i == 0 ? null : _shops[i - 1].id),
+      // Period and tab segmented controls, pinned under the title row.
+      bottomHeight: 92,
+      bottom: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             AppSegmentedControl(
               key: ValueKey(_segmentsEpoch),
@@ -296,53 +256,59 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
                 s.shopIssuedCustomPeriod,
               ],
               selectedIndex: presets.indexOf(_preset),
-              onChanged: (i) => presets[i] == _RangePreset.custom ? _pickCustomRange() : _applyPreset(presets[i]),
+              onChanged: (i) => presets[i] == _RangePreset.custom
+                  ? _pickCustomRange()
+                  : _applyPreset(presets[i]),
               minSegmentWidth: 84,
               padding: EdgeInsets.zero,
             ),
-            if (_dateFrom != null && _dateTo != null) ...[
-              const SizedBox(height: 6),
-              Center(
-                child: Text(
-                  '${_formatDate(_dateFrom!)} — ${_formatDate(_dateTo!)}',
-                  style: const TextStyle(fontSize: 11.5, color: kInkMuted),
-                ),
-              ),
-            ],
-            if (_shops.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              BlockCaption(s.shopIssuedShopFilterTitle),
-              ChoiceField<int?>(
-                title: s.shopIssuedShopFilterTitle,
-                options: [
-                  ChoiceOption<int?>(null, s.shopIssuedAllShops),
-                  for (final shop in _shops) ChoiceOption<int?>(shop.id, shop.name),
-                ],
-                selected: _shopId,
-                onChanged: _selectShop,
-              ),
-            ],
+            const SizedBox(height: 10),
+            AppSegmentedControl(
+              labels: [
+                s.shopAnalyticsTabProducts,
+                s.shopAnalyticsTabShops,
+                s.shopAnalyticsTabBuyers,
+                s.shopAnalyticsTabStock,
+              ],
+              selectedIndex: _tab.index,
+              onChanged: (i) => _selectTab(_Tab.values[i]),
+              minSegmentWidth: 0,
+              padding: EdgeInsets.zero,
+            ),
           ],
         ),
       ),
-      const SizedBox(height: 12),
-      AppSegmentedControl(
-        labels: [
-          s.shopAnalyticsTabProducts,
-          s.shopAnalyticsTabShops,
-          s.shopAnalyticsTabBuyers,
-          s.shopAnalyticsTabStock,
-        ],
-        selectedIndex: _tab.index,
-        onChanged: (i) => _selectTab(_Tab.values[i]),
-        minSegmentWidth: 88,
-        padding: EdgeInsets.zero,
+      body: (context, topInset) => AppRefresh(
+        topOffset: topInset,
+        onRefresh: _load,
+        child: CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(16, topInset + 8, 16, 12),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  if (_dateFrom != null && _dateTo != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Center(
+                        child: Text(
+                          '${_formatDate(_dateFrom!)} — ${_formatDate(_dateTo!)}',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: kInkMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ..._metricsBlock(s),
+                ]),
+              ),
+            ),
+            ..._content(s, isDark),
+          ],
+        ),
       ),
-      if (_searching) ...[
-        const SizedBox(height: 10),
-        BlockSearchField(controller: _searchCtrl, hint: s.shopAnalyticsSearchHint),
-      ],
-    ];
+    );
   }
 
   List<Widget> _metricsBlock(S s) {
@@ -355,16 +321,33 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
               MetricRow(
                 flex: const [2, 3],
                 metrics: [
-                  Metric(s.shopIssuedAmountLabel, _fmt.format(data.soldAmount), icon: Icons.shopping_bag_outlined),
-                  Metric(s.shopAnalyticsSoldSum, '${_fmt.format(data.soldValue)} сум', icon: Icons.payments_outlined, accent: true),
+                  Metric(
+                    s.shopIssuedAmountLabel,
+                    _fmt.format(data.soldAmount),
+                    icon: Icons.shopping_bag_outlined,
+                  ),
+                  Metric(
+                    s.shopAnalyticsSoldSum,
+                    '${_fmt.format(data.soldValue)} сум',
+                    icon: Icons.payments_outlined,
+                    accent: true,
+                  ),
                 ],
               ),
               const BlockDivider(),
               MetricRow(
                 flex: const [2, 3],
                 metrics: [
-                  Metric(s.shopAnalyticsStockQty, _fmt.format(data.stockAmount), icon: Icons.inventory_2_outlined),
-                  Metric(s.shopAnalyticsStockValue, '${_fmt.format(data.stockValue)} сум', icon: Icons.warehouse_outlined),
+                  Metric(
+                    s.shopAnalyticsStockQty,
+                    _fmt.format(data.stockAmount),
+                    icon: Icons.inventory_2_outlined,
+                  ),
+                  Metric(
+                    s.shopAnalyticsStockValue,
+                    '${_fmt.format(data.stockValue)} сум',
+                    icon: Icons.warehouse_outlined,
+                  ),
                 ],
               ),
             ],
@@ -382,7 +365,12 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
-            child: Center(child: Text(_error!, style: const TextStyle(color: Color(0xFFD32F2F)))),
+            child: Center(
+              child: Text(
+                _error!,
+                style: const TextStyle(color: Color(0xFFD32F2F)),
+              ),
+            ),
           ),
         ),
       ];
@@ -399,31 +387,50 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
         final rows = _tab == _Tab.products
             ? data.topProducts
             : _tab == _Tab.shops
-                ? data.topShops
-                : data.topBuyers;
-        final maxValue = rows.fold<double>(0, (m, r) => r.totalValue > m ? r.totalValue : m);
+            ? data.topShops
+            : data.topBuyers;
+        final maxValue = rows.fold<double>(
+          0,
+          (m, r) => r.totalValue > m ? r.totalValue : m,
+        );
         final rq = _searchCtrl.text.trim().toLowerCase();
         final shownRows = rq.isEmpty
             ? rows
-            : rows.where((r) => '${r.title} ${r.subtitle}'.toLowerCase().contains(rq)).toList();
+            : rows
+                  .where(
+                    (r) =>
+                        '${r.title} ${r.subtitle}'.toLowerCase().contains(rq),
+                  )
+                  .toList();
         count = shownRows.length;
         rowAt = (i) => _RankRow(
-              rank: i + 1,
-              row: shownRows[i],
-              kind: _tab,
-              fmt: _fmt,
-              share: maxValue > 0 ? shownRows[i].totalValue / maxValue : 0,
-              ordersLabel: s.shopStockOrdersCount(shownRows[i].salesCount),
-              pcsLabel: s.shopAnalyticsPcs,
-            );
+          rank: i + 1,
+          row: shownRows[i],
+          kind: _tab,
+          fmt: _fmt,
+          share: maxValue > 0 ? shownRows[i].totalValue / maxValue : 0,
+          ordersLabel: s.shopStockOrdersCount(shownRows[i].salesCount),
+          pcsLabel: s.shopAnalyticsPcs,
+        );
         break;
       case _Tab.stock:
         final q = _searchCtrl.text.trim().toLowerCase();
         final stock = q.isEmpty
             ? data.stock
-            : data.stock.where((r) => '${r.article} ${r.name} ${r.color}'.toLowerCase().contains(q)).toList();
+            : data.stock
+                  .where(
+                    (r) => '${r.article} ${r.name} ${r.color}'
+                        .toLowerCase()
+                        .contains(q),
+                  )
+                  .toList();
         count = stock.length;
-        rowAt = (i) => _StockRow(row: stock[i], fmt: _fmt, showShop: _shopId == null && _shops.length > 1, pcsLabel: s.shopAnalyticsPcs);
+        rowAt = (i) => _StockRow(
+          row: stock[i],
+          fmt: _fmt,
+          showShop: _shopId == null && _shops.length > 1,
+          pcsLabel: s.shopAnalyticsPcs,
+        );
         break;
     }
 
@@ -433,7 +440,8 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
         sliver: SliverList.builder(
           itemCount: count,
-          itemBuilder: (_, i) => GroupedTile(index: i, count: count, child: rowAt(i)),
+          itemBuilder: (_, i) =>
+              GroupedTile(index: i, count: count, child: rowAt(i)),
         ),
       ),
     ];
@@ -445,9 +453,16 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.insights_rounded, size: 40, color: kInkMuted.withOpacity(0.6)),
+            Icon(
+              Icons.insights_rounded,
+              size: 40,
+              color: kInkMuted.withOpacity(0.6),
+            ),
             const SizedBox(height: 10),
-            Text(s.shopAnalyticsEmpty, style: const TextStyle(color: kInkMuted, fontSize: 13)),
+            Text(
+              s.shopAnalyticsEmpty,
+              style: const TextStyle(color: kInkMuted, fontSize: 13),
+            ),
           ],
         ),
       ),
@@ -483,7 +498,11 @@ class _RankRow extends StatelessWidget {
   final String ordersLabel;
   final String pcsLabel;
 
-  static const _medals = [Color(0xFFE0A100), Color(0xFF8E9AAB), Color(0xFFB87333)];
+  static const _medals = [
+    Color(0xFFE0A100),
+    Color(0xFF8E9AAB),
+    Color(0xFFB87333),
+  ];
 
   Widget _leading() {
     switch (kind) {
@@ -493,8 +512,15 @@ class _RankRow extends StatelessWidget {
         return Container(
           width: 38,
           height: 38,
-          decoration: BoxDecoration(color: AppColors.brandOrange.withOpacity(0.12), borderRadius: BorderRadius.circular(11)),
-          child: const Icon(Icons.storefront_rounded, size: 19, color: AppColors.brandOrange),
+          decoration: BoxDecoration(
+            color: AppColors.brandOrange.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: const Icon(
+            Icons.storefront_rounded,
+            size: 19,
+            color: AppColors.brandOrange,
+          ),
         );
       default:
         final medal = rank <= 3 ? _medals[rank - 1] : kInkMuted;
@@ -502,15 +528,28 @@ class _RankRow extends StatelessWidget {
           width: 38,
           height: 38,
           alignment: Alignment.center,
-          decoration: BoxDecoration(color: medal.withOpacity(0.14), borderRadius: BorderRadius.circular(11)),
-          child: Text('$rank', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: medal)),
+          decoration: BoxDecoration(
+            color: medal.withOpacity(0.14),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Text(
+            '$rank',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: medal,
+            ),
+          ),
         );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final sub = [if (row.subtitle.isNotEmpty) row.subtitle, ordersLabel].join(' · ');
+    final sub = [
+      if (row.subtitle.isNotEmpty) row.subtitle,
+      ordersLabel,
+    ].join(' · ');
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       child: Column(
@@ -527,10 +566,19 @@ class _RankRow extends StatelessWidget {
                       row.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: kInk),
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: kInk,
+                      ),
                     ),
                     const SizedBox(height: 2),
-                    Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, color: kInkMuted)),
+                    Text(
+                      sub,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11.5, color: kInkMuted),
+                    ),
                   ],
                 ),
               ),
@@ -538,9 +586,19 @@ class _RankRow extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('${fmt.format(row.totalValue)} сум', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kInk)),
+                  Text(
+                    '${fmt.format(row.totalValue)} сум',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: kInk,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text('${fmt.format(row.totalAmount)} $pcsLabel', style: const TextStyle(fontSize: 11.5, color: kInkMuted)),
+                  Text(
+                    '${fmt.format(row.totalAmount)} $pcsLabel',
+                    style: const TextStyle(fontSize: 11.5, color: kInkMuted),
+                  ),
                 ],
               ),
             ],
@@ -562,7 +620,12 @@ class _RankRow extends StatelessWidget {
 }
 
 class _StockRow extends StatelessWidget {
-  const _StockRow({required this.row, required this.fmt, required this.showShop, required this.pcsLabel});
+  const _StockRow({
+    required this.row,
+    required this.fmt,
+    required this.showShop,
+    required this.pcsLabel,
+  });
 
   final AnalyticsStockRow row;
   final NumberFormat fmt;
@@ -589,11 +652,20 @@ class _StockRow extends StatelessWidget {
                   '${row.article} · ${row.name}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: kInk),
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: kInk,
+                  ),
                 ),
                 if (meta.isNotEmpty) ...[
                   const SizedBox(height: 2),
-                  Text(meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, color: kInkMuted)),
+                  Text(
+                    meta,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11.5, color: kInkMuted),
+                  ),
                 ],
               ],
             ),
@@ -604,10 +676,17 @@ class _StockRow extends StatelessWidget {
             children: [
               Text(
                 '${fmt.format(row.amount)} $pcsLabel',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: empty ? const Color(0xFFD32F2F) : kInk),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: empty ? const Color(0xFFD32F2F) : kInk,
+                ),
               ),
               const SizedBox(height: 2),
-              Text('${fmt.format(row.value)} сум', style: const TextStyle(fontSize: 11.5, color: kInkMuted)),
+              Text(
+                '${fmt.format(row.value)} сум',
+                style: const TextStyle(fontSize: 11.5, color: kInkMuted),
+              ),
             ],
           ),
         ],

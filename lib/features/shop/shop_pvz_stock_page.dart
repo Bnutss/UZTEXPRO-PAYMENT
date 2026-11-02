@@ -8,11 +8,9 @@ import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/adaptive_back_button.dart';
 import '../../core/widgets/app_refresh.dart';
 import '../../core/widgets/app_segmented_control.dart';
-import '../../core/widgets/choice_field.dart';
-import '../../core/widgets/search_toggle.dart';
+import '../../core/widgets/fading_header_scaffold.dart';
 import '../auth/widgets/logo_stroke_loader.dart';
 import 'shop_api.dart';
 
@@ -43,18 +41,44 @@ class _WaitStatus {
 const int _overdueDaysThreshold = 3;
 
 _WaitStatus _waitStatus(S s, int? days) {
-  if (days == null) return _WaitStatus(Colors.grey.shade100, Colors.grey.shade600, Colors.grey.shade300, '—');
+  if (days == null)
+    return _WaitStatus(
+      Colors.grey.shade100,
+      Colors.grey.shade600,
+      Colors.grey.shade300,
+      '—',
+    );
   if (days <= 2) {
-    return _WaitStatus(const Color(0xFFF0FDF4), const Color(0xFF166534), const Color(0xFF86EFAC), s.shopStockStatusWaiting);
+    return _WaitStatus(
+      const Color(0xFFF0FDF4),
+      const Color(0xFF166534),
+      const Color(0xFF86EFAC),
+      s.shopStockStatusWaiting,
+    );
   }
   if (days == _overdueDaysThreshold) {
-    return _WaitStatus(const Color(0xFFFEFCE8), const Color(0xFF854D0E), const Color(0xFFFDE68A), s.shopStockStatusSoon);
+    return _WaitStatus(
+      const Color(0xFFFEFCE8),
+      const Color(0xFF854D0E),
+      const Color(0xFFFDE68A),
+      s.shopStockStatusSoon,
+    );
   }
-  return _WaitStatus(const Color(0xFFFEF2F2), const Color(0xFF991B1B), const Color(0xFFFECACA), s.shopStockStatusOverdue);
+  return _WaitStatus(
+    const Color(0xFFFEF2F2),
+    const Color(0xFF991B1B),
+    const Color(0xFFFECACA),
+    s.shopStockStatusOverdue,
+  );
 }
 
 class _BuyerGroup {
-  _BuyerGroup({required this.buyerId, required this.buyerName, required this.orders, required this.maxDays});
+  _BuyerGroup({
+    required this.buyerId,
+    required this.buyerName,
+    required this.orders,
+    required this.maxDays,
+  });
 
   final int? buyerId;
   final String buyerName;
@@ -104,8 +128,8 @@ class ShopPvzStockPage extends StatefulWidget {
   State<ShopPvzStockPage> createState() => _ShopPvzStockPageState();
 }
 
-class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerProviderStateMixin {
-
+class _ShopPvzStockPageState extends State<ShopPvzStockPage>
+    with SingleTickerProviderStateMixin {
   final NumberFormat _numberFormat = NumberFormat('#,##0', 'ru');
   final _searchController = TextEditingController();
   bool _searching = false;
@@ -143,7 +167,10 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _animCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
+    _animCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
     _startAfterTransition();
     _searchController.addListener(() {
@@ -270,7 +297,12 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _StockCustomRangeSheet(initialRange: DateTimeRange(start: _dateFrom ?? now, end: _dateTo ?? now)),
+      builder: (_) => _StockCustomRangeSheet(
+        initialRange: DateTimeRange(
+          start: _dateFrom ?? now,
+          end: _dateTo ?? now,
+        ),
+      ),
     );
     if (range == null) {
       setState(() => _segmentsEpoch++);
@@ -309,7 +341,8 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _StockOrderDetailSheet(order: order, numberFormat: _numberFormat),
+      builder: (_) =>
+          _StockOrderDetailSheet(order: order, numberFormat: _numberFormat),
     );
   }
 
@@ -317,183 +350,205 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
   Widget build(BuildContext context) {
     final s = S.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final listBg = isDark ? Theme.of(context).colorScheme.surface : AppColors.groupedBackground;
+    final listBg = isDark
+        ? Theme.of(context).colorScheme.surface
+        : AppColors.groupedBackground;
 
     final visibleOrders = _overdueOnly
-        ? _orders.where((o) => (_daysSince(o.confirmedAt) ?? 0) > _overdueDaysThreshold).toList()
+        ? _orders
+              .where(
+                (o) => (_daysSince(o.confirmedAt) ?? 0) > _overdueDaysThreshold,
+              )
+              .toList()
         : _orders;
     final groups = _groupByBuyer(visibleOrders);
-    final overdueCount = _orders.where((o) => (_daysSince(o.confirmedAt) ?? 0) > _overdueDaysThreshold).length;
+    final overdueCount = _orders
+        .where((o) => (_daysSince(o.confirmedAt) ?? 0) > _overdueDaysThreshold)
+        .length;
     final totalQty = _orders.fold<double>(0, (sum, o) => sum + o.totalAmount);
-    final buyersCount = _orders.map((o) => o.buyerId ?? o.buyerName).toSet().length;
+    final buyersCount = _orders
+        .map((o) => o.buyerId ?? o.buyerName)
+        .toSet()
+        .length;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        appBar: AppBar(
-          leadingWidth: kBackButtonLeadingWidth,
-          leading: const AdaptiveBackButton(),
-          title: Text(s.shopStockTitle, style: const TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontSize: 18)),
-          centerTitle: false,
-          backgroundColor: isDark ? Theme.of(context).colorScheme.surface : AppColors.groupedBackground,
-          foregroundColor: const Color(0xFF1C1C1E),
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-          actions: [
-            SearchToggleButton(active: _searching, onPressed: _toggleSearch),
+    return FadingHeaderScaffold(
+      title: s.shopStockTitle,
+      background: listBg,
+      searching: _searching,
+      onToggleSearch: _toggleSearch,
+      searchController: _searchController,
+      searchHint: s.shopPickupSearchHint,
+      // Shop filter: a native menu next to search (check on the selected one).
+      filterLabels: _shops.isNotEmpty
+          ? [s.shopIssuedAllShops, for (final shop in _shops) shop.name]
+          : null,
+      filterSelected: _shopId == null
+          ? 0
+          : (_shops.indexWhere((shop) => shop.id == _shopId) + 1),
+      filterActive: _shopId != null,
+      onFilterSelected: (i) => _selectShop(i == 0 ? null : _shops[i - 1].id),
+      // Two native segmented controls (period, all / overdue), pinned under
+      // the title row.
+      bottomHeight: 92,
+      bottom: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildDateFilterRow(s),
+            const SizedBox(height: 10),
+            AppSegmentedControl(
+              labels: [s.filterAll, s.shopStockOverdueOnly],
+              selectedIndex: _overdueOnly ? 1 : 0,
+              onChanged: (i) {
+                if ((i == 1) != _overdueOnly) _toggleOverdueOnly();
+              },
+              minSegmentWidth: 0,
+              padding: EdgeInsets.zero,
+            ),
           ],
         ),
-        // Filters live in a fixed header and only the list scrolls, same
-        // layout as the passes screen.
-        body: Column(
+      ),
+      body: (context, topInset) => AppRefresh(
+        topOffset: topInset,
+        onRefresh: _load,
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(16, topInset + 8, 16, 16),
           children: [
-            Container(
-              color: listBg,
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                _buildDateFilterRow(s),
-                if (_preset != _RangePreset.all) ...[
-                  const SizedBox(height: 8),
-                  Center(
-                    child: Text(
-                      '${_stockFormatDate(_dateFrom!)} — ${_stockFormatDate(_dateTo!)}',
-                      style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+            if (_preset != _RangePreset.all &&
+                _dateFrom != null &&
+                _dateTo != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Center(
+                  child: Text(
+                    '${_stockFormatDate(_dateFrom!)} — ${_stockFormatDate(_dateTo!)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.5),
                     ),
                   ),
-                ],
-                AnimatedSearchSlot(
-                  open: _searching,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 14),
-                    child: _SearchBar(controller: _searchController, isDark: isDark, hintText: s.shopPickupSearchHint),
-                  ),
                 ),
-                if (_shops.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 2, bottom: 6),
-                    child: Text(
-                      s.shopIssuedShopFilterTitle,
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
-                    ),
-                  ),
-                  _buildShopFilterRow(s, isDark),
-                ],
-                const SizedBox(height: 10),
-                AppSegmentedControl(
-                  labels: [s.filterAll, s.shopStockOverdueOnly],
-                  selectedIndex: _overdueOnly ? 1 : 0,
-                  onChanged: (i) {
-                    if ((i == 1) != _overdueOnly) _toggleOverdueOnly();
-                  },
-                  minSegmentWidth: 0,
-                  padding: EdgeInsets.zero,
-                ),
-                ],
               ),
-            ),
-            Expanded(
-              child: AppRefresh(
-                onRefresh: _load,
-                child: Container(
-                  color: listBg,
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
-                    children: [
-                if (_loading)
-                  _skeleton(isDark)
-                else if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 60),
-                    child: Center(child: Text(_error!, style: const TextStyle(color: Color(0xFFD32F2F)))),
-                  )
-                else ...[
-                  FadeTransition(
-                    opacity: _fadeAnim,
-                    child: _buildSummary(s, count: _orders.length, qty: totalQty, overdue: overdueCount, buyers: buyersCount),
+            if (_loading)
+              _skeleton(isDark)
+            else if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 60),
+                child: Center(
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(color: Color(0xFFD32F2F)),
                   ),
-                  const SizedBox(height: 20),
-                  if (groups.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 40),
-                      child: Center(
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 72,
-                              height: 72,
-                              decoration: BoxDecoration(
-                                color: isDark ? Colors.white10 : Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12)],
-                              ),
-                              child: Icon(Icons.inventory_2_outlined, size: 34, color: isDark ? Colors.white38 : Colors.grey.shade400),
-                            ),
-                            const SizedBox(height: 14),
-                            Text(
-                              s.shopStockEmpty,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55), fontSize: 13),
-                            ),
-                          ],
+                ),
+              )
+            else ...[
+              FadeTransition(
+                opacity: _fadeAnim,
+                child: _buildSummary(
+                  s,
+                  count: _orders.length,
+                  qty: totalQty,
+                  overdue: overdueCount,
+                  buyers: buyersCount,
+                ),
+              ),
+              const SizedBox(height: 20),
+              if (groups.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 40),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white10 : Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: isDark
+                                ? []
+                                : [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.06),
+                                      blurRadius: 12,
+                                    ),
+                                  ],
+                          ),
+                          child: Icon(
+                            Icons.inventory_2_outlined,
+                            size: 34,
+                            color: isDark
+                                ? Colors.white38
+                                : Colors.grey.shade400,
+                          ),
                         ),
-                      ),
-                    )
-                  else
-                    FadeTransition(
-                      opacity: _fadeAnim,
-                      child: Column(
-                        children: [
-                          for (final group in groups) ...[
-                            _BuyerGroupHeader(
-                              group: group,
-                              s: s,
-                              isDark: isDark,
-                              expanded: _expandedBuyers.contains(group.buyerId ?? -1),
-                              onTap: () => _toggleBuyer(group.buyerId ?? -1),
-                            ),
-                            AnimatedSize(
-                              duration: const Duration(milliseconds: 220),
-                              curve: Curves.easeOutCubic,
-                              alignment: Alignment.topCenter,
-                              child: _expandedBuyers.contains(group.buyerId ?? -1)
-                                  ? Column(
-                                      children: [
-                                        const SizedBox(height: 8),
-                                        for (final order in group.orders)
-                                          Padding(
-                                            padding: const EdgeInsets.only(bottom: 8),
-                                            child: _StockOrderTile(
-                                              order: order,
-                                              isDark: isDark,
-                                              numberFormat: _numberFormat,
-                                              s: s,
-                                              showShop: _shopId == null && _shops.length > 1,
-                                              onTap: () => _openDetail(order),
-                                            ),
-                                          ),
-                                      ],
-                                    )
-                                  : const SizedBox(width: double.infinity),
-                            ),
-                            const SizedBox(height: 10),
-                          ],
-                        ],
-                      ),
+                        const SizedBox(height: 14),
+                        Text(
+                          s.shopStockEmpty,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.55),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                     ),
-                ],
+                  ),
+                )
+              else
+                FadeTransition(
+                  opacity: _fadeAnim,
+                  child: Column(
+                    children: [
+                      for (final group in groups) ...[
+                        _BuyerGroupHeader(
+                          group: group,
+                          s: s,
+                          isDark: isDark,
+                          expanded: _expandedBuyers.contains(
+                            group.buyerId ?? -1,
+                          ),
+                          onTap: () => _toggleBuyer(group.buyerId ?? -1),
+                        ),
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          alignment: Alignment.topCenter,
+                          child: _expandedBuyers.contains(group.buyerId ?? -1)
+                              ? Column(
+                                  children: [
+                                    const SizedBox(height: 8),
+                                    for (final order in group.orders)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 8,
+                                        ),
+                                        child: _StockOrderTile(
+                                          order: order,
+                                          isDark: isDark,
+                                          numberFormat: _numberFormat,
+                                          s: s,
+                                          showShop:
+                                              _shopId == null &&
+                                              _shops.length > 1,
+                                          onTap: () => _openDetail(order),
+                                        ),
+                                      ),
+                                  ],
+                                )
+                              : const SizedBox(width: double.infinity),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
                     ],
                   ),
                 ),
-              ),
-            ),
+            ],
           ],
         ),
       ),
@@ -520,26 +575,32 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
     );
   }
 
-  Widget _buildShopFilterRow(S s, bool isDark) {
-    return ChoiceField<int?>(
-      title: s.shopIssuedShopFilterTitle,
-      options: [
-        ChoiceOption<int?>(null, s.shopIssuedAllShops),
-        for (final shop in _shops) ChoiceOption<int?>(shop.id, shop.name),
-      ],
-      selected: _shopId,
-      onChanged: _selectShop,
-    );
-  }
-
-  Widget _buildSummary(S s, {required int count, required double qty, required int overdue, required int buyers}) {
+  Widget _buildSummary(
+    S s, {
+    required int count,
+    required double qty,
+    required int overdue,
+    required int buyers,
+  }) {
     return Column(
       children: [
         Row(
           children: [
-            Expanded(child: _SummaryCard(label: s.shopStockOrdersLabel, value: '$count', icon: Icons.receipt_long_rounded)),
+            Expanded(
+              child: _SummaryCard(
+                label: s.shopStockOrdersLabel,
+                value: '$count',
+                icon: Icons.receipt_long_rounded,
+              ),
+            ),
             const SizedBox(width: 10),
-            Expanded(child: _SummaryCard(label: s.shopStockQtyLabel, value: _numberFormat.format(qty), icon: Icons.inventory_2_rounded)),
+            Expanded(
+              child: _SummaryCard(
+                label: s.shopStockQtyLabel,
+                value: _numberFormat.format(qty),
+                icon: Icons.inventory_2_rounded,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 10),
@@ -555,7 +616,13 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage> with SingleTickerPr
               ),
             ),
             const SizedBox(width: 10),
-            Expanded(child: _SummaryCard(label: s.shopStockBuyersLabel, value: '$buyers', icon: Icons.people_alt_rounded)),
+            Expanded(
+              child: _SummaryCard(
+                label: s.shopStockBuyersLabel,
+                value: '$buyers',
+                icon: Icons.people_alt_rounded,
+              ),
+            ),
           ],
         ),
       ],
@@ -584,7 +651,13 @@ String _stockFormatDateTime(DateTime dt) {
 // ─── Buyer group header ─────────────────────────────────────────────────
 
 class _BuyerGroupHeader extends StatelessWidget {
-  const _BuyerGroupHeader({required this.group, required this.s, required this.isDark, required this.expanded, required this.onTap});
+  const _BuyerGroupHeader({
+    required this.group,
+    required this.s,
+    required this.isDark,
+    required this.expanded,
+    required this.onTap,
+  });
 
   final _BuyerGroup group;
   final S s;
@@ -602,49 +675,85 @@ class _BuyerGroupHeader extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: onSurface.withOpacity(0.08)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: _ShopStockColors.g2.withOpacity(0.1), shape: BoxShape.circle),
-            child: const Icon(Icons.person_rounded, size: 15, color: _ShopStockColors.g2),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: onSurface.withOpacity(0.08)),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              group.buyerName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: onSurface),
-            ),
+          child: Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _ShopStockColors.g2.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.person_rounded,
+                  size: 15,
+                  color: _ShopStockColors.g2,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  group.buyerName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: onSurface,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                s.shopStockOrdersCount(group.orders.length),
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: onSurface.withOpacity(0.5),
+                ),
+              ),
+              if (hasOverdue) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFFECACA)),
+                  ),
+                  child: Text(
+                    s.shopStockGroupBadge,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF991B1B),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(width: 6),
+              AnimatedRotation(
+                turns: expanded ? 0.5 : 0,
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                child: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 22,
+                  color: onSurface.withOpacity(0.45),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Text(s.shopStockOrdersCount(group.orders.length), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: onSurface.withOpacity(0.5))),
-          if (hasOverdue) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFFECACA))),
-              child: Text(s.shopStockGroupBadge, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF991B1B))),
-            ),
-          ],
-          const SizedBox(width: 6),
-          AnimatedRotation(
-            turns: expanded ? 0.5 : 0,
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            child: Icon(Icons.keyboard_arrow_down_rounded, size: 22, color: onSurface.withOpacity(0.45)),
-          ),
-        ],
-      ),
         ),
       ),
     );
@@ -673,7 +782,9 @@ class _StockOrderTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final cardBg = isDark ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.white;
+    final cardBg = isDark
+        ? Theme.of(context).colorScheme.surfaceContainerHighest
+        : Colors.white;
     final days = _daysSince(order.confirmedAt);
     final status = _waitStatus(s, days);
 
@@ -686,7 +797,13 @@ class _StockOrderTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: cardBg,
             borderRadius: BorderRadius.circular(14),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.18 : 0.05), blurRadius: 10, offset: const Offset(0, 2))],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.18 : 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(14),
@@ -704,13 +821,23 @@ class _StockOrderTile extends StatelessWidget {
                           Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: status.bg,
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(color: status.border),
                                 ),
-                                child: Text('№${order.id}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: status.fg)),
+                                child: Text(
+                                  '№${order.id}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: status.fg,
+                                  ),
+                                ),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -718,15 +845,32 @@ class _StockOrderTile extends StatelessWidget {
                                   order.buyerName,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: onSurface),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: onSurface,
+                                  ),
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(color: status.bg, borderRadius: BorderRadius.circular(20), border: Border.all(color: status.border)),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: status.bg,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: status.border),
+                                ),
                                 child: Text(
-                                  days == null ? '—' : '$days ${s.shopStockDaysLabel}',
-                                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: status.fg),
+                                  days == null
+                                      ? '—'
+                                      : '$days ${s.shopStockDaysLabel}',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: status.fg,
+                                  ),
                                 ),
                               ),
                             ],
@@ -734,17 +878,24 @@ class _StockOrderTile extends StatelessWidget {
                           const SizedBox(height: 8),
                           _StockInfoLine(
                             icon: Icons.inventory_2_outlined,
-                            text: '${order.items.length} ${s.shopPickupPositions} · ${numberFormat.format(order.totalValue)} сум',
+                            text:
+                                '${order.items.length} ${s.shopPickupPositions} · ${numberFormat.format(order.totalValue)} сум',
                             onSurface: onSurface,
                           ),
                           const SizedBox(height: 4),
                           if (showShop) ...[
-                            _StockInfoLine(icon: Icons.storefront_rounded, text: order.shopName, onSurface: onSurface),
+                            _StockInfoLine(
+                              icon: Icons.storefront_rounded,
+                              text: order.shopName,
+                              onSurface: onSurface,
+                            ),
                             const SizedBox(height: 4),
                           ],
                           _StockInfoLine(
                             icon: Icons.event_available_rounded,
-                            text: order.confirmedAt != null ? _stockFormatDateTime(order.confirmedAt!) : '—',
+                            text: order.confirmedAt != null
+                                ? _stockFormatDateTime(order.confirmedAt!)
+                                : '—',
                             onSurface: onSurface,
                           ),
                         ],
@@ -766,7 +917,11 @@ class _StockInfoLine extends StatelessWidget {
   final String text;
   final Color onSurface;
 
-  const _StockInfoLine({required this.icon, required this.text, required this.onSurface});
+  const _StockInfoLine({
+    required this.icon,
+    required this.text,
+    required this.onSurface,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -790,7 +945,10 @@ class _StockInfoLine extends StatelessWidget {
 // ─── Order detail sheet ────────────────────────────────────────────────
 
 class _StockOrderDetailSheet extends StatelessWidget {
-  const _StockOrderDetailSheet({required this.order, required this.numberFormat});
+  const _StockOrderDetailSheet({
+    required this.order,
+    required this.numberFormat,
+  });
 
   final PvzOrder order;
   final NumberFormat numberFormat;
@@ -811,7 +969,10 @@ class _StockOrderDetailSheet extends StatelessWidget {
       expand: false,
       builder: (context, scrollController) {
         return Container(
-          decoration: BoxDecoration(color: surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -821,26 +982,62 @@ class _StockOrderDetailSheet extends StatelessWidget {
                   width: 40,
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 18),
-                  decoration: BoxDecoration(color: onSurface.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+                  decoration: BoxDecoration(
+                    color: onSurface.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
                 ),
               ),
-              if (order.buyerPhotoUrl != null) _StockPhotoPreview(photoUrl: order.buyerPhotoUrl!, heroTag: 'stock_order_photo_${order.id}'),
+              if (order.buyerPhotoUrl != null)
+                _StockPhotoPreview(
+                  photoUrl: order.buyerPhotoUrl!,
+                  heroTag: 'stock_order_photo_${order.id}',
+                ),
               const SizedBox(height: 16),
               Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: status.bg, borderRadius: BorderRadius.circular(12), border: Border.all(color: status.border)),
-                    child: Icon(Icons.local_shipping_rounded, color: status.fg, size: 20),
+                    decoration: BoxDecoration(
+                      color: status.bg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: status.border),
+                    ),
+                    child: Icon(
+                      Icons.local_shipping_rounded,
+                      color: status.fg,
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(s.shopPickupOrderTitle(order.id), style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: onSurface)),
+                    child: Text(
+                      s.shopPickupOrderTitle(order.id),
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: onSurface,
+                      ),
+                    ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(color: status.bg, borderRadius: BorderRadius.circular(20), border: Border.all(color: status.border)),
-                    child: Text(status.label, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: status.fg)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: status.bg,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: status.border),
+                    ),
+                    child: Text(
+                      status.label,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: status.fg,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -854,16 +1051,33 @@ class _StockOrderDetailSheet extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    _StockDetailRow(icon: Icons.person_outline_rounded, label: s.shopPickupBuyer, value: order.buyerName, onSurface: onSurface),
+                    _StockDetailRow(
+                      icon: Icons.person_outline_rounded,
+                      label: s.shopPickupBuyer,
+                      value: order.buyerName,
+                      onSurface: onSurface,
+                    ),
                     const SizedBox(height: 8),
-                    _StockDetailRow(icon: Icons.badge_outlined, label: s.shopPickupSeller, value: order.sellerName, onSurface: onSurface),
+                    _StockDetailRow(
+                      icon: Icons.badge_outlined,
+                      label: s.shopPickupSeller,
+                      value: order.sellerName,
+                      onSurface: onSurface,
+                    ),
                     const SizedBox(height: 8),
-                    _StockDetailRow(icon: Icons.storefront_outlined, label: s.shopIssuedShopFilterTitle, value: order.shopName, onSurface: onSurface),
+                    _StockDetailRow(
+                      icon: Icons.storefront_outlined,
+                      label: s.shopIssuedShopFilterTitle,
+                      value: order.shopName,
+                      onSurface: onSurface,
+                    ),
                     const SizedBox(height: 8),
                     _StockDetailRow(
                       icon: Icons.event_available_rounded,
                       label: s.shopStockWaitingSince,
-                      value: order.confirmedAt != null ? _stockFormatDateTime(order.confirmedAt!) : '—',
+                      value: order.confirmedAt != null
+                          ? _stockFormatDateTime(order.confirmedAt!)
+                          : '—',
                       onSurface: onSurface,
                     ),
                     const SizedBox(height: 8),
@@ -877,31 +1091,55 @@ class _StockOrderDetailSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
-              Text(s.shopPickupItemsHeader, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: onSurface)),
+              Text(
+                s.shopPickupItemsHeader,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: onSurface,
+                ),
+              ),
               const SizedBox(height: 10),
               ...order.items.map(
                 (item) => Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: onSurface.withOpacity(0.04), borderRadius: BorderRadius.circular(12)),
+                  decoration: BoxDecoration(
+                    color: onSurface.withOpacity(0.04),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: Row(
                     children: [
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('${item.article} — ${item.productName}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: onSurface)),
+                            Text(
+                              '${item.article} — ${item.productName}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: onSurface,
+                              ),
+                            ),
                             const SizedBox(height: 2),
                             Text(
                               '${item.color} · Размер ${item.sizeName} · ${numberFormat.format(item.amount)} шт',
-                              style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.55)),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: onSurface.withOpacity(0.55),
+                              ),
                             ),
                           ],
                         ),
                       ),
                       Text(
                         '${numberFormat.format(item.subtotal)} сум',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _ShopStockColors.g2),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _ShopStockColors.g2,
+                        ),
                       ),
                     ],
                   ),
@@ -911,17 +1149,35 @@ class _StockOrderDetailSheet extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [_ShopStockColors.g1, _ShopStockColors.g2]),
+                  gradient: const LinearGradient(
+                    colors: [_ShopStockColors.g1, _ShopStockColors.g2],
+                  ),
                   borderRadius: BorderRadius.circular(14),
-                  boxShadow: [BoxShadow(color: _ShopStockColors.g2.withOpacity(0.3), blurRadius: 14, offset: const Offset(0, 6))],
+                  boxShadow: [
+                    BoxShadow(
+                      color: _ShopStockColors.g2.withOpacity(0.3),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(s.totalLabel, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    Text(
+                      s.totalLabel,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     Text(
                       '${numberFormat.format(order.totalValue)} сум',
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ],
                 ),
@@ -940,7 +1196,12 @@ class _StockDetailRow extends StatelessWidget {
   final String value;
   final Color onSurface;
 
-  const _StockDetailRow({required this.icon, required this.label, required this.value, required this.onSurface});
+  const _StockDetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onSurface,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -949,7 +1210,10 @@ class _StockDetailRow extends StatelessWidget {
       children: [
         Icon(icon, size: 15, color: onSurface.withOpacity(0.4)),
         const SizedBox(width: 8),
-        Text(label, style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.55))),
+        Text(
+          label,
+          style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.55)),
+        ),
         const SizedBox(width: 4),
         Expanded(
           child: Text(
@@ -957,7 +1221,11 @@ class _StockDetailRow extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.right,
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: onSurface),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: onSurface,
+            ),
           ),
         ),
       ],
@@ -976,7 +1244,11 @@ class _StockPhotoPreview extends StatelessWidget {
     return Center(
       child: GestureDetector(
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => _StockFullScreenPhotoView(photoUrl: photoUrl, heroTag: heroTag), fullscreenDialog: true),
+          MaterialPageRoute(
+            builder: (_) =>
+                _StockFullScreenPhotoView(photoUrl: photoUrl, heroTag: heroTag),
+            fullscreenDialog: true,
+          ),
         ),
         child: Container(
           width: 128,
@@ -984,22 +1256,38 @@ class _StockPhotoPreview extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: Colors.black.withOpacity(0.08)),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 12, offset: const Offset(0, 4))],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.12),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Stack(
             fit: StackFit.expand,
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(13),
-                child: Hero(tag: heroTag, child: Image.network(photoUrl, fit: BoxFit.cover)),
+                child: Hero(
+                  tag: heroTag,
+                  child: Image.network(photoUrl, fit: BoxFit.cover),
+                ),
               ),
               Positioned(
                 right: 6,
                 bottom: 6,
                 child: Container(
                   padding: const EdgeInsets.all(5),
-                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.5), shape: BoxShape.circle),
-                  child: const Icon(Icons.zoom_in_rounded, color: Colors.white, size: 15),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.zoom_in_rounded,
+                    color: Colors.white,
+                    size: 15,
+                  ),
                 ),
               ),
             ],
@@ -1011,7 +1299,10 @@ class _StockPhotoPreview extends StatelessWidget {
 }
 
 class _StockFullScreenPhotoView extends StatelessWidget {
-  const _StockFullScreenPhotoView({required this.photoUrl, required this.heroTag});
+  const _StockFullScreenPhotoView({
+    required this.photoUrl,
+    required this.heroTag,
+  });
 
   final String photoUrl;
   final String heroTag;
@@ -1020,7 +1311,11 @@ class _StockFullScreenPhotoView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white, elevation: 0),
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
       body: Center(
         child: InteractiveViewer(
           minScale: 0.8,
@@ -1083,9 +1378,14 @@ class _StockCustomRangeSheetState extends State<_StockCustomRangeSheet> {
     final onSurface = Theme.of(context).colorScheme.onSurface;
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: Container(
-        decoration: BoxDecoration(color: surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1096,7 +1396,10 @@ class _StockCustomRangeSheetState extends State<_StockCustomRangeSheet> {
                 width: 40,
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 18),
-                decoration: BoxDecoration(color: onSurface.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+                decoration: BoxDecoration(
+                  color: onSurface.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
               ),
             ),
             Row(
@@ -1104,23 +1407,50 @@ class _StockCustomRangeSheetState extends State<_StockCustomRangeSheet> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [_ShopStockColors.g1, _ShopStockColors.g2], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                    gradient: const LinearGradient(
+                      colors: [_ShopStockColors.g1, _ShopStockColors.g2],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.date_range_rounded, color: Colors.white, size: 20),
+                  child: const Icon(
+                    Icons.date_range_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(s.shopIssuedCustomPeriod, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: onSurface)),
+                  child: Text(
+                    s.shopIssuedCustomPeriod,
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: onSurface,
+                    ),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 20),
             Row(
               children: [
-                Expanded(child: _StockDatePickerField(label: s.shopIssuedDateFrom, date: _from, onTap: _pickFrom)),
+                Expanded(
+                  child: _StockDatePickerField(
+                    label: s.shopIssuedDateFrom,
+                    date: _from,
+                    onTap: _pickFrom,
+                  ),
+                ),
                 const SizedBox(width: 12),
-                Expanded(child: _StockDatePickerField(label: s.shopIssuedDateTo, date: _to, onTap: _pickTo)),
+                Expanded(
+                  child: _StockDatePickerField(
+                    label: s.shopIssuedDateTo,
+                    date: _to,
+                    onTap: _pickTo,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 20),
@@ -1129,7 +1459,9 @@ class _StockCustomRangeSheetState extends State<_StockCustomRangeSheet> {
               child: AdaptiveButton(
                 onPressed: () {
                   HapticFeedback.selectionClick();
-                  Navigator.of(context).pop(DateTimeRange(start: _from, end: _to));
+                  Navigator.of(
+                    context,
+                  ).pop(DateTimeRange(start: _from, end: _to));
                 },
                 label: s.shopIssuedApply,
                 style: AdaptiveButtonStyle.filled,
@@ -1150,7 +1482,11 @@ class _StockDatePickerField extends StatelessWidget {
   final DateTime date;
   final VoidCallback onTap;
 
-  const _StockDatePickerField({required this.label, required this.date, required this.onTap});
+  const _StockDatePickerField({
+    required this.label,
+    required this.date,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1173,13 +1509,30 @@ class _StockDatePickerField extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Icon(Icons.calendar_today_rounded, size: 13, color: onSurface.withOpacity(0.4)),
+                  Icon(
+                    Icons.calendar_today_rounded,
+                    size: 13,
+                    color: onSurface.withOpacity(0.4),
+                  ),
                   const SizedBox(width: 6),
-                  Text(label, style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.55))),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: onSurface.withOpacity(0.55),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 6),
-              Text(_stockFormatDate(date), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: onSurface)),
+              Text(
+                _stockFormatDate(date),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: onSurface,
+                ),
+              ),
             ],
           ),
         ),
@@ -1193,7 +1546,13 @@ class _StockDatePickerField extends StatelessWidget {
 // ─── Summary card ────────────────────────────────────────────────────────
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.label, required this.value, required this.icon, this.highlight = false, this.highlightColor});
+  const _SummaryCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.highlight = false,
+    this.highlightColor,
+  });
 
   final String label;
   final String value;
@@ -1208,10 +1567,20 @@ class _SummaryCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: highlight ? hc.withOpacity(0.1) : Theme.of(context).colorScheme.surface,
+        color: highlight
+            ? hc.withOpacity(0.1)
+            : Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: highlight ? hc.withOpacity(0.35) : onSurface.withOpacity(0.12)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 4))],
+        border: Border.all(
+          color: highlight ? hc.withOpacity(0.35) : onSurface.withOpacity(0.12),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1220,7 +1589,10 @@ class _SummaryCard extends StatelessWidget {
             width: 30,
             height: 30,
             alignment: Alignment.center,
-            decoration: BoxDecoration(color: hc.withOpacity(0.12), shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: hc.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
             child: Icon(icon, size: 16, color: hc),
           ),
           const SizedBox(height: 10),
@@ -1228,10 +1600,17 @@ class _SummaryCard extends StatelessWidget {
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: highlight ? hc : onSurface),
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: highlight ? hc : onSurface,
+            ),
           ),
           const SizedBox(height: 2),
-          Text(label, style: TextStyle(fontSize: 11, color: onSurface.withOpacity(0.55))),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: onSurface.withOpacity(0.55)),
+          ),
         ],
       ),
     );
@@ -1239,44 +1618,3 @@ class _SummaryCard extends StatelessWidget {
 }
 
 // ─── Search bar ──────────────────────────────────────────────────────────
-
-class _SearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  final bool isDark;
-  final String hintText;
-
-  const _SearchBar({required this.controller, required this.isDark, required this.hintText});
-
-  @override
-  Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    return Container(
-      height: 46,
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.07) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isDark ? Colors.white12 : Colors.grey.shade200),
-        boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2))],
-      ),
-      child: TextField(
-        autofocus: true,
-        controller: controller,
-        style: TextStyle(color: onSurface, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: '$hintText...',
-          hintStyle: TextStyle(color: onSurface.withOpacity(0.38), fontSize: 14),
-          prefixIcon: Icon(Icons.search_rounded, color: onSurface.withOpacity(0.38), size: 20),
-          suffixIcon: ValueListenableBuilder<TextEditingValue>(
-            valueListenable: controller,
-            builder: (_, v, __) => v.text.isEmpty
-                ? const SizedBox.shrink()
-                : IconButton(icon: Icon(Icons.clear_rounded, size: 18, color: onSurface.withOpacity(0.4)), onPressed: controller.clear),
-          ),
-          filled: false,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 14),
-        ),
-      ),
-    );
-  }
-}

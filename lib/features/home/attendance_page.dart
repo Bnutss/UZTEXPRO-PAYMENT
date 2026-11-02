@@ -1,12 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -15,10 +13,9 @@ import 'package:uztexpro_payment/main.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/adaptive_back_button.dart';
 import '../../core/widgets/app_refresh.dart';
 import '../../core/widgets/app_segmented_control.dart';
-import '../../core/widgets/search_toggle.dart';
+import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/ui_blocks.dart';
 import '../auth/widgets/logo_stroke_loader.dart';
 
@@ -256,8 +253,7 @@ class _AttendancePageState extends State<AttendancePage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) =>
-          _EmployeeSheet(entry: entry, photoHeaders: _photoHeaders),
+      builder: (_) => _EmployeeSheet(entry: entry, photoHeaders: _photoHeaders),
     );
   }
 
@@ -266,129 +262,38 @@ class _AttendancePageState extends State<AttendancePage> {
     final s = S.of(context);
     const bg = AppColors.groupedBackground;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        backgroundColor: bg,
-        appBar: AppBar(
-          leadingWidth: kBackButtonLeadingWidth,
-          leading: const AdaptiveBackButton(),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                s.attendanceTitle,
-                style: const TextStyle(
-                  color: _kInk,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 180),
-                alignment: Alignment.topLeft,
-                child: _selectedFactory == null
-                    ? const SizedBox(width: double.infinity)
-                    : Text(
-                        _selectedFactory!.name,
-                        style: const TextStyle(
-                          color: AppColors.brandRed,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                          height: 1.2,
-                        ),
-                      ),
-              ),
-            ],
-          ),
-          centerTitle: false,
-          backgroundColor: bg,
-          foregroundColor: _kInk,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          surfaceTintColor: Colors.transparent,
-          actions: [
-            if (_factories.length > 1)
-              _FilterButton(
-                active: _factoryId != null,
-                onPressed: () => _openFactorySheet(s),
-              ),
-            SearchToggleButton(active: _searching, onPressed: _toggleSearch),
-          ],
-        ),
-        body: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  AnimatedSearchSlot(
-                    open: _searching,
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _buildSearch(s),
-                    ),
-                  ),
-                  _buildSummary(s),
-                  const SizedBox(height: 12),
-                  AppSegmentedControl(
-                    labels: [s.dashboardInTerritory, s.attendanceCameToday],
-                    selectedIndex: _onlyToday ? 1 : 0,
-                    onChanged: (i) {
-                      if ((i == 1) == _onlyToday) return;
-                      HapticFeedback.selectionClick();
-                      setState(() => _onlyToday = i == 1);
-                      _load();
-                    },
-                    minSegmentWidth: 0,
-                    padding: EdgeInsets.zero,
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ),
-            ),
-            Expanded(
-              child: AppRefresh(onRefresh: _load, child: _buildList(s)),
-            ),
-          ],
+    return FadingHeaderScaffold(
+      title: s.attendanceTitle,
+      subtitle: _selectedFactory?.name,
+      background: bg,
+      searching: _searching,
+      onToggleSearch: _toggleSearch,
+      searchController: _searchController,
+      searchHint: s.attendanceSearchHint,
+      // Factory filter: a button next to search that opens the factory sheet.
+      onFilterTap: _factories.length > 1 ? () => _openFactorySheet(s) : null,
+      filterActive: _factoryId != null,
+      // Native "In territory / Came today" control, pinned under the title row.
+      bottomHeight: 46,
+      bottom: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+        child: AppSegmentedControl(
+          labels: [s.dashboardInTerritory, s.attendanceCameToday],
+          selectedIndex: _onlyToday ? 1 : 0,
+          onChanged: (i) {
+            if ((i == 1) == _onlyToday) return;
+            HapticFeedback.selectionClick();
+            setState(() => _onlyToday = i == 1);
+            _load();
+          },
+          minSegmentWidth: 0,
+          padding: EdgeInsets.zero,
         ),
       ),
-    );
-  }
-
-  Widget _buildSearch(S s) {
-    return TextField(
-      controller: _searchController,
-      autofocus: true,
-      textInputAction: TextInputAction.search,
-      style: const TextStyle(fontSize: 15, color: _kInk),
-      decoration: InputDecoration(
-        hintText: s.attendanceSearchHint,
-        hintStyle: const TextStyle(color: _kMuted, fontSize: 15),
-        prefixIcon: const Icon(Icons.search_rounded, color: _kMuted),
-        suffixIcon: ValueListenableBuilder<TextEditingValue>(
-          valueListenable: _searchController,
-          builder: (_, value, _) => value.text.isEmpty
-              ? const SizedBox.shrink()
-              : IconButton(
-                  icon: const Icon(Icons.cancel_rounded, color: _kMuted),
-                  onPressed: _searchController.clear,
-                ),
-        ),
-        filled: true,
-        fillColor: Colors.white,
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(vertical: 13),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
+      body: (context, topInset) => AppRefresh(
+        topOffset: topInset,
+        onRefresh: _load,
+        child: _buildList(s, topInset),
       ),
     );
   }
@@ -520,60 +425,85 @@ class _AttendancePageState extends State<AttendancePage> {
     if (picked != null) _selectFactory(picked.id);
   }
 
-  Widget _buildList(S s) {
+  Widget _buildList(S s, double topInset) {
+    // The summary card scrolls with the list (first item), so it never sits
+    // as an opaque block over the cards.
+    final padding = EdgeInsets.fromLTRB(16, topInset + 4, 16, 28);
+    const physics = BouncingScrollPhysics(
+      parent: AlwaysScrollableScrollPhysics(),
+    );
+
+    Widget message(Widget content) => ListView(
+      physics: physics,
+      padding: padding,
+      children: [_buildSummary(s), const SizedBox(height: 12), content],
+    );
+
     if (_loading && _entries.isEmpty) {
-      return const Center(child: LogoStrokeLoader(size: 80));
+      return message(
+        const Padding(
+          padding: EdgeInsets.only(top: 40),
+          child: Center(child: LogoStrokeLoader(size: 80)),
+        ),
+      );
     }
     if (_error != null) {
-      return _centeredMessage(
-        Icons.error_outline_rounded,
-        _error!,
-        color: const Color(0xFFD32F2F),
+      return message(
+        _messageBlock(
+          Icons.error_outline_rounded,
+          _error!,
+          color: const Color(0xFFD32F2F),
+        ),
       );
     }
     if (_entries.isEmpty) {
-      return _centeredMessage(Icons.people_outline_rounded, s.attendanceEmpty);
+      return message(
+        _messageBlock(Icons.people_outline_rounded, s.attendanceEmpty),
+      );
     }
-    return ListView.separated(
-      physics: const BouncingScrollPhysics(
-        parent: AlwaysScrollableScrollPhysics(),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-      itemCount: _entries.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (_, i) => _entryTile(_entries[i]),
+    return ListView.builder(
+      physics: physics,
+      padding: padding,
+      itemCount: _entries.length + 1,
+      itemBuilder: (_, i) {
+        if (i == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildSummary(s),
+          );
+        }
+        return Padding(
+          padding: EdgeInsets.only(bottom: i == _entries.length ? 0 : 8),
+          child: _entryTile(_entries[i - 1]),
+        );
+      },
     );
   }
 
-  Widget _centeredMessage(IconData icon, String text, {Color color = _kMuted}) {
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 64),
-          child: Column(
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
-                      blurRadius: 12,
-                    ),
-                  ],
+  Widget _messageBlock(IconData icon, String text, {Color color = _kMuted}) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 40),
+      child: Column(
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 12,
                 ),
-                child: Icon(icon, size: 34, color: color.withOpacity(0.7)),
-              ),
-              const SizedBox(height: 14),
-              Text(text, style: TextStyle(color: color, fontSize: 14)),
-            ],
+              ],
+            ),
+            child: Icon(icon, size: 34, color: color.withOpacity(0.7)),
           ),
-        ),
-      ],
+          const SizedBox(height: 14),
+          Text(text, style: TextStyle(color: color, fontSize: 14)),
+        ],
+      ),
     );
   }
 
@@ -718,86 +648,6 @@ class _StatusAvatar extends StatelessWidget {
 class _FactoryPick {
   final int? id;
   const _FactoryPick(this.id);
-}
-
-/// Round app-bar button matching [SearchToggleButton]; shows a brand-colour
-/// dot while a factory filter is applied.
-class _FilterButton extends StatelessWidget {
-  final bool active;
-  final VoidCallback onPressed;
-
-  const _FilterButton({required this.active, required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    const icon = Icons.tune_rounded;
-    final Widget button;
-    if (Platform.isIOS) {
-      button = SizedBox(
-        width: 46,
-        height: 46,
-        child: AdaptiveButton.icon(
-          onPressed: onPressed,
-          icon: icon,
-          iconColor: _kInk,
-          color: _kInk,
-          style: AdaptiveButtonStyle.glass,
-          size: AdaptiveButtonSize.medium,
-          useSmoothRectangleBorder: false,
-          minSize: const Size(46, 46),
-        ),
-      );
-    } else {
-      button = Material(
-        color: Colors.transparent,
-        shape: const CircleBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onPressed,
-          child: Container(
-            width: 46,
-            height: 46,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: Color(0xFFF2F2F2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(icon, color: _kInk, size: 22),
-          ),
-        ),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: Center(
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            button,
-            if (active)
-              Positioned(
-                top: 2,
-                right: 2,
-                child: IgnorePointer(
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.brandRed,
-                      border: Border.all(
-                        color: AppColors.groupedBackground,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 /// Bottom sheet with one row per factory: icon, name, how many are on site
@@ -1134,7 +984,11 @@ class _EmployeeSheet extends StatelessWidget {
 
     final tiles = <_InfoTile>[
       if (entry.factory.isNotEmpty)
-        _InfoTile(Icons.factory_rounded, s.attendanceFilterFactory, entry.factory),
+        _InfoTile(
+          Icons.factory_rounded,
+          s.attendanceFilterFactory,
+          entry.factory,
+        ),
       if (entry.department.isNotEmpty)
         _InfoTile(
           Icons.account_tree_rounded,
@@ -1265,9 +1119,7 @@ class _EmployeeSheet extends StatelessWidget {
                   ],
                   const SizedBox(height: 10),
                   StatusTag(
-                    entry.isIn
-                        ? s.dashboardInTerritory
-                        : s.attendanceStatusOut,
+                    entry.isIn ? s.dashboardInTerritory : s.attendanceStatusOut,
                     color: entry.isIn ? _kOnline : _kMuted,
                   ),
                 ],

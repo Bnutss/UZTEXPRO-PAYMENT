@@ -38,6 +38,7 @@ class SearchToggleButton extends StatelessWidget {
           style: AdaptiveButtonStyle.glass,
           size: AdaptiveButtonSize.medium,
           useSmoothRectangleBorder: false,
+          padding: EdgeInsets.zero,
           minSize: const Size(46, 46),
         ),
       );
