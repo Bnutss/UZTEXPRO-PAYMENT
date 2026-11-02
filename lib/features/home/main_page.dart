@@ -101,6 +101,18 @@ class _MainPageScreenState extends State<MainPageScreen>
 
   // ── Filtered list ────────────────────────────────────────────────────────────
 
+  List<dynamic> _statusesFromReports() {
+    final byId = <int, String>{};
+    for (final r in paymentReports) {
+      final id = r['status'];
+      if (id is int) byId[id] = r['status_name']?.toString() ?? '$id';
+    }
+    final ids = byId.keys.toList()..sort();
+    return [
+      for (final id in ids) {'id': id, 'name': byId[id]},
+    ];
+  }
+
   List<dynamic> get _filteredReports {
     final q = _searchController.text.toLowerCase().trim();
     return paymentReports.where((r) {
@@ -1302,7 +1314,12 @@ class _MainPageScreenState extends State<MainPageScreen>
               color: listBg,
               padding: const EdgeInsets.only(top: 6, bottom: 8),
               child: _PayFilterRow(
-                statuses: statuses,
+                // Пользователям без групп утверждения бэкенд отдаёт пустой
+                // список статусов (payment-raport-status) — тогда фильтры
+                // строим из самих заявок (status + status_name).
+                statuses: statuses.isNotEmpty
+                    ? statuses
+                    : _statusesFromReports(),
                 usedIds: paymentReports
                     .map<int>((r) => r['status'] as int)
                     .toSet(),

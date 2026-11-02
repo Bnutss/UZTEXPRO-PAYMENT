@@ -330,6 +330,22 @@ class _MenuPageState extends State<MenuPage>
     );
   }
 
+  /// Группа `Raport` открывает «Платежи» без полного доступа. Бэкенд
+  /// (edo.views.PaymentRaportView) для пользователей вне групп утверждения
+  /// отдаёт только их собственные заявки (applicant = сам сотрудник).
+  /// Группы утверждения/оплаты видят заявки по своему этапу.
+  static const _paymentGroups = {
+    'Raport',
+    'nach_sanbjeniya_utverjdeniya',
+    'zam_direktor_utverjdeniya',
+    'gen_direktor_utverjdeniya',
+    'oplata_payment',
+    'for_accounting_payment_view',
+  };
+
+  bool get _canSeePayments =>
+      _extractGroups(_parsedToken()).any(_paymentGroups.contains);
+
   bool get _canSeePasses =>
       _extractGroups(_parsedToken()).any(_passOnlyGroups.contains);
 
@@ -572,6 +588,8 @@ class _MenuPageState extends State<MenuPage>
   /// are built per access: timesheet and logout for everyone, AI assistant
   /// only with full access.
   Widget _buildHeaderMenu(S s) {
+    // Android: собственное Material-меню (на iOS остаётся нативное ниже).
+    if (Platform.isAndroid) return _buildAndroidHeaderMenu(s);
     final native = PlatformInfo.isIOS26OrHigher();
     dynamic ic(String sf, IconData material) => native ? sf : material;
 
@@ -610,6 +628,138 @@ class _MenuPageState extends State<MenuPage>
             _showLogoutDialog();
         }
       },
+    );
+  }
+
+  void _onHeaderMenuSelected(String value) {
+    switch (value) {
+      case 'timesheet':
+        _openTimesheet();
+      case 'ai':
+        _openAiAssistant();
+      case 'logout':
+        HapticFeedback.lightImpact();
+        _showLogoutDialog();
+    }
+  }
+
+  /// Android-версия меню «⋯»: круглая кнопка с ripple, карточка со
+  /// скруглением и мягкой тенью, иконки в цветных плашках, «Выйти»
+  /// отделён разделителем и выделен красным. Размер строк ≥ 48dp.
+  Widget _buildAndroidHeaderMenu(S s) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        splashColor: const Color(0x14000000),
+        highlightColor: const Color(0x0D000000),
+      ),
+      child: PopupMenuButton<String>(
+        tooltip: '',
+        padding: EdgeInsets.zero,
+        offset: const Offset(0, 54),
+        elevation: 12,
+        color: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.black.withValues(alpha: 0.28),
+        constraints: const BoxConstraints(minWidth: 228),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0x0F000000)),
+        ),
+        popUpAnimationStyle: AnimationStyle(
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+          duration: const Duration(milliseconds: 220),
+          reverseDuration: const Duration(milliseconds: 140),
+        ),
+        onOpened: HapticFeedback.selectionClick,
+        onSelected: _onHeaderMenuSelected,
+        itemBuilder: (_) => [
+          _androidMenuItem(
+            'timesheet',
+            s.timesheetTitle,
+            Icons.calendar_month_rounded,
+            const Color(0xFF1976D2),
+          ),
+          if (_hasFullAccess)
+            _androidMenuItem(
+              'ai',
+              s.aiAssistantTitle,
+              Icons.auto_awesome_rounded,
+              const Color(0xFF7E57C2),
+            ),
+          const PopupMenuDivider(height: 8),
+          _androidMenuItem(
+            'logout',
+            s.logOut,
+            Icons.logout_rounded,
+            const Color(0xFFD32F2F),
+            destructive: true,
+          ),
+        ],
+        child: Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: const Color(0x14000000)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x1A000000),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.more_horiz_rounded,
+            size: 24,
+            color: Color(0xFF1C1C1E),
+          ),
+        ),
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _androidMenuItem(
+    String value,
+    String label,
+    IconData icon,
+    Color accent, {
+    bool destructive = false,
+  }) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(icon, size: 19, color: accent),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: destructive
+                    ? const Color(0xFFD32F2F)
+                    : const Color(0xFF1C1C1E),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1446,8 +1596,19 @@ class _MenuPageState extends State<MenuPage>
       ),
     );
 
+    Widget paymentsCard() => _MenuCard(
+      icon: Icons.receipt_long_rounded,
+      label: s.menuPayments,
+      description: s.menuPaymentsDesc,
+      onTap: () => Navigator.push(
+        context,
+        FadeRoute(builder: (_) => MainPageScreen(jwtToken: widget.jwtToken)),
+      ),
+    );
+
     if (!_hasFullAccess) {
       final cards = <Widget>[
+        if (_canSeePayments) paymentsCard(),
         if (_canSeePasses) passCard(),
         if (_canSignRequests) signCard(),
       ];
@@ -1460,15 +1621,7 @@ class _MenuPageState extends State<MenuPage>
     }
 
     return [
-      _MenuCard(
-        icon: Icons.receipt_long_rounded,
-        label: s.menuPayments,
-        description: s.menuPaymentsDesc,
-        onTap: () => Navigator.push(
-          context,
-          FadeRoute(builder: (_) => MainPageScreen(jwtToken: widget.jwtToken)),
-        ),
-      ),
+      paymentsCard(),
       const SizedBox(height: 12),
       passCard(),
       const SizedBox(height: 12),
