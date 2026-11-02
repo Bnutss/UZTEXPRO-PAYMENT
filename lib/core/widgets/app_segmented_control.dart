@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
@@ -63,11 +64,13 @@ class AppSegmentedControl extends StatelessWidget {
         // scroll view, so it is only used when every segment fits; wider
         // sets get the scrollable pill track on both platforms.
         final Widget control = Platform.isIOS && !overflows && !forcePill
-            ? AdaptiveSegmentedControl(
-                labels: labels,
-                selectedIndex: selectedIndex,
-                color: AppColors.brandOrange,
-                onValueChanged: handleChanged,
+            ? _GlassBacking(
+                child: AdaptiveSegmentedControl(
+                  labels: labels,
+                  selectedIndex: selectedIndex,
+                  color: AppColors.brandOrange,
+                  onValueChanged: handleChanged,
+                ),
               )
             : _PillSegments(
                 labels: labels,
@@ -76,8 +79,8 @@ class AppSegmentedControl extends StatelessWidget {
                 widths: scrolls
                     ? widths
                     : stretch
-                        ? [for (final w in widths) w * available / needed]
-                        : null,
+                    ? [for (final w in widths) w * available / needed]
+                    : null,
               );
 
         final sized = SizedBox(
@@ -92,6 +95,40 @@ class AppSegmentedControl extends StatelessWidget {
           child: sized,
         );
       },
+    );
+  }
+}
+
+/// The native iOS 26 segmented control is Liquid Glass and very transparent:
+/// list rows scrolling under it show through sharply. A frosted pill behind
+/// it (blur + white tint, like the folder bar in Telegram) makes whatever is
+/// underneath faint and blurred while the glass stays on top. Not needed on
+/// iOS < 26 (opaque Cupertino control).
+class _GlassBacking extends StatelessWidget {
+  const _GlassBacking({required this.child});
+
+  /// Blur radius of what is behind the control.
+  static const double _blur = 18;
+
+  /// Opacity of the white tint over the blur (higher = more frosted).
+  static const double _frost = 0.62;
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!PlatformInfo.isIOS26OrHigher()) return child;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: _blur, sigmaY: _blur),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: _frost),
+          ),
+          child: child,
+        ),
+      ),
     );
   }
 }

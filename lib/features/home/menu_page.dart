@@ -8,6 +8,7 @@ import '../../core/widgets/confirm_dialog.dart';
 import '../../core/widgets/fade_route.dart';
 import '../../core/widgets/floating_notch_bar.dart';
 import '../../core/widgets/logo_3d.dart';
+import '../../core/widgets/routeless_alert.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -366,19 +367,20 @@ class _MenuPageState extends State<MenuPage>
     setState(() => _currentIndex = index);
   }
 
+  Future<void> _logoutNow() async {
+    final nav = Navigator.of(context);
+    try {
+      await storage.delete(key: "jwt");
+    } catch (_) {}
+    nav.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (route) => false,
+    );
+  }
+
   void _showLogoutDialog() {
     final s = S.of(context);
-
-    Future<void> confirmLogout() async {
-      final nav = Navigator.of(context);
-      try {
-        await storage.delete(key: "jwt");
-      } catch (_) {}
-      nav.pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginPage()),
-        (route) => false,
-      );
-    }
+    final confirmLogout = _logoutNow;
 
     if (!Platform.isIOS) {
       showConfirmDialog(
@@ -393,6 +395,30 @@ class _MenuPageState extends State<MenuPage>
       return;
     }
 
+    final actions = [
+      AlertAction(
+        title: s.cancel,
+        onPressed: () {},
+        style: AlertActionStyle.cancel,
+      ),
+      AlertAction(
+        title: s.logOutBtn,
+        onPressed: confirmLogout,
+        style: AlertActionStyle.destructive,
+      ),
+    ];
+
+    // iOS 26+: the same native alert, shown in the Overlay instead of as a
+    // route, so the native tab bar and toolbar stay visible behind it.
+    if (showRoutelessNativeAlert(
+      context,
+      title: s.logOut,
+      message: s.logOutConfirm,
+      actions: actions,
+    )) {
+      return;
+    }
+
     // Native platform alert (real Liquid Glass chrome on iOS 26+) instead of
     // a hand-rolled Dialog stacking its own AdaptiveButtons on top of the
     // header's own native glass button — that double platform-view overlap
@@ -401,18 +427,7 @@ class _MenuPageState extends State<MenuPage>
       context: context,
       title: s.logOut,
       message: s.logOutConfirm,
-      actions: [
-        AlertAction(
-          title: s.cancel,
-          onPressed: () {},
-          style: AlertActionStyle.cancel,
-        ),
-        AlertAction(
-          title: s.logOutBtn,
-          onPressed: confirmLogout,
-          style: AlertActionStyle.destructive,
-        ),
-      ],
+      actions: actions,
     );
   }
 

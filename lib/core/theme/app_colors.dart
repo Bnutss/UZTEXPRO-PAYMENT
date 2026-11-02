@@ -15,5 +15,5 @@ class AppColors {
   /// iOS's systemGray5. Every screen must reference this constant instead of
   /// its own hardcoded gray hex, or screens drift out of sync with each
   /// other (as happened before this existed).
-  static const Color groupedBackground = Color(0xFFE5E5EA);
+  static const Color groupedBackground = Color(0xFFF2F2F7);
 }

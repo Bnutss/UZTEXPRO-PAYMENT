@@ -270,9 +270,20 @@ class _AttendancePageState extends State<AttendancePage> {
       onToggleSearch: _toggleSearch,
       searchController: _searchController,
       searchHint: s.attendanceSearchHint,
-      // Factory filter: a button next to search that opens the factory sheet.
-      onFilterTap: _factories.length > 1 ? () => _openFactorySheet(s) : null,
+      // Factory filter: a native menu next to search (check on the selected
+      // one), with how many people are on site in each factory.
+      filterLabels: _factories.length > 1
+          ? [
+              '${s.attendanceAllFactories} · ${_factories.fold<int>(0, (n, f) => n + f.inTerritory)}',
+              for (final f in _factories) '${f.name} · ${f.inTerritory}',
+            ]
+          : null,
+      filterSelected: _factoryId == null
+          ? 0
+          : (_factories.indexWhere((f) => f.id == _factoryId) + 1),
       filterActive: _factoryId != null,
+      onFilterSelected: (i) =>
+          _selectFactory(i == 0 ? null : _factories[i - 1].id),
       // Native "In territory / Came today" control, pinned under the title row.
       bottomHeight: 46,
       bottom: Padding(
@@ -406,23 +417,6 @@ class _AttendancePageState extends State<AttendancePage> {
       if (f.id == _factoryId) return f;
     }
     return null;
-  }
-
-  Future<void> _openFactorySheet(S s) async {
-    HapticFeedback.selectionClick();
-    final picked = await showModalBottomSheet<_FactoryPick>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _FactorySheet(
-        title: s.attendanceFilterFactory,
-        allLabel: s.attendanceAllFactories,
-        onSiteLabel: s.dashboardInTerritory,
-        factories: _factories,
-        selectedId: _factoryId,
-      ),
-    );
-    if (picked != null) _selectFactory(picked.id);
   }
 
   Widget _buildList(S s, double topInset) {
@@ -641,175 +635,6 @@ class _StatusAvatar extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Result wrapper so "all factories" (id == null) can be told apart from a
-/// dismissed sheet (which returns null).
-class _FactoryPick {
-  final int? id;
-  const _FactoryPick(this.id);
-}
-
-/// Bottom sheet with one row per factory: icon, name, how many are on site
-/// right now, and a check mark on the current choice.
-class _FactorySheet extends StatelessWidget {
-  final String title;
-  final String allLabel;
-  final String onSiteLabel;
-  final List<_AttendanceFactory> factories;
-  final int? selectedId;
-
-  const _FactorySheet({
-    required this.title,
-    required this.allLabel,
-    required this.onSiteLabel,
-    required this.factories,
-    required this.selectedId,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final total = factories.fold<int>(0, (sum, f) => sum + f.inTerritory);
-    final rows = <_FactoryRowData>[
-      _FactoryRowData(null, allLabel, total, Icons.apps_rounded),
-      for (final f in factories)
-        _FactoryRowData(f.id, f.name, f.inTerritory, Icons.factory_rounded),
-    ];
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.8,
-      ),
-      decoration: const BoxDecoration(
-        color: AppColors.groupedBackground,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: _kInk.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: _kInk,
-                  ),
-                ),
-              ),
-            ),
-            Flexible(
-              child: ListView.separated(
-                shrinkWrap: true,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-                physics: const BouncingScrollPhysics(),
-                itemCount: rows.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 8),
-                itemBuilder: (_, i) => _row(context, rows[i]),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _row(BuildContext context, _FactoryRowData r) {
-    final selected = r.id == selectedId;
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        Navigator.of(context).pop(_FactoryPick(r.id));
-      },
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected ? AppColors.brandOrange : Colors.transparent,
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: selected
-                    ? const LinearGradient(
-                        colors: [AppColors.brandOrange, AppColors.brandRed],
-                      )
-                    : null,
-                color: selected
-                    ? null
-                    : AppColors.brandOrange.withOpacity(0.14),
-              ),
-              child: Icon(
-                r.icon,
-                size: 19,
-                color: selected ? Colors.white : AppColors.brandRed,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    r.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: _kInk,
-                    ),
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    '${r.count} · $onSiteLabel',
-                    style: const TextStyle(fontSize: 12, color: _kMuted),
-                  ),
-                ],
-              ),
-            ),
-            if (selected)
-              const Icon(
-                Icons.check_circle_rounded,
-                color: AppColors.brandRed,
-                size: 22,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FactoryRowData {
-  final int? id;
-  final String name;
-  final int count;
-  final IconData icon;
-  const _FactoryRowData(this.id, this.name, this.count, this.icon);
 }
 
 /// iOS-style frosted-glass close button drawn entirely in Flutter. A native
