@@ -10,14 +10,15 @@ import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_refresh.dart';
 import '../../core/widgets/app_segmented_control.dart';
+import '../../core/widgets/native_segments.dart';
 import '../../core/widgets/fading_header_scaffold.dart';
+import '../../core/widgets/ui_blocks.dart';
 import '../auth/widgets/logo_stroke_loader.dart';
 import 'shop_api.dart';
 
 enum _RangePreset { all, today, week, month, custom }
 
 class _ShopStockColors {
-  static const Color g1 = AppColors.brandOrange;
   static const Color g2 = AppColors.brandRed;
 }
 
@@ -72,46 +73,6 @@ _WaitStatus _waitStatus(S s, int? days) {
   );
 }
 
-class _BuyerGroup {
-  _BuyerGroup({
-    required this.buyerId,
-    required this.buyerName,
-    required this.orders,
-    required this.maxDays,
-  });
-
-  final int? buyerId;
-  final String buyerName;
-  final List<PvzOrder> orders;
-  final int maxDays;
-}
-
-List<_BuyerGroup> _groupByBuyer(List<PvzOrder> orders) {
-  final Map<int, List<PvzOrder>> byBuyer = {};
-  for (final order in orders) {
-    final key = order.buyerId ?? -1;
-    byBuyer.putIfAbsent(key, () => []).add(order);
-  }
-  final groups = byBuyer.entries.map((entry) {
-    final maxDays = entry.value.fold<int>(0, (max, o) {
-      final d = _daysSince(o.confirmedAt) ?? 0;
-      return d > max ? d : max;
-    });
-    return _BuyerGroup(
-      buyerId: entry.key == -1 ? null : entry.key,
-      buyerName: entry.value.first.buyerName,
-      orders: entry.value,
-      maxDays: maxDays,
-    );
-  }).toList();
-  groups.sort((a, b) {
-    final byDays = b.maxDays.compareTo(a.maxDays);
-    if (byDays != 0) return byDays;
-    return b.orders.length.compareTo(a.orders.length);
-  });
-  return groups;
-}
-
 /// "Остатки товаров ПВЗ" — orders confirmed by accounting but still sitting
 /// unclaimed at a pickup point, broken down by client, flagged red once
 /// they've waited more than [_overdueDaysThreshold] days since confirmation.
@@ -157,8 +118,6 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage>
   int? _shopId;
 
   bool _overdueOnly = false;
-  // Buyer groups start collapsed; keyed by buyerId (-1 = unknown buyer).
-  final Set<int> _expandedBuyers = {};
 
   List<PvzOrder> _orders = [];
   bool _loading = true;
@@ -293,25 +252,32 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage>
   Future<void> _pickCustomRange() async {
     HapticFeedback.selectionClick();
     final now = DateTime.now();
-    final range = await showModalBottomSheet<DateTimeRange>(
+    final from = await AdaptiveDatePicker.show(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _StockCustomRangeSheet(
-        initialRange: DateTimeRange(
-          start: _dateFrom ?? now,
-          end: _dateTo ?? now,
-        ),
-      ),
+      firstDate: DateTime(2024, 1, 1),
+      lastDate: now,
+      initialDate: _dateFrom ?? now,
     );
-    if (range == null) {
+    if (from == null || !mounted) {
+      setState(() => _segmentsEpoch++);
+      return;
+    }
+    final to = await AdaptiveDatePicker.show(
+      context: context,
+      firstDate: from,
+      lastDate: now,
+      initialDate: (_dateTo != null && !_dateTo!.isBefore(from))
+          ? _dateTo!
+          : from,
+    );
+    if (to == null || !mounted) {
       setState(() => _segmentsEpoch++);
       return;
     }
     setState(() {
       _preset = _RangePreset.custom;
-      _dateFrom = range.start;
-      _dateTo = range.end;
+      _dateFrom = from;
+      _dateTo = to;
     });
     _load();
   }
@@ -323,27 +289,19 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage>
     _load();
   }
 
-  void _toggleBuyer(int key) {
-    HapticFeedback.selectionClick();
-    setState(() {
-      if (!_expandedBuyers.remove(key)) _expandedBuyers.add(key);
-    });
-  }
-
   void _toggleOverdueOnly() {
     HapticFeedback.selectionClick();
     setState(() => _overdueOnly = !_overdueOnly);
   }
 
-  void _openDetail(PvzOrder order) {
+  /// Orders open in place, several at once.
+  final Set<int> _expandedOrders = {};
+
+  void _toggleOrder(int id) {
     HapticFeedback.selectionClick();
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) =>
-          _StockOrderDetailSheet(order: order, numberFormat: _numberFormat),
-    );
+    setState(() {
+      if (!_expandedOrders.remove(id)) _expandedOrders.add(id);
+    });
   }
 
   @override
@@ -361,7 +319,13 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage>
               )
               .toList()
         : _orders;
-    final groups = _groupByBuyer(visibleOrders);
+    // One flat list, the longest waiting first.
+    final sortedOrders = [...visibleOrders]
+      ..sort(
+        (a, b) => (_daysSince(b.confirmedAt) ?? -1).compareTo(
+          _daysSince(a.confirmedAt) ?? -1,
+        ),
+      );
     final overdueCount = _orders
         .where((o) => (_daysSince(o.confirmedAt) ?? 0) > _overdueDaysThreshold)
         .length;
@@ -456,7 +420,7 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage>
                 ),
               ),
               const SizedBox(height: 20),
-              if (groups.isEmpty)
+              if (sortedOrders.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 40),
                   child: Center(
@@ -503,49 +467,33 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage>
               else
                 FadeTransition(
                   opacity: _fadeAnim,
-                  child: Column(
-                    children: [
-                      for (final group in groups) ...[
-                        _BuyerGroupHeader(
-                          group: group,
-                          s: s,
-                          isDark: isDark,
-                          expanded: _expandedBuyers.contains(
-                            group.buyerId ?? -1,
+                  // One block with a flat Telegram-style list: a row per order,
+                  // hairlines that start at the text.
+                  child: Container(
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Theme.of(context).colorScheme.surfaceContainerHigh
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Column(
+                      children: [
+                        for (var i = 0; i < sortedOrders.length; i++) ...[
+                          if (i > 0) const _ListHairline(indent: _kTextIndent),
+                          _StockOrderTile(
+                            order: sortedOrders[i],
+                            numberFormat: _numberFormat,
+                            s: s,
+                            showShop: _shopId == null && _shops.length > 1,
+                            expanded: _expandedOrders.contains(
+                              sortedOrders[i].id,
+                            ),
+                            onTap: () => _toggleOrder(sortedOrders[i].id),
                           ),
-                          onTap: () => _toggleBuyer(group.buyerId ?? -1),
-                        ),
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeOutCubic,
-                          alignment: Alignment.topCenter,
-                          child: _expandedBuyers.contains(group.buyerId ?? -1)
-                              ? Column(
-                                  children: [
-                                    const SizedBox(height: 8),
-                                    for (final order in group.orders)
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 8,
-                                        ),
-                                        child: _StockOrderTile(
-                                          order: order,
-                                          isDark: isDark,
-                                          numberFormat: _numberFormat,
-                                          s: s,
-                                          showShop:
-                                              _shopId == null &&
-                                              _shops.length > 1,
-                                          onTap: () => _openDetail(order),
-                                        ),
-                                      ),
-                                  ],
-                                )
-                              : const SizedBox(width: double.infinity),
-                        ),
-                        const SizedBox(height: 10),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
             ],
@@ -557,7 +505,7 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage>
 
   Widget _buildDateFilterRow(S s) {
     const presets = _RangePreset.values;
-    return AppSegmentedControl(
+    return NativeSegments(
       key: ValueKey(_segmentsEpoch),
       labels: [
         s.shopStockAllPeriod,
@@ -570,8 +518,6 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage>
       onChanged: (i) => presets[i] == _RangePreset.custom
           ? _pickCustomRange()
           : _applyPreset(presets[i]),
-      minSegmentWidth: 84,
-      padding: EdgeInsets.zero,
     );
   }
 
@@ -648,894 +594,308 @@ String _stockFormatDateTime(DateTime dt) {
   return '${two(local.day)}.${two(local.month)}.${local.year} ${two(local.hour)}:${two(local.minute)}';
 }
 
-// ─── Buyer group header ─────────────────────────────────────────────────
+// ─── Telegram-style list ─────────────────────────────────────────────────
 
-class _BuyerGroupHeader extends StatelessWidget {
-  const _BuyerGroupHeader({
-    required this.group,
+/// Where the text of a row starts (16 padding + 44 avatar + 12 gap).
+const double _kTextIndent = 72;
+
+/// A thin line that starts at the text, like in Telegram's lists.
+class _ListHairline extends StatelessWidget {
+  const _ListHairline({required this.indent});
+
+  final double indent;
+
+  @override
+  Widget build(BuildContext context) => Divider(
+    height: 0.5,
+    thickness: 0.5,
+    indent: indent,
+    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
+  );
+}
+
+/// One order: the buyer, then its number, positions and sum; on the right how
+/// long it has been waiting (red once overdue). Tapping opens the details
+/// right under the row.
+class _StockOrderTile extends StatelessWidget {
+  const _StockOrderTile({
+    required this.order,
+    required this.numberFormat,
     required this.s,
-    required this.isDark,
+    required this.showShop,
     required this.expanded,
     required this.onTap,
   });
 
-  final _BuyerGroup group;
+  final PvzOrder order;
+  final NumberFormat numberFormat;
   final S s;
-  final bool isDark;
+  final bool showShop;
   final bool expanded;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final hasOverdue = group.maxDays > _overdueDaysThreshold;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: onSurface.withOpacity(0.08)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: _ShopStockColors.g2.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.person_rounded,
-                  size: 15,
-                  color: _ShopStockColors.g2,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  group.buyerName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: onSurface,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                s.shopStockOrdersCount(group.orders.length),
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: onSurface.withOpacity(0.5),
-                ),
-              ),
-              if (hasOverdue) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF2F2),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFFECACA)),
-                  ),
-                  child: Text(
-                    s.shopStockGroupBadge,
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF991B1B),
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(width: 6),
-              AnimatedRotation(
-                turns: expanded ? 0.5 : 0,
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                child: Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 22,
-                  color: onSurface.withOpacity(0.45),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Order tile ──────────────────────────────────────────────────────────
-
-class _StockOrderTile extends StatelessWidget {
-  const _StockOrderTile({
-    required this.order,
-    required this.isDark,
-    required this.numberFormat,
-    required this.s,
-    required this.showShop,
-    required this.onTap,
-  });
-
-  final PvzOrder order;
-  final bool isDark;
-  final NumberFormat numberFormat;
-  final S s;
-  final bool showShop;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final cardBg = isDark
-        ? Theme.of(context).colorScheme.surfaceContainerHighest
-        : Colors.white;
     final days = _daysSince(order.confirmedAt);
     final status = _waitStatus(s, days);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.18 : 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(width: 4, color: status.border),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: status.bg,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: status.border),
-                                ),
-                                child: Text(
-                                  '№${order.id}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: status.fg,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  order.buyerName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: onSurface,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: status.bg,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: status.border),
-                                ),
-                                child: Text(
-                                  days == null
-                                      ? '—'
-                                      : '$days ${s.shopStockDaysLabel}',
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: status.fg,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          _StockInfoLine(
-                            icon: Icons.inventory_2_outlined,
-                            text:
-                                '${order.items.length} ${s.shopPickupPositions} · ${numberFormat.format(order.totalValue)} сум',
-                            onSurface: onSurface,
-                          ),
-                          const SizedBox(height: 4),
-                          if (showShop) ...[
-                            _StockInfoLine(
-                              icon: Icons.storefront_rounded,
-                              text: order.shopName,
-                              onSurface: onSurface,
-                            ),
-                            const SizedBox(height: 4),
-                          ],
-                          _StockInfoLine(
-                            icon: Icons.event_available_rounded,
-                            text: order.confirmedAt != null
-                                ? _stockFormatDateTime(order.confirmedAt!)
-                                : '—',
-                            onSurface: onSurface,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+    final muted = TextStyle(
+      fontSize: 13,
+      color: onSurface.withValues(alpha: 0.5),
     );
-  }
-}
 
-class _StockInfoLine extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  final Color onSurface;
-
-  const _StockInfoLine({
-    required this.icon,
-    required this.text,
-    required this.onSurface,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Icon(icon, size: 13, color: onSurface.withOpacity(0.4)),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.55)),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Order detail sheet ────────────────────────────────────────────────
-
-class _StockOrderDetailSheet extends StatelessWidget {
-  const _StockOrderDetailSheet({
-    required this.order,
-    required this.numberFormat,
-  });
-
-  final PvzOrder order;
-  final NumberFormat numberFormat;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = S.of(context);
-    final surface = Theme.of(context).colorScheme.surface;
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final outline = Theme.of(context).colorScheme.outline;
-    final days = _daysSince(order.confirmedAt);
-    final status = _waitStatus(s, days);
-
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.4,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 18),
-                  decoration: BoxDecoration(
-                    color: onSurface.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-              if (order.buyerPhotoUrl != null)
-                _StockPhotoPreview(
-                  photoUrl: order.buyerPhotoUrl!,
-                  heroTag: 'stock_order_photo_${order.id}',
-                ),
-              const SizedBox(height: 16),
-              Row(
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 9, 10, 9),
+              child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: status.bg,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: status.border),
-                    ),
-                    child: Icon(
-                      Icons.local_shipping_rounded,
-                      color: status.fg,
-                      size: 20,
-                    ),
-                  ),
+                  PersonAvatar(name: order.buyerName, size: 44),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      s.shopPickupOrderTitle(order.id),
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: onSurface,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          order.buyerName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '№${order.id} · ${order.items.length} ${s.shopPickupPositions}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: muted,
+                        ),
+                        Text(
+                          '${numberFormat.format(order.totalValue)} сум',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: muted.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: onSurface.withValues(alpha: 0.7),
+                          ),
+                        ),
+                        if (showShop)
+                          Text(
+                            order.shopName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: muted,
+                          ),
+                      ],
                     ),
                   ),
+                  const SizedBox(width: 10),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
+                      horizontal: 8,
+                      vertical: 3,
                     ),
                     decoration: BoxDecoration(
                       color: status.bg,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: status.border),
                     ),
                     child: Text(
-                      status.label,
+                      days == null ? '—' : '$days ${s.shopStockDaysLabel}',
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 11,
                         fontWeight: FontWeight.w800,
                         color: status.fg,
                       ),
                     ),
                   ),
+                  AnimatedRotation(
+                    turns: expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 22,
+                      color: onSurface.withValues(alpha: 0.4),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: onSurface.withOpacity(0.04),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: outline.withOpacity(0.5)),
-                ),
-                child: Column(
-                  children: [
-                    _StockDetailRow(
-                      icon: Icons.person_outline_rounded,
-                      label: s.shopPickupBuyer,
-                      value: order.buyerName,
-                      onSurface: onSurface,
-                    ),
-                    const SizedBox(height: 8),
-                    _StockDetailRow(
-                      icon: Icons.badge_outlined,
-                      label: s.shopPickupSeller,
-                      value: order.sellerName,
-                      onSurface: onSurface,
-                    ),
-                    const SizedBox(height: 8),
-                    _StockDetailRow(
-                      icon: Icons.storefront_outlined,
-                      label: s.shopIssuedShopFilterTitle,
-                      value: order.shopName,
-                      onSurface: onSurface,
-                    ),
-                    const SizedBox(height: 8),
-                    _StockDetailRow(
-                      icon: Icons.event_available_rounded,
-                      label: s.shopStockWaitingSince,
-                      value: order.confirmedAt != null
-                          ? _stockFormatDateTime(order.confirmedAt!)
-                          : '—',
-                      onSurface: onSurface,
-                    ),
-                    const SizedBox(height: 8),
-                    _StockDetailRow(
-                      icon: Icons.hourglass_bottom_rounded,
-                      label: s.shopStockDaysLabel,
-                      value: days == null ? '—' : '$days',
-                      onSurface: onSurface,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                s.shopPickupItemsHeader,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: onSurface,
-                ),
-              ),
-              const SizedBox(height: 10),
-              ...order.items.map(
-                (item) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: onSurface.withOpacity(0.04),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${item.article} — ${item.productName}',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: onSurface,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${item.color} · Размер ${item.sizeName} · ${numberFormat.format(item.amount)} шт',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: onSurface.withOpacity(0.55),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        '${numberFormat.format(item.subtotal)} сум',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: _ShopStockColors.g2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [_ShopStockColors.g1, _ShopStockColors.g2],
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _ShopStockColors.g2.withOpacity(0.3),
-                      blurRadius: 14,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      s.totalLabel,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      '${numberFormat.format(order.totalValue)} сум',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _StockDetailRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color onSurface;
-
-  const _StockDetailRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.onSurface,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 15, color: onSurface.withOpacity(0.4)),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: TextStyle(fontSize: 13, color: onSurface.withOpacity(0.55)),
-        ),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: onSurface,
             ),
           ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: expanded
+              ? _StockOrderDetails(
+                  order: order,
+                  numberFormat: numberFormat,
+                  s: s,
+                  days: days,
+                  status: status,
+                )
+              : const SizedBox(width: double.infinity),
         ),
       ],
     );
   }
 }
 
-class _StockPhotoPreview extends StatelessWidget {
-  const _StockPhotoPreview({required this.photoUrl, required this.heroTag});
-
-  final String photoUrl;
-  final String heroTag;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: GestureDetector(
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) =>
-                _StockFullScreenPhotoView(photoUrl: photoUrl, heroTag: heroTag),
-            fullscreenDialog: true,
-          ),
-        ),
-        child: Container(
-          width: 128,
-          height: 168,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.black.withOpacity(0.08)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.12),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(13),
-                child: Hero(
-                  tag: heroTag,
-                  child: Image.network(photoUrl, fit: BoxFit.cover),
-                ),
-              ),
-              Positioned(
-                right: 6,
-                bottom: 6,
-                child: Container(
-                  padding: const EdgeInsets.all(5),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.zoom_in_rounded,
-                    color: Colors.white,
-                    size: 15,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StockFullScreenPhotoView extends StatelessWidget {
-  const _StockFullScreenPhotoView({
-    required this.photoUrl,
-    required this.heroTag,
+/// The opened part of an order: who and when, the goods, the total.
+class _StockOrderDetails extends StatelessWidget {
+  const _StockOrderDetails({
+    required this.order,
+    required this.numberFormat,
+    required this.s,
+    required this.days,
+    required this.status,
   });
 
-  final String photoUrl;
-  final String heroTag;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: Center(
-        child: InteractiveViewer(
-          minScale: 0.8,
-          maxScale: 4,
-          child: Hero(tag: heroTag, child: Image.network(photoUrl)),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Custom range sheet ─────────────────────────────────────────────────
-
-class _StockCustomRangeSheet extends StatefulWidget {
-  final DateTimeRange initialRange;
-
-  const _StockCustomRangeSheet({required this.initialRange});
-
-  @override
-  State<_StockCustomRangeSheet> createState() => _StockCustomRangeSheetState();
-}
-
-class _StockCustomRangeSheetState extends State<_StockCustomRangeSheet> {
-  late DateTime _from;
-  late DateTime _to;
-
-  @override
-  void initState() {
-    super.initState();
-    _from = widget.initialRange.start;
-    _to = widget.initialRange.end;
-  }
-
-  Future<void> _pickFrom() async {
-    final picked = await AdaptiveDatePicker.show(
-      context: context,
-      firstDate: DateTime(2024, 1, 1),
-      lastDate: _to,
-      initialDate: _from,
-    );
-    if (picked == null || !mounted) return;
-    setState(() => _from = picked);
-  }
-
-  Future<void> _pickTo() async {
-    final picked = await AdaptiveDatePicker.show(
-      context: context,
-      firstDate: _from,
-      lastDate: DateTime.now(),
-      initialDate: _to,
-    );
-    if (picked == null || !mounted) return;
-    setState(() => _to = picked);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = S.of(context);
-    final surface = Theme.of(context).colorScheme.surface;
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 18),
-                decoration: BoxDecoration(
-                  color: onSurface.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [_ShopStockColors.g1, _ShopStockColors.g2],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.date_range_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    s.shopIssuedCustomPeriod,
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: onSurface,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: _StockDatePickerField(
-                    label: s.shopIssuedDateFrom,
-                    date: _from,
-                    onTap: _pickFrom,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _StockDatePickerField(
-                    label: s.shopIssuedDateTo,
-                    date: _to,
-                    onTap: _pickTo,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              height: 50,
-              child: AdaptiveButton(
-                onPressed: () {
-                  HapticFeedback.selectionClick();
-                  Navigator.of(
-                    context,
-                  ).pop(DateTimeRange(start: _from, end: _to));
-                },
-                label: s.shopIssuedApply,
-                style: AdaptiveButtonStyle.filled,
-                color: _ShopStockColors.g2,
-                textColor: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StockDatePickerField extends StatelessWidget {
-  final String label;
-  final DateTime date;
-  final VoidCallback onTap;
-
-  const _StockDatePickerField({
-    required this.label,
-    required this.date,
-    required this.onTap,
-  });
+  final PvzOrder order;
+  final NumberFormat numberFormat;
+  final S s;
+  final int? days;
+  final _WaitStatus status;
 
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final outline = Theme.of(context).colorScheme.outline;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
+    final muted = onSurface.withValues(alpha: 0.5);
+
+    Widget facts(String label, String value, {Color? valueColor}) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(fontSize: 13, color: muted)),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: valueColor ?? onSurface,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(_kTextIndent, 0, 16, 12),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+      decoration: BoxDecoration(
+        color: onSurface.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: outline.withOpacity(0.5)),
-            color: onSurface.withOpacity(0.03),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          facts(s.shopPickupSeller, order.sellerName),
+          facts(s.shopIssuedShopFilterTitle, order.shopName),
+          facts(
+            s.shopStockWaitingSince,
+            order.confirmedAt != null
+                ? _stockFormatDateTime(order.confirmedAt!)
+                : '—',
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+          facts(
+            s.shopStockDaysLabel,
+            days == null ? '—' : '$days',
+            valueColor: status.fg,
+          ),
+          const SizedBox(height: 6),
+          const _ListHairline(indent: 0),
+          Padding(
+            padding: const EdgeInsets.only(top: 10, bottom: 4),
+            child: Text(
+              s.shopPickupItemsHeader.toUpperCase(),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+                color: muted,
+              ),
+            ),
+          ),
+          for (var i = 0; i < order.items.length; i++) ...[
+            if (i > 0) const _ListHairline(indent: 0),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.calendar_today_rounded,
-                    size: 13,
-                    color: onSurface.withOpacity(0.4),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${order.items[i].article} — ${order.items[i].productName}',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                            color: onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${order.items[i].color} · ${order.items[i].sizeName} · ${numberFormat.format(order.items[i].amount)} шт',
+                          style: TextStyle(fontSize: 12, color: muted),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 12),
                   Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: onSurface.withOpacity(0.55),
+                    '${numberFormat.format(order.items[i].subtotal)} сум',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _ShopStockColors.g2,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                _stockFormatDate(date),
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: onSurface,
+            ),
+          ],
+          const _ListHairline(indent: 0),
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  s.totalLabel,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: onSurface,
+                  ),
                 ),
-              ),
-            ],
+                Text(
+                  '${numberFormat.format(order.totalValue)} сум',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: _ShopStockColors.g2,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

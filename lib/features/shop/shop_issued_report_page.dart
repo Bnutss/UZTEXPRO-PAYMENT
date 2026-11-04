@@ -186,22 +186,33 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage>
 
   Future<void> _pickCustomRange() async {
     HapticFeedback.selectionClick();
-    final range = await showModalBottomSheet<DateTimeRange>(
+    final now = DateTime.now();
+    final from = await AdaptiveDatePicker.show(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _CustomRangeSheet(
-        initialRange: DateTimeRange(start: _dateFrom, end: _dateTo),
-      ),
+      firstDate: DateTime(2024, 1, 1),
+      lastDate: now,
+      initialDate: _dateFrom.isAfter(now) ? now : _dateFrom,
     );
-    if (range == null) {
+    if (from == null || !mounted) {
+      setState(() => _segmentsEpoch++);
+      return;
+    }
+    final to = await AdaptiveDatePicker.show(
+      context: context,
+      firstDate: from,
+      lastDate: now,
+      initialDate: _dateTo.isBefore(from) || _dateTo.isAfter(now)
+          ? from
+          : _dateTo,
+    );
+    if (to == null || !mounted) {
       setState(() => _segmentsEpoch++);
       return;
     }
     setState(() {
       _preset = _RangePreset.custom;
-      _dateFrom = range.start;
-      _dateTo = range.end;
+      _dateFrom = from;
+      _dateTo = to;
     });
     _load();
   }
@@ -530,228 +541,6 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage>
     return const Padding(
       padding: EdgeInsets.only(top: 56, bottom: 56),
       child: Center(child: LogoStrokeLoader(size: 120)),
-    );
-  }
-}
-
-// ─── Custom range sheet ─────────────────────────────────────────────────
-//
-// showDateRangePicker's own calendar dialog is full-screen on phones in
-// portrait (Material has no compact variant of it) — a single-date picker
-// dialog is compact, so a from/to pair of those inside our own bottom
-// sheet gives the same result without taking over the whole screen.
-
-class _CustomRangeSheet extends StatefulWidget {
-  final DateTimeRange initialRange;
-
-  const _CustomRangeSheet({required this.initialRange});
-
-  @override
-  State<_CustomRangeSheet> createState() => _CustomRangeSheetState();
-}
-
-class _CustomRangeSheetState extends State<_CustomRangeSheet> {
-  late DateTime _from;
-  late DateTime _to;
-
-  @override
-  void initState() {
-    super.initState();
-    _from = widget.initialRange.start;
-    _to = widget.initialRange.end;
-  }
-
-  Future<void> _pickFrom() async {
-    final picked = await AdaptiveDatePicker.show(
-      context: context,
-      firstDate: DateTime(2024, 1, 1),
-      lastDate: _to,
-      initialDate: _from,
-    );
-    if (picked == null || !mounted) return;
-    setState(() => _from = picked);
-  }
-
-  Future<void> _pickTo() async {
-    final picked = await AdaptiveDatePicker.show(
-      context: context,
-      firstDate: _from,
-      lastDate: DateTime.now(),
-      initialDate: _to,
-    );
-    if (picked == null || !mounted) return;
-    setState(() => _to = picked);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = S.of(context);
-    final surface = Theme.of(context).colorScheme.surface;
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 18),
-                decoration: BoxDecoration(
-                  color: onSurface.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [
-                        _ShopIssuedReportPageColors.g1,
-                        _ShopIssuedReportPageColors.g2,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.date_range_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    s.shopIssuedCustomPeriod,
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: onSurface,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: _DatePickerField(
-                    label: s.shopIssuedDateFrom,
-                    date: _from,
-                    onTap: _pickFrom,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _DatePickerField(
-                    label: s.shopIssuedDateTo,
-                    date: _to,
-                    onTap: _pickTo,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              height: 50,
-              child: AdaptiveButton(
-                onPressed: () {
-                  HapticFeedback.selectionClick();
-                  Navigator.of(
-                    context,
-                  ).pop(DateTimeRange(start: _from, end: _to));
-                },
-                label: s.shopIssuedApply,
-                style: AdaptiveButtonStyle.filled,
-                color: _ShopIssuedReportPageColors.g2,
-                textColor: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DatePickerField extends StatelessWidget {
-  final String label;
-  final DateTime date;
-  final VoidCallback onTap;
-
-  const _DatePickerField({
-    required this.label,
-    required this.date,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final outline = Theme.of(context).colorScheme.outline;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: outline.withOpacity(0.5)),
-            color: onSurface.withOpacity(0.03),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.calendar_today_rounded,
-                    size: 13,
-                    color: onSurface.withOpacity(0.4),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: onSurface.withOpacity(0.55),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                _formatDate(date),
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: onSurface,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

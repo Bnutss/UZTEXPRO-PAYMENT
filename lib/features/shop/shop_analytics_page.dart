@@ -8,6 +8,7 @@ import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_refresh.dart';
 import '../../core/widgets/app_segmented_control.dart';
+import '../../core/widgets/native_segments.dart';
 import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/ui_blocks.dart';
 import '../auth/widgets/logo_stroke_loader.dart';
@@ -246,7 +247,7 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            AppSegmentedControl(
+            NativeSegments(
               key: ValueKey(_segmentsEpoch),
               labels: [
                 s.shopStockAllPeriod,
@@ -259,8 +260,6 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
               onChanged: (i) => presets[i] == _RangePreset.custom
                   ? _pickCustomRange()
                   : _applyPreset(presets[i]),
-              minSegmentWidth: 84,
-              padding: EdgeInsets.zero,
             ),
             const SizedBox(height: 10),
             AppSegmentedControl(

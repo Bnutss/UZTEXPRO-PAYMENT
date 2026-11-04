@@ -39,10 +39,17 @@ class FloatingNotchBar extends StatelessWidget {
         ? Colors.white.withOpacity(0.09)
         : Colors.black.withOpacity(0.06);
     final idleIcon = isDark ? const Color(0xFF8E8E93) : const Color(0xFF8E8E93);
-    final idleLabel = isDark ? const Color(0xFFAEAEB2) : const Color(0xFF636366);
+    final idleLabel = isDark
+        ? const Color(0xFFAEAEB2)
+        : const Color(0xFF636366);
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, 10 + (bottom > 0 ? bottom - 6 : 0)),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        0,
+        16,
+        10 + (bottom > 0 ? bottom - 6 : 0),
+      ),
       child: SizedBox(
         height: _barHeight + _lift,
         child: LayoutBuilder(
@@ -139,7 +146,11 @@ class FloatingNotchBar extends StatelessWidget {
                               AnimatedOpacity(
                                 duration: const Duration(milliseconds: 200),
                                 opacity: i == selected ? 0 : 1,
-                                child: Icon(item.icon, size: 26, color: idleIcon),
+                                child: Icon(
+                                  item.icon,
+                                  size: 26,
+                                  color: idleIcon,
+                                ),
                               ),
                               const SizedBox(height: 4),
                               AnimatedDefaultTextStyle(
@@ -208,8 +219,14 @@ class _BarPainter extends CustomPainter {
       ..quadraticBezierTo(0, 0, rl, 0)
       ..lineTo(shoulderL.clamp(rl, w), 0)
       ..cubicTo(cx - _notchR * 0.62, 0, cx - _notchR * 0.82, _dip, cx, _dip)
-      ..cubicTo(cx + _notchR * 0.82, _dip, cx + _notchR * 0.62, 0,
-          shoulderR.clamp(0, w - rr), 0)
+      ..cubicTo(
+        cx + _notchR * 0.82,
+        _dip,
+        cx + _notchR * 0.62,
+        0,
+        shoulderR.clamp(0, w - rr),
+        0,
+      )
       ..lineTo(w - rr, 0)
       ..quadraticBezierTo(w, 0, w, rr)
       ..lineTo(w, h - _r)
@@ -231,7 +248,10 @@ class _BarPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_BarPainter old) =>
-      old.cx != cx || old.fill != fill || old.outline != outline || old.shadow != shadow;
+      old.cx != cx ||
+      old.fill != fill ||
+      old.outline != outline ||
+      old.shadow != shadow;
 }
 
 /// Нажимаемая область без «ряби» Material: пункт слегка уменьшается и тускнеет.
@@ -250,20 +270,20 @@ class _PressableState extends State<_Pressable> {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (_) => setState(() => _down = true),
-        onTapUp: (_) => setState(() => _down = false),
-        onTapCancel: () => setState(() => _down = false),
-        onTap: widget.onTap,
-        child: AnimatedScale(
-          scale: _down ? 0.9 : 1,
-          duration: const Duration(milliseconds: 110),
-          curve: Curves.easeOut,
-          child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 110),
-            opacity: _down ? 0.65 : 1,
-            child: widget.child,
-          ),
-        ),
-      );
+    behavior: HitTestBehavior.opaque,
+    onTapDown: (_) => setState(() => _down = true),
+    onTapUp: (_) => setState(() => _down = false),
+    onTapCancel: () => setState(() => _down = false),
+    onTap: widget.onTap,
+    child: AnimatedScale(
+      scale: _down ? 0.9 : 1,
+      duration: const Duration(milliseconds: 110),
+      curve: Curves.easeOut,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 110),
+        opacity: _down ? 0.65 : 1,
+        child: widget.child,
+      ),
+    ),
+  );
 }

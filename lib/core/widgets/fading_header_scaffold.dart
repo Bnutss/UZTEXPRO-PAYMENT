@@ -140,27 +140,22 @@ class FadingHeaderScaffold extends StatelessWidget {
           ),
         ),
         ...trailing,
-        if (filterLabels == null && onFilterTap != null)
+        // Filter and search share one glass capsule.
+        if ((filterLabels != null && onFilterSelected != null) ||
+            onFilterTap != null ||
+            onToggleSearch != null)
           Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: _HeaderTapFilterButton(
-              active: filterActive,
-              onPressed: onFilterTap!,
+            child: _HeaderActionsCapsule(
+              filterLabels: filterLabels,
+              filterSelected: filterSelected,
+              onFilterSelected: onFilterSelected,
+              onFilterTap: onFilterTap,
+              filterActive: filterActive,
+              filterSfSymbol: filterSfSymbol,
+              onSearch: onToggleSearch,
             ),
           ),
-        if (filterLabels != null && onFilterSelected != null)
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: _HeaderFilterButton(
-              labels: filterLabels!,
-              selected: filterSelected,
-              active: filterActive,
-              sfSymbol: filterSfSymbol,
-              onSelected: onFilterSelected!,
-            ),
-          ),
-        if (onToggleSearch != null)
-          SearchToggleButton(active: false, onPressed: onToggleSearch!),
       ],
     );
 
@@ -252,23 +247,33 @@ class FadingHeaderScaffold extends StatelessWidget {
   }
 }
 
-class _HeaderSearchField extends StatelessWidget {
+/// The search field. On iOS it sits on a native Liquid Glass capsule (the
+/// package has only glass buttons, so the field is the content of one); tapping
+/// the glass puts the cursor in the field. Elsewhere a plain white pill.
+class _HeaderSearchField extends StatefulWidget {
   const _HeaderSearchField({required this.controller, required this.hint});
 
   final TextEditingController? controller;
   final String hint;
 
   @override
+  State<_HeaderSearchField> createState() => _HeaderSearchFieldState();
+}
+
+class _HeaderSearchFieldState extends State<_HeaderSearchField> {
+  final _focus = FocusNode();
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
     const ink = Color(0xFF1C1C1E);
-    return Container(
-      height: 46,
+    final content = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: dark ? Colors.white.withValues(alpha: 0.10) : Colors.white,
-        borderRadius: BorderRadius.circular(23),
-      ),
       child: Row(
         children: [
           Icon(
@@ -279,13 +284,15 @@ class _HeaderSearchField extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
-              controller: controller,
+              controller: widget.controller,
+              focusNode: _focus,
               autofocus: true,
               textInputAction: TextInputAction.search,
               cursorColor: ink,
               style: const TextStyle(color: ink, fontSize: 15),
+              onSubmitted: (_) => _focus.unfocus(),
               decoration: InputDecoration(
-                hintText: hint,
+                hintText: widget.hint,
                 hintStyle: TextStyle(
                   color: ink.withValues(alpha: 0.4),
                   fontSize: 15,
@@ -302,57 +309,160 @@ class _HeaderSearchField extends StatelessWidget {
         ],
       ),
     );
+
+    if (Platform.isIOS) {
+      return SizedBox(
+        height: 46,
+        child: LayoutBuilder(
+          builder: (context, box) {
+            final width = box.maxWidth.isFinite ? box.maxWidth : 240.0;
+            return AdaptiveButton.child(
+              onPressed: _focus.requestFocus,
+              color: ink,
+              style: AdaptiveButtonStyle.glass,
+              size: AdaptiveButtonSize.large,
+              useSmoothRectangleBorder: false,
+              padding: EdgeInsets.zero,
+              borderRadius: BorderRadius.circular(23),
+              minSize: Size(width, 46),
+              child: SizedBox(width: width, height: 46, child: content),
+            );
+          },
+        ),
+      );
+    }
+
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      height: 46,
+      decoration: BoxDecoration(
+        color: dark ? Colors.white.withValues(alpha: 0.10) : Colors.white,
+        borderRadius: BorderRadius.circular(23),
+      ),
+      child: content,
+    );
   }
 }
 
-/// Round glass filter button with a native menu (check on the selected entry)
-/// and a dot while a filter is applied.
-class _HeaderFilterButton extends StatelessWidget {
-  const _HeaderFilterButton({
-    required this.labels,
-    required this.selected,
-    required this.active,
-    required this.sfSymbol,
-    required this.onSelected,
+/// Filter and search side by side in ONE capsule: native Liquid Glass on iOS,
+/// a light pill elsewhere. The filter opens a menu (check on the selected
+/// entry) or just reports a tap; a dot on it shows an applied filter.
+class _HeaderActionsCapsule extends StatelessWidget {
+  const _HeaderActionsCapsule({
+    required this.filterLabels,
+    required this.filterSelected,
+    required this.onFilterSelected,
+    required this.onFilterTap,
+    required this.filterActive,
+    required this.filterSfSymbol,
+    required this.onSearch,
   });
 
-  final List<String> labels;
-  final int selected;
-  final bool active;
-  final String sfSymbol;
-  final ValueChanged<int> onSelected;
+  final List<String>? filterLabels;
+  final int filterSelected;
+  final ValueChanged<int>? onFilterSelected;
+  final VoidCallback? onFilterTap;
+  final bool filterActive;
+  final String filterSfSymbol;
+  final VoidCallback? onSearch;
+
+  static const _slot = 46.0;
+  static const _ink = Color(0xFF1C1C1E);
 
   @override
   Widget build(BuildContext context) {
-    final native = PlatformInfo.isIOS26OrHigher();
-    final button = AdaptivePopupMenuButton.icon<int>(
-      icon: native ? sfSymbol : Icons.tune_rounded,
-      size: 46,
-      tint: const Color(0xFF1C1C1E),
-      items: [
-        for (var i = 0; i < labels.length; i++)
-          AdaptivePopupMenuItem<int>(
-            label: labels[i],
-            value: i,
-            selected: i == selected,
-          ),
-      ],
-      onSelected: (index, item) {
-        HapticFeedback.selectionClick();
-        onSelected(index);
-      },
-    );
+    final hasMenu = filterLabels != null && onFilterSelected != null;
+    final hasFilter = hasMenu || onFilterTap != null;
+    final hasSearch = onSearch != null;
+    final count = (hasFilter ? 1 : 0) + (hasSearch ? 1 : 0);
+    if (count == 0) return const SizedBox.shrink();
+    final width = _slot * count;
+
+    final Widget background = Platform.isIOS
+        ? AdaptiveButton.child(
+            onPressed: () {},
+            color: _ink,
+            style: AdaptiveButtonStyle.glass,
+            size: AdaptiveButtonSize.medium,
+            useSmoothRectangleBorder: false,
+            padding: EdgeInsets.zero,
+            borderRadius: BorderRadius.circular(_slot / 2),
+            minSize: Size(width, _slot),
+            child: SizedBox(width: width, height: _slot),
+          )
+        : DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF2F2F2),
+              borderRadius: BorderRadius.circular(_slot / 2),
+            ),
+          );
+
+    Widget filter() {
+      if (hasMenu) {
+        return AdaptivePopupMenuButton.icon<int>(
+          icon: PlatformInfo.isIOS26OrHigher()
+              ? filterSfSymbol
+              : Icons.tune_rounded,
+          size: _slot,
+          tint: _ink,
+          // Plain: the capsule behind it is the glass.
+          buttonStyle: PopupButtonStyle.plain,
+          items: [
+            for (var i = 0; i < filterLabels!.length; i++)
+              AdaptivePopupMenuItem<int>(
+                label: filterLabels![i],
+                value: i,
+                selected: i == filterSelected,
+              ),
+          ],
+          onSelected: (index, item) {
+            HapticFeedback.selectionClick();
+            onFilterSelected!(index);
+          },
+        );
+      }
+      return InkResponse(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onFilterTap!();
+        },
+        child: const Center(
+          child: Icon(Icons.tune_rounded, color: _ink, size: 22),
+        ),
+      );
+    }
+
     return SizedBox(
-      width: 46,
-      height: 46,
+      width: width,
+      height: _slot,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Positioned.fill(child: button),
-          if (active)
+          Positioned.fill(child: background),
+          Row(
+            children: [
+              if (hasFilter)
+                SizedBox(width: _slot, height: _slot, child: filter()),
+              if (hasSearch)
+                SizedBox(
+                  width: _slot,
+                  height: _slot,
+                  child: InkResponse(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      onSearch!();
+                    },
+                    child: const Center(
+                      child: Icon(Icons.search_rounded, color: _ink, size: 22),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (hasFilter && filterActive)
             Positioned(
-              top: 3,
-              right: 3,
+              top: 5,
+              left: _slot - 17,
               child: IgnorePointer(
                 child: Container(
                   width: 11,
@@ -415,79 +525,6 @@ class FloatingBottomBar extends StatelessWidget {
             child: child,
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Round glass filter button that just reports a tap (opens a picker), with
-/// the same dot as [_HeaderFilterButton] while a filter is applied.
-class _HeaderTapFilterButton extends StatelessWidget {
-  const _HeaderTapFilterButton({required this.active, required this.onPressed});
-
-  final bool active;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    void handle() {
-      HapticFeedback.lightImpact();
-      onPressed();
-    }
-
-    const ink = Color(0xFF1C1C1E);
-    final Widget button = Platform.isIOS
-        ? AdaptiveButton.icon(
-            onPressed: handle,
-            icon: Icons.tune_rounded,
-            iconColor: ink,
-            color: ink,
-            style: AdaptiveButtonStyle.glass,
-            size: AdaptiveButtonSize.medium,
-            useSmoothRectangleBorder: false,
-            padding: EdgeInsets.zero,
-            minSize: const Size(46, 46),
-          )
-        : Material(
-            color: Colors.transparent,
-            shape: const CircleBorder(),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: handle,
-              child: Container(
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF2F2F2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.tune_rounded, color: ink, size: 22),
-              ),
-            ),
-          );
-    return SizedBox(
-      width: 46,
-      height: 46,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned.fill(child: button),
-          if (active)
-            Positioned(
-              top: 3,
-              right: 3,
-              child: IgnorePointer(
-                child: Container(
-                  width: 11,
-                  height: 11,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF6A00),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }

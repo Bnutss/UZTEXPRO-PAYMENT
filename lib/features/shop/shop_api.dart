@@ -43,13 +43,13 @@ class PvzOrderItem {
   double get subtotal => amount * price;
 
   factory PvzOrderItem.fromJson(Map<String, dynamic> json) => PvzOrderItem(
-        article: json['article'] as String? ?? '',
-        productName: json['product_name'] as String? ?? '',
-        color: json['color'] as String? ?? '',
-        sizeName: json['size_name'] as String? ?? '',
-        amount: (json['amount'] as num?)?.toDouble() ?? 0,
-        price: (json['price'] as num?)?.toDouble() ?? 0,
-      );
+    article: json['article'] as String? ?? '',
+    productName: json['product_name'] as String? ?? '',
+    color: json['color'] as String? ?? '',
+    sizeName: json['size_name'] as String? ?? '',
+    amount: (json['amount'] as num?)?.toDouble() ?? 0,
+    price: (json['price'] as num?)?.toDouble() ?? 0,
+  );
 }
 
 class PvzOrder {
@@ -84,6 +84,7 @@ class PvzOrder {
   final bool isIssued;
   final DateTime? issuedAt;
   final String? issuedByName;
+
   /// Hand-over snapshot — only exists once the order has been issued.
   final String? buyerPhotoUrl;
 
@@ -91,24 +92,28 @@ class PvzOrder {
   final String? buyerAvatarUrl;
 
   factory PvzOrder.fromJson(Map<String, dynamic> json) => PvzOrder(
-        id: json['id'] as int,
-        shopName: json['shop_name'] as String? ?? '',
-        buyerId: json['buyer'] as int?,
-        buyerName: json['buyer_name'] as String? ?? '',
-        sellerName: json['seller_name'] as String? ?? '',
-        items: (json['items'] as List? ?? [])
-            .map((e) => PvzOrderItem.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0,
-        totalValue: (json['total_value'] as num?)?.toDouble() ?? 0,
-        createAt: DateTime.parse(json['create_at'] as String),
-        confirmedAt: json['confirmed_at'] != null ? DateTime.parse(json['confirmed_at'] as String) : null,
-        isIssued: json['is_issued'] as bool? ?? false,
-        issuedAt: json['issued_at'] != null ? DateTime.parse(json['issued_at'] as String) : null,
-        issuedByName: json['issued_by_name'] as String?,
-        buyerPhotoUrl: _imageUrl(json['buyer_photo'] as String?),
-        buyerAvatarUrl: _imageUrl(json['buyer_avatar'] as String?),
-      );
+    id: json['id'] as int,
+    shopName: json['shop_name'] as String? ?? '',
+    buyerId: json['buyer'] as int?,
+    buyerName: json['buyer_name'] as String? ?? '',
+    sellerName: json['seller_name'] as String? ?? '',
+    items: (json['items'] as List? ?? [])
+        .map((e) => PvzOrderItem.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0,
+    totalValue: (json['total_value'] as num?)?.toDouble() ?? 0,
+    createAt: DateTime.parse(json['create_at'] as String),
+    confirmedAt: json['confirmed_at'] != null
+        ? DateTime.parse(json['confirmed_at'] as String)
+        : null,
+    isIssued: json['is_issued'] as bool? ?? false,
+    issuedAt: json['issued_at'] != null
+        ? DateTime.parse(json['issued_at'] as String)
+        : null,
+    issuedByName: json['issued_by_name'] as String?,
+    buyerPhotoUrl: _imageUrl(json['buyer_photo'] as String?),
+    buyerAvatarUrl: _imageUrl(json['buyer_avatar'] as String?),
+  );
 }
 
 class PvzShop {
@@ -117,10 +122,8 @@ class PvzShop {
   final int id;
   final String name;
 
-  factory PvzShop.fromJson(Map<String, dynamic> json) => PvzShop(
-        id: json['id'] as int,
-        name: json['name'] as String? ?? '',
-      );
+  factory PvzShop.fromJson(Map<String, dynamic> json) =>
+      PvzShop(id: json['id'] as int, name: json['name'] as String? ?? '');
 }
 
 class PvzIssuedReport {
@@ -136,7 +139,8 @@ class PvzIssuedReport {
   final double totalValue;
   final List<PvzOrder> sales;
 
-  factory PvzIssuedReport.fromJson(Map<String, dynamic> json) => PvzIssuedReport(
+  factory PvzIssuedReport.fromJson(Map<String, dynamic> json) =>
+      PvzIssuedReport(
         salesCount: json['sales_count'] as int? ?? 0,
         totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0,
         totalValue: (json['total_value'] as num?)?.toDouble() ?? 0,
@@ -165,7 +169,8 @@ class AnalyticsStockRow {
   final double amount;
   final double value;
 
-  factory AnalyticsStockRow.fromJson(Map<String, dynamic> json) => AnalyticsStockRow(
+  factory AnalyticsStockRow.fromJson(Map<String, dynamic> json) =>
+      AnalyticsStockRow(
         article: json['article'] as String? ?? '',
         name: json['name'] as String? ?? '',
         color: json['color'] as String? ?? '',
@@ -198,32 +203,33 @@ class AnalyticsRankRow {
   static double _n(dynamic v) => (v as num?)?.toDouble() ?? 0;
 
   factory AnalyticsRankRow.product(Map<String, dynamic> j) => AnalyticsRankRow(
-        title: '${j['article'] ?? ''} · ${j['name'] ?? ''}',
-        subtitle: j['color'] as String? ?? '',
-        totalAmount: _n(j['total_amount']),
-        totalValue: _n(j['total_value']),
-        salesCount: j['sales_count'] as int? ?? 0,
-      );
+    title: '${j['article'] ?? ''} · ${j['name'] ?? ''}',
+    subtitle: j['color'] as String? ?? '',
+    totalAmount: _n(j['total_amount']),
+    totalValue: _n(j['total_value']),
+    salesCount: j['sales_count'] as int? ?? 0,
+  );
 
   factory AnalyticsRankRow.shop(Map<String, dynamic> j) => AnalyticsRankRow(
-        title: j['shop_name'] as String? ?? '',
-        subtitle: '',
-        totalAmount: _n(j['total_amount']),
-        totalValue: _n(j['total_value']),
-        salesCount: j['sales_count'] as int? ?? 0,
-        shopId: j['shop'] as int?,
-      );
+    title: j['shop_name'] as String? ?? '',
+    subtitle: '',
+    totalAmount: _n(j['total_amount']),
+    totalValue: _n(j['total_value']),
+    salesCount: j['sales_count'] as int? ?? 0,
+    shopId: j['shop'] as int?,
+  );
 
   factory AnalyticsRankRow.buyer(Map<String, dynamic> j) => AnalyticsRankRow(
-        title: j['buyer_name'] as String? ?? '—',
-        subtitle: [j['factory_name'], j['shop_name']]
-            .where((e) => e != null && '$e'.isNotEmpty)
-            .join(' · '),
-        totalAmount: _n(j['total_amount']),
-        totalValue: _n(j['total_value']),
-        salesCount: j['sales_count'] as int? ?? 0,
-        shopId: j['shop'] as int?,
-      );
+    title: j['buyer_name'] as String? ?? '—',
+    subtitle: [
+      j['factory_name'],
+      j['shop_name'],
+    ].where((e) => e != null && '$e'.isNotEmpty).join(' · '),
+    totalAmount: _n(j['total_amount']),
+    totalValue: _n(j['total_value']),
+    salesCount: j['sales_count'] as int? ?? 0,
+    shopId: j['shop'] as int?,
+  );
 }
 
 class ProductAnalytics {
@@ -249,7 +255,8 @@ class ProductAnalytics {
   factory ProductAnalytics.fromJson(Map<String, dynamic> json) {
     List<Map<String, dynamic>> list(String key) =>
         (json[key] as List? ?? []).cast<Map<String, dynamic>>();
-    final totals = (json['stock_totals'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final totals =
+        (json['stock_totals'] as Map?)?.cast<String, dynamic>() ?? const {};
     return ProductAnalytics(
       stock: list('stock').map(AnalyticsStockRow.fromJson).toList(),
       stockAmount: (totals['total_amount'] as num?)?.toDouble() ?? 0,
@@ -287,17 +294,18 @@ class PvzApi {
 
   /// Auth header for `Image.network` — the buyer-face endpoint needs the
   /// same bearer token as the JSON API.
-  static Map<String, String> imageHeaders(String jwtToken) =>
-      {'Authorization': 'Bearer ${_token(jwtToken)}'};
+  static Map<String, String> imageHeaders(String jwtToken) => {
+    'Authorization': 'Bearer ${_token(jwtToken)}',
+  };
 
   /// The buyer's access photo (Employee.face), served as an image. Last
   /// resort when there is neither a profile photo nor a hand-over snapshot.
   static String buyerFaceUrl(int buyerId) => '$API/shop/buyer-face/$buyerId/';
 
   static Map<String, String> _headers(String jwtToken) => {
-        'Authorization': 'Bearer ${_token(jwtToken)}',
-        'Content-Type': 'application/json',
-      };
+    'Authorization': 'Bearer ${_token(jwtToken)}',
+    'Content-Type': 'application/json',
+  };
 
   static Future<List<PvzOrder>> fetchPending(
     String jwtToken, {
@@ -312,15 +320,21 @@ class PvzApi {
       if (dateFrom != null) params['date_from'] = _dateOnly(dateFrom);
       if (dateTo != null) params['date_to'] = _dateOnly(dateTo);
       if (shopId != null) params['shop'] = '$shopId';
-      final uri = Uri.parse('$API/shop/sale-pending/').replace(
-        queryParameters: params.isNotEmpty ? params : null,
-      );
-      final res = await http.get(uri, headers: _headers(jwtToken)).timeout(const Duration(seconds: 20));
+      final uri = Uri.parse(
+        '$API/shop/sale-pending/',
+      ).replace(queryParameters: params.isNotEmpty ? params : null);
+      final res = await http
+          .get(uri, headers: _headers(jwtToken))
+          .timeout(const Duration(seconds: 20));
       if (res.statusCode != 200) {
-        throw PvzApiException(_extractError(res.body, fallback: 'Не удалось загрузить заказы'));
+        throw PvzApiException(
+          _extractError(res.body, fallback: 'Не удалось загрузить заказы'),
+        );
       }
       final decoded = json.decode(utf8.decode(res.bodyBytes)) as List;
-      return decoded.map((e) => PvzOrder.fromJson(e as Map<String, dynamic>)).toList();
+      return decoded
+          .map((e) => PvzOrder.fromJson(e as Map<String, dynamic>))
+          .toList();
     } on PvzApiException {
       rethrow;
     } catch (_) {
@@ -333,14 +347,23 @@ class PvzApi {
       // This endpoint is paginated ({count, results, ...}, 12 per page by
       // default), so ask for everything and accept a bare list as well.
       final res = await http
-          .get(Uri.parse('$API/shop/shop/?limit=500'), headers: _headers(jwtToken))
+          .get(
+            Uri.parse('$API/shop/shop/?limit=500'),
+            headers: _headers(jwtToken),
+          )
           .timeout(const Duration(seconds: 20));
       if (res.statusCode != 200) {
-        throw PvzApiException(_extractError(res.body, fallback: 'Не удалось загрузить магазины'));
+        throw PvzApiException(
+          _extractError(res.body, fallback: 'Не удалось загрузить магазины'),
+        );
       }
       final body = json.decode(utf8.decode(res.bodyBytes));
-      final decoded = body is Map ? (body['results'] as List? ?? const []) : body as List;
-      return decoded.map((e) => PvzShop.fromJson(e as Map<String, dynamic>)).toList();
+      final decoded = body is Map
+          ? (body['results'] as List? ?? const [])
+          : body as List;
+      return decoded
+          .map((e) => PvzShop.fromJson(e as Map<String, dynamic>))
+          .toList();
     } on PvzApiException {
       rethrow;
     } catch (_) {
@@ -359,12 +382,20 @@ class PvzApi {
       if (shopId != null) params['shop'] = '$shopId';
       if (dateFrom != null) params['date_from'] = _dateOnly(dateFrom);
       if (dateTo != null) params['date_to'] = _dateOnly(dateTo);
-      final uri = Uri.parse('$API/shop/sale-issued-report/').replace(queryParameters: params.isNotEmpty ? params : null);
-      final res = await http.get(uri, headers: _headers(jwtToken)).timeout(const Duration(seconds: 20));
+      final uri = Uri.parse(
+        '$API/shop/sale-issued-report/',
+      ).replace(queryParameters: params.isNotEmpty ? params : null);
+      final res = await http
+          .get(uri, headers: _headers(jwtToken))
+          .timeout(const Duration(seconds: 20));
       if (res.statusCode != 200) {
-        throw PvzApiException(_extractError(res.body, fallback: 'Не удалось загрузить отчёт'));
+        throw PvzApiException(
+          _extractError(res.body, fallback: 'Не удалось загрузить отчёт'),
+        );
       }
-      return PvzIssuedReport.fromJson(json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
+      return PvzIssuedReport.fromJson(
+        json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>,
+      );
     } on PvzApiException {
       rethrow;
     } catch (_) {
@@ -385,12 +416,20 @@ class PvzApi {
       if (dateFrom != null) params['date_from'] = _dateOnly(dateFrom);
       if (dateTo != null) params['date_to'] = _dateOnly(dateTo);
       if (query.isNotEmpty) params['q'] = query;
-      final uri = Uri.parse('$API/shop/product-analytics/').replace(queryParameters: params.isNotEmpty ? params : null);
-      final res = await http.get(uri, headers: _headers(jwtToken)).timeout(const Duration(seconds: 30));
+      final uri = Uri.parse(
+        '$API/shop/product-analytics/',
+      ).replace(queryParameters: params.isNotEmpty ? params : null);
+      final res = await http
+          .get(uri, headers: _headers(jwtToken))
+          .timeout(const Duration(seconds: 30));
       if (res.statusCode != 200) {
-        throw PvzApiException(_extractError(res.body, fallback: 'Не удалось загрузить аналитику'));
+        throw PvzApiException(
+          _extractError(res.body, fallback: 'Не удалось загрузить аналитику'),
+        );
       }
-      return ProductAnalytics.fromJson(json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
+      return ProductAnalytics.fromJson(
+        json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>,
+      );
     } on PvzApiException {
       rethrow;
     } catch (_) {

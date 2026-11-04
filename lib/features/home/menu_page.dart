@@ -54,6 +54,9 @@ class _MenuPageState extends State<MenuPage>
   static const Color _gradientStart = AppColors.brandOrange;
   static const Color _gradientEnd = AppColors.brandRed;
 
+  /// Height of the floating header (padding + the 44px logo row).
+  static const double _headerSpace = 76;
+
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -458,27 +461,71 @@ class _MenuPageState extends State<MenuPage>
             opacity: _fadeAnimation,
             child: SlideTransition(
               position: _slideAnimation,
-              child: Column(
+              child: Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  if (nativeBar)
-                    const SizedBox(height: 8)
-                  else ...[
-                    const SizedBox(height: 16),
-                    _buildHeader(s),
-                    const SizedBox(height: 16),
-                  ],
-                  Expanded(
-                    child: IndexedStack(
-                      index: _currentIndex,
-                      children: [
-                        _buildHomeTab(s),
-                        _buildConfirmationsTab(s),
-                        _buildProductionTab(s),
-                        _buildShopTab(s),
-                        const SettingsScreen(),
-                      ],
-                    ),
+                  Column(
+                    children: [
+                      // The header floats over the page (below). Settings
+                      // starts right under the status bar and scrolls beneath
+                      // it, so nothing cuts the content off at a hard edge.
+                      SizedBox(
+                        height: nativeBar
+                            ? 8
+                            : (_currentIndex == 4 ? 0 : _headerSpace),
+                      ),
+                      Expanded(
+                        child: IndexedStack(
+                          clipBehavior: Clip.none,
+                          index: _currentIndex,
+                          children: [
+                            _buildHomeTab(s),
+                            _buildConfirmationsTab(s),
+                            _buildProductionTab(s),
+                            _buildShopTab(s),
+                            SettingsScreen(
+                              topInset: nativeBar ? 0 : _headerSpace,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
+                  if (!nativeBar) ...[
+                    // Under the status bar: content scrolling up fades out.
+                    Positioned(
+                      top: -MediaQuery.paddingOf(context).top,
+                      left: 0,
+                      right: 0,
+                      height: MediaQuery.paddingOf(context).top,
+                      child: const ColoredBox(
+                        color: AppColors.groupedBackground,
+                      ),
+                    ),
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: DecoratedBox(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              AppColors.groupedBackground,
+                              AppColors.groupedBackground,
+                              Color(0x00F2F2F7),
+                            ],
+                            stops: [0, 0.65, 1],
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: _buildHeader(s),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

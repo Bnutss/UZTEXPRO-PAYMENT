@@ -5,16 +5,24 @@ import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:http/http.dart' as http;
+import 'package:uztexpro_payment/main.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/localization/locale_notifier.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/fade_route.dart';
+import '../../core/widgets/ui_blocks.dart';
 import 'face_id_tile.dart';
+import 'settings_rows.dart';
 import 'privacy_policy_page.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({Key? key}) : super(key: key);
+  const SettingsScreen({Key? key, this.topInset = 0}) : super(key: key);
+
+  /// Space the floating header takes above the first row (content still
+  /// scrolls beneath it).
+  final double topInset;
 
   @override
   _SettingsScreenState createState() => _SettingsScreenState();
@@ -31,6 +39,10 @@ class _SettingsScreenState extends State<SettingsScreen>
   String _email = '';
   String _login = '';
   String _version = '';
+  // The photo of the employee linked to this user (same source as "My
+  // timesheet"); empty until loaded or when the user has no employee.
+  String? _photoUrl;
+  String _apiToken = '';
   bool _canCheckBiometrics = false;
   bool _useBiometrics = false;
   // Which biometric icon/label to show — detected per device instead of
@@ -40,7 +52,6 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   static const Color _gradientStart = AppColors.brandOrange;
   static const Color _gradientEnd = AppColors.brandRed;
-  static const double _tile = 38;
 
   final List<Map<String, String>> _languages = [
     {'code': 'ru', 'name': 'Русский', 'desc': 'Русский язык'},
@@ -60,7 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       curve: Curves.easeOutCubic,
     );
     _animationController.forward();
-    _loadUserData();
+    _loadUserData().then((_) => _loadPhoto());
     _loadVersion();
     _checkBiometrics();
     _loadBiometricPreference();
@@ -145,6 +156,48 @@ class _SettingsScreenState extends State<SettingsScreen>
     });
   }
 
+  /// Photo links may come back relative or with plain http behind the proxy.
+  static String? _resolvePhoto(String? url) {
+    if (url == null || url.isEmpty) return null;
+    final origin = Uri.parse(API).origin;
+    if (url.startsWith('//')) return 'https:$url';
+    if (url.startsWith('/')) return '$origin$url';
+    if (url.startsWith('http://')) return 'https://${url.substring(7)}';
+    return url;
+  }
+
+  Future<void> _loadPhoto() async {
+    try {
+      final jwtRaw = await _storage.read(key: 'jwt');
+      if (jwtRaw == null) return;
+      final token = (jsonDecode(jwtRaw) as Map<String, dynamic>)['token'];
+      if (token is! String) return;
+      final now = DateTime.now();
+      final res = await http
+          .get(
+            Uri.parse('$API/hr/mobile-timesheet/').replace(
+              queryParameters: {'year': '${now.year}', 'month': '${now.month}'},
+            ),
+            headers: {'Authorization': 'Bearer $token'},
+          )
+          .timeout(const Duration(seconds: 20));
+      if (res.statusCode != 200) return;
+      final body =
+          json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      final photo = _resolvePhoto(
+        (body['employee'] as Map?)?['photo'] as String?,
+      );
+      if (mounted && photo != null) {
+        setState(() {
+          _photoUrl = photo;
+          _apiToken = token;
+        });
+      }
+    } catch (_) {
+      // No employee linked or no network: the initials stay.
+    }
+  }
+
   Future<void> _loadVersion() async {
     final info = await PackageInfo.fromPlatform();
     setState(() => _version = info.version);
@@ -164,56 +217,69 @@ class _SettingsScreenState extends State<SettingsScreen>
   Widget build(BuildContext context) {
     final s = S.of(context);
 
-    return FadeTransition(
-      opacity: _animation,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(s),
-          const SizedBox(height: 16),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
-              children: [_buildSettingsCard(s)],
+    final page = CustomScrollView(
+      clipBehavior: Clip.none,
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(16, 16 + widget.topInset, 16, 0),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([_buildSettingsCard(s)]),
+          ),
+        ),
+        // The platform name sits at the very bottom, clear of the tab bar.
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                24,
+                16,
+                MediaQuery.paddingOf(context).bottom + 90,
+              ),
+              child: Text(
+                s.paymentSystem,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: _gradientEnd,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(S s) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Text(
-        s.settingsTitle,
-        style: const TextStyle(
-          color: Color(0xFF1C1C1E),
-          fontSize: 20,
-          fontWeight: FontWeight.w800,
         ),
-      ),
+      ],
     );
+
+    // Scrolls under the (transparent) header: no clip edge, no block.
+    return FadeTransition(opacity: _animation, child: page);
   }
 
-  /// Profile, language and biometrics in one card, set apart by thin lines.
+  List<PhotoSource> get _photoSources => [
+    if (_photoUrl != null)
+      PhotoSource(_photoUrl!, headers: {'Authorization': 'Bearer $_apiToken'}),
+  ];
+
+  /// Telegram-style: the profile on the page itself, then groups of rows with
+  /// colored icon tiles.
   Widget _buildSettingsCard(S s) {
-    return _GlassCard(
-      child: Column(
-        children: [
-          _buildProfileSection(s),
-          const _CardDivider(),
-          _buildLanguageSection(s),
-          if (_canCheckBiometrics) ...[
-            const _CardDivider(),
-            _buildBiometricSection(s),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildProfileSection(s),
+        const SizedBox(height: 20),
+        _buildLanguageGroup(s),
+        const SizedBox(height: 20),
+        SettingsGroup(
+          children: [
+            if (_canCheckBiometrics) _buildBiometricRow(s),
+            _buildPrivacyRow(s),
+            _buildVersionRow(s),
           ],
-          const _CardDivider(),
-          _buildPrivacySection(s),
-          const _CardDivider(),
-          _buildVersionSection(s),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -231,24 +297,10 @@ class _SettingsScreenState extends State<SettingsScreen>
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _gradientStart.withOpacity(0.12),
-            ),
-            child: Center(
-              child: Text(
-                initials,
-                style: const TextStyle(
-                  color: _gradientStart,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 28,
-                  letterSpacing: 1,
-                ),
-              ),
-            ),
+          PersonAvatar(
+            name: _displayName.isNotEmpty ? _displayName : initials,
+            size: 80,
+            sources: _photoSources,
           ),
           const SizedBox(height: 16),
           Text(
@@ -307,94 +359,30 @@ class _SettingsScreenState extends State<SettingsScreen>
               ],
             ),
           ],
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-            decoration: BoxDecoration(
-              color: _gradientStart.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.business_center_outlined,
-                  color: _gradientEnd,
-                  size: 13,
-                ),
-                const SizedBox(width: 7),
-                Text(
-                  s.paymentSystem,
-                  style: const TextStyle(
-                    color: _gradientEnd,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildLanguageSection(S s) {
+  Widget _buildLanguageGroup(S s) {
     final currentCode = localeNotifier.value.languageCode;
     final selectedIndex = _languages
         .indexWhere((lang) => lang['code'] == currentCode)
         .clamp(0, _languages.length - 1);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: _tile,
-                height: _tile,
-                decoration: BoxDecoration(
-                  color: _gradientStart.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.language_rounded,
-                  color: _gradientStart,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      s.language,
-                      style: const TextStyle(
-                        color: Color(0xFF1C1C1E),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      s.languageDesc,
-                      style: const TextStyle(
-                        color: Color(0xFF8A8A8E),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _buildLanguageControl(selectedIndex),
-        ],
-      ),
+    return SettingsGroup(
+      children: [
+        SettingsRow(
+          icon: Icons.language_rounded,
+          color: SettingsColors.blue,
+          title: s.language,
+          subtitle: s.languageDesc,
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: _buildLanguageControl(selectedIndex),
+        ),
+      ],
     );
   }
 
@@ -411,10 +399,8 @@ class _SettingsScreenState extends State<SettingsScreen>
         .toList();
 
     // AdaptiveSegmentedControl renders a Material 3 SegmentedButton on
-    // Android, but the app theme has useMaterial3 disabled — that mismatch
-    // is what made it look off here. A plain custom pill track matches
-    // this card's own glass styling instead, same as the iOS control does
-    // natively.
+    // Android, but the app theme has useMaterial3 disabled, so Android gets a
+    // plain pill track matching the iOS control's look.
     if (Platform.isIOS) {
       return AdaptiveSegmentedControl(
         labels: labels,
@@ -430,223 +416,54 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildBiometricSection(S s) {
+  Widget _buildBiometricRow(S s) {
     // An iPhone is always Face ID, even while it reports nothing (a simulator,
     // or Face ID not set up yet); other devices show what they report.
     final isFaceId =
         _biometricType == BiometricType.face ||
         (_biometricType == null && Platform.isIOS);
-    final description = isFaceId ? s.useFaceId : s.useFingerprint;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _toggleBiometricPreference(!_useBiometrics),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              if (isFaceId)
-                const FaceIdTile(size: _tile)
-              else
-                Container(
-                  width: _tile,
-                  height: _tile,
-                  decoration: BoxDecoration(
-                    color: _gradientStart.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.fingerprint,
-                    color: _gradientStart,
-                    size: 20,
-                  ),
-                ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      s.biometricAuth,
-                      style: const TextStyle(
-                        color: Color(0xFF1C1C1E),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      description,
-                      style: const TextStyle(
-                        color: Color(0xFF8A8A8E),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              AdaptiveSwitch(
-                value: _useBiometrics,
-                onChanged: _toggleBiometricPreference,
-                activeColor: _gradientStart,
-              ),
-            ],
-          ),
-        ),
+    return SettingsRow(
+      leading: isFaceId
+          ? const FaceIdTile()
+          : const SettingsIconTile(
+              icon: Icons.fingerprint,
+              color: SettingsColors.green,
+            ),
+      title: s.biometricAuth,
+      subtitle: isFaceId ? s.useFaceId : s.useFingerprint,
+      onTap: () => _toggleBiometricPreference(!_useBiometrics),
+      trailing: AdaptiveSwitch(
+        value: _useBiometrics,
+        onChanged: _toggleBiometricPreference,
+        activeColor: _gradientStart,
       ),
     );
   }
 
-  Widget _buildPrivacySection(S s) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          Navigator.push(
-            context,
-            FadeRoute(builder: (_) => const PrivacyPolicyPage()),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Container(
-                width: _tile,
-                height: _tile,
-                decoration: BoxDecoration(
-                  color: _gradientStart.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.shield_outlined,
-                  color: _gradientStart,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      s.privacyPolicy,
-                      style: const TextStyle(
-                        color: Color(0xFF1C1C1E),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      s.privacyPolicyDesc,
-                      style: const TextStyle(
-                        color: Color(0xFF8A8A8E),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right_rounded, color: Color(0xFFB0B0B5)),
-            ],
-          ),
-        ),
+  Widget _buildPrivacyRow(S s) {
+    return SettingsRow(
+      icon: Icons.shield_outlined,
+      color: SettingsColors.blue,
+      title: s.privacyPolicy,
+      subtitle: s.privacyPolicyDesc,
+      onTap: () => Navigator.push(
+        context,
+        FadeRoute(builder: (_) => const PrivacyPolicyPage()),
       ),
     );
   }
 
-  /// App version as the last row of the settings card. Plain information:
-  /// nothing opens on tap, so no dialog route / overlay is involved and the
-  /// native tab bar and toolbar never disappear.
-  Widget _buildVersionSection(S s) {
+  /// App version: plain information, nothing opens on tap, so no dialog route
+  /// is involved and the native tab bar and toolbar never disappear.
+  Widget _buildVersionRow(S s) {
     final year = DateTime.now().year;
     final copyright = year > 2026 ? '© 2026–$year UztexPro' : '© 2026 UztexPro';
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        children: [
-          Container(
-            width: _tile,
-            height: _tile,
-            decoration: BoxDecoration(
-              color: _gradientStart.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.info_outline_rounded,
-              color: _gradientStart,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  s.appVersionLabel(_version),
-                  style: const TextStyle(
-                    color: Color(0xFF1C1C1E),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  copyright,
-                  style: const TextStyle(
-                    color: Color(0xFF8A8A8E),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CardDivider extends StatelessWidget {
-  const _CardDivider();
-
-  @override
-  Widget build(BuildContext context) => const Divider(
-    height: 1,
-    thickness: 1,
-    indent: 16,
-    endIndent: 16,
-    color: Color(0xFFF0F0F0),
-  );
-}
-
-// ── Reusable card ────────────────────────────────────────────────────────────
-
-class _GlassCard extends StatelessWidget {
-  final Widget child;
-
-  const _GlassCard({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFEDEDED), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: child,
+    return SettingsRow(
+      icon: Icons.info_outline_rounded,
+      color: SettingsColors.gray,
+      title: s.appVersionLabel(_version),
+      subtitle: copyright,
     );
   }
 }

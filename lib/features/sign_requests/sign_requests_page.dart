@@ -1,6 +1,7 @@
 import '../../core/widgets/fade_route.dart';
 import '../../core/widgets/app_button.dart';
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -21,6 +22,7 @@ const _kPath = 'texmansys/material-purchase-application';
 
 class SignRequestsPage extends StatefulWidget {
   final String jwtToken;
+
   const SignRequestsPage({Key? key, required this.jwtToken}) : super(key: key);
 
   @override
@@ -348,6 +350,7 @@ class _SignRequestsPageState extends State<SignRequestsPage>
   }
 
   int get _pendingCount => _all.where((a) => a['status'] == 0).length;
+
   int get _signingCount => _all.where((a) => a['status'] == 1).length;
 
   @override
@@ -602,14 +605,38 @@ class _FilterBar extends StatelessWidget {
     final t = S.of(context);
     String withCount(String label, int count) =>
         count > 0 ? '$label $count' : label;
-    return AppSegmentedControl(
-      labels: [
-        withCount(t.filterAll, allCount),
-        withCount(t.pending, pendingCount),
-        withCount(t.filterForSigning, signingCount),
-      ],
-      selectedIndex: _values.indexOf(selected).clamp(0, _values.length - 1),
-      onChanged: (i) => onSelect(_values[i]),
+    final labels = [
+      withCount(t.filterAll, allCount),
+      withCount(t.pending, pendingCount),
+      withCount(t.filterForSigning, signingCount),
+    ];
+    final index = _values.indexOf(selected).clamp(0, _values.length - 1);
+    void change(int i) {
+      HapticFeedback.selectionClick();
+      onSelect(_values[i]);
+    }
+
+    // The package's own control on iOS (native, Liquid Glass on iOS 26); the
+    // shared pill track on Android, where the package draws a Material 3 one
+    // that clashes with this app's theme.
+    if (!Platform.isIOS) {
+      return AppSegmentedControl(
+        labels: labels,
+        selectedIndex: index,
+        onChanged: (i) => onSelect(_values[i]),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: SizedBox(
+        height: 36,
+        child: AdaptiveSegmentedControl(
+          labels: labels,
+          selectedIndex: index,
+          color: AppColors.brandOrange,
+          onValueChanged: change,
+        ),
+      ),
     );
   }
 }

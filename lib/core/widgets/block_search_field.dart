@@ -28,7 +28,11 @@ class BlockSearchField extends StatelessWidget {
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: const TextStyle(color: kInkMuted, fontSize: 14),
-          prefixIcon: const Icon(Icons.search_rounded, size: 20, color: kInkMuted),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            size: 20,
+            color: kInkMuted,
+          ),
           filled: false,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 11),

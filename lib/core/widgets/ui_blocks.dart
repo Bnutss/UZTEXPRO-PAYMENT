@@ -101,7 +101,12 @@ class MetricRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var i = 0; i < metrics.length; i++) ...[
-            if (i > 0) Container(width: 1, margin: const EdgeInsets.symmetric(horizontal: 12), color: line),
+            if (i > 0)
+              Container(
+                width: 1,
+                margin: const EdgeInsets.symmetric(horizontal: 12),
+                color: line,
+              ),
             Expanded(
               flex: i < flex.length ? flex[i] : 1,
               child: _MetricCell(metrics[i]),
@@ -126,7 +131,11 @@ class _MetricCell extends StatelessWidget {
         Row(
           children: [
             if (metric.icon != null) ...[
-              Icon(metric.icon, size: 13, color: metric.accent ? AppColors.brandRed : kInkMuted),
+              Icon(
+                metric.icon,
+                size: 13,
+                color: metric.accent ? AppColors.brandRed : kInkMuted,
+              ),
               const SizedBox(width: 4),
             ],
             Flexible(
@@ -134,7 +143,11 @@ class _MetricCell extends StatelessWidget {
                 metric.label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11, color: kInkMuted, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: kInkMuted,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ],
@@ -168,9 +181,9 @@ class BlockDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: EdgeInsets.only(left: indent, top: gap, bottom: gap),
-        child: Container(height: 1, color: _hairline(context)),
-      );
+    padding: EdgeInsets.only(left: indent, top: gap, bottom: gap),
+    child: Container(height: 1, color: _hairline(context)),
+  );
 }
 
 /// One candidate image for [FallbackNetworkImage].
@@ -207,8 +220,11 @@ class _FallbackNetworkImageState extends State<FallbackNetworkImage> {
   @override
   void didUpdateWidget(FallbackNetworkImage old) {
     super.didUpdateWidget(old);
-    final changed = old.sources.length != widget.sources.length ||
-        (widget.sources.isNotEmpty && old.sources.isNotEmpty && old.sources.first.url != widget.sources.first.url);
+    final changed =
+        old.sources.length != widget.sources.length ||
+        (widget.sources.isNotEmpty &&
+            old.sources.isNotEmpty &&
+            old.sources.first.url != widget.sources.first.url);
     if (changed) _index = 0;
   }
 
@@ -233,7 +249,8 @@ class _FallbackNetworkImageState extends State<FallbackNetworkImage> {
         _next();
         return widget.placeholder();
       },
-      loadingBuilder: (_, child, progress) => progress == null ? child : widget.placeholder(),
+      loadingBuilder: (_, child, progress) =>
+          progress == null ? child : widget.placeholder(),
     );
   }
 }
@@ -245,7 +262,12 @@ class PersonAvatar extends StatelessWidget {
   final List<PhotoSource> sources;
   final double size;
 
-  const PersonAvatar({super.key, required this.name, this.sources = const [], this.size = 40});
+  const PersonAvatar({
+    super.key,
+    required this.name,
+    this.sources = const [],
+    this.size = 40,
+  });
 
   static const _tints = [
     (Color(0xFFFFEBD2), Color(0xFFC25E00)),
@@ -256,7 +278,11 @@ class PersonAvatar extends StatelessWidget {
   ];
 
   String get _initials {
-    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
     if (parts.isEmpty) return '?';
     final first = parts.first.characters.first;
     final second = parts.length > 1 ? parts[1].characters.first : '';
@@ -267,22 +293,31 @@ class PersonAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final tint = _tints[name.hashCode.abs() % _tints.length];
     Widget fallback() => Container(
-          width: size,
-          height: size,
-          alignment: Alignment.center,
-          color: tint.$1,
-          child: Text(
-            _initials,
-            style: TextStyle(fontSize: size * 0.36, fontWeight: FontWeight.w700, color: tint.$2),
-          ),
-        );
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      color: tint.$1,
+      child: Text(
+        _initials,
+        style: TextStyle(
+          fontSize: size * 0.36,
+          fontWeight: FontWeight.w700,
+          color: tint.$2,
+        ),
+      ),
+    );
     return ClipOval(
       child: SizedBox(
         width: size,
         height: size,
         child: sources.isEmpty
             ? fallback()
-            : FallbackNetworkImage(sources: sources, width: size, height: size, placeholder: fallback),
+            : FallbackNetworkImage(
+                sources: sources,
+                width: size,
+                height: size,
+                placeholder: fallback,
+              ),
       ),
     );
   }
@@ -306,9 +341,20 @@ class StatusTag extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 5, height: 5, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
           const SizedBox(width: 4),
-          Text(text, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color)),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
         ],
       ),
     );
@@ -323,7 +369,12 @@ class GroupedTile extends StatelessWidget {
   final int count;
   final Widget child;
 
-  const GroupedTile({super.key, required this.index, required this.count, required this.child});
+  const GroupedTile({
+    super.key,
+    required this.index,
+    required this.count,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
