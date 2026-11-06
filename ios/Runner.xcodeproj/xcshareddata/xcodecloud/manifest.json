@@ -1,0 +1,9 @@
+{
+  "id" : "27e04692-af46-4b73-97b3-41eadd8d7e32",
+  "targets" : [
+    {
+      "id" : "94E79151-1F30-4F2A-8A32-56F261470975",
+      "name" : "uztexpro_payment"
+    }
+  ]
+}
