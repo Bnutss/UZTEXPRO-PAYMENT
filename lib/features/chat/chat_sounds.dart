@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 
 /// Sound files of the chat (assets/sound).
-const String kSendSound = 'sound/telegram_soundin.mp3';
+const String kSendSound = 'sound/dice.mp3';
 const String kIncomingSound = 'sound/sound_17216.mp3';
 
 /// Plays one sound file; a seam for tests.

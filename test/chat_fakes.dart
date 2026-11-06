@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -59,6 +60,7 @@ class FakeLink implements ChatLink {
     int? to,
     required String text,
     required String clientId,
+    int? replyTo,
   }) {
     if (!_conn.value) return false;
     sent.add({
@@ -77,12 +79,102 @@ class FakeLink implements ChatLink {
 }
 
 class FakeRest implements ChatRest {
+  final groupCalls = <String>[];
+
+  /// The group answers 404 (deleted / I was removed).
+  bool groupGone = false;
+
+  @override
+  Future<ChatConversation> createGroup(
+    String title,
+    List<int> memberIds, {
+    Uint8List? photo,
+  }) async {
+    groupCalls.add('create:$title:${memberIds.join(',')}');
+    return ChatConversation(
+      id: 900,
+      peer: ChatUser.groupStandIn(900, title, null),
+      lastMessage: null,
+      unread: 0,
+      updatedAt: DateTime(2026),
+      isGroup: true,
+      membersCount: memberIds.length + 1,
+      myRole: 'owner',
+    );
+  }
+
+  @override
+  Future<ChatConversation> group(int id) async {
+    groupCalls.add('group:$id');
+    if (groupGone) throw const ChatApiException(404);
+    return ChatConversation(
+      id: id,
+      peer: ChatUser.groupStandIn(id, 'G', null),
+      lastMessage: null,
+      unread: 0,
+      updatedAt: DateTime(2026),
+      isGroup: true,
+    );
+  }
+
+  @override
+  Future<ChatConversation> updateGroup(
+    int id, {
+    String? title,
+    Uint8List? photo,
+    bool removePhoto = false,
+  }) => group(id);
+
+  @override
+  Future<void> addMembers(int id, List<int> userIds) async =>
+      groupCalls.add('add:$id');
+
+  @override
+  Future<void> removeMember(int id, int userId) async =>
+      groupCalls.add('remove:$id:$userId');
+
+  @override
+  Future<void> setMemberRole(int id, int userId, String role) async =>
+      groupCalls.add('role:$id:$userId:$role');
+
+  @override
+  Future<void> deleteGroup(int id) async {
+    groupCalls.add('delete:$id');
+    if (groupGone) throw const ChatApiException(404);
+  }
+
+  final deletedChats = <String>[];
+  final mutedChats = <String>[];
+  final deletedMessages = <String>[];
+
+  @override
+  Future<ChatMessage> editMessage(int id, String text) async =>
+      store.firstWhere((m) => m.id == id);
+
+  @override
+  Future<void> deleteMessage(int id, {bool forAll = false}) async =>
+      deletedMessages.add('$id:${forAll ? 'all' : 'me'}');
+
+  @override
+  Future<void> deleteConversation(int id, {bool forAll = false}) async =>
+      deletedChats.add('$id:${forAll ? 'all' : 'me'}');
+
+  @override
+  Future<void> setMuted(int id, bool muted) async =>
+      mutedChats.add('$id:$muted');
+
   int unreadOnServer = 0;
   int unreadCalls = 0;
   bool failUnread = false;
 
   @override
   int? get myId => meId;
+
+  @override
+  String get apiBase => '';
+
+  @override
+  String get apiToken => '';
 
   final contactsList = <ChatUser>[];
   final conversationsList = <ChatConversation>[];
@@ -155,8 +247,9 @@ class FakeRest implements ChatRest {
   Future<ChatMessage> sendMessage(
     int conversationId,
     String text,
-    String clientId,
-  ) async {
+    String clientId, {
+    int? replyTo,
+  }) async {
     sentViaRest++;
     if (failSend) throw const ChatApiException(null);
     final dup = store.where((m) => m.clientId == clientId).toList();

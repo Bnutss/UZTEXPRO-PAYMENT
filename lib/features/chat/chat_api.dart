@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:uztexpro_payment/main.dart' show API;
@@ -26,6 +27,11 @@ abstract class ChatRest {
   /// The id of the signed-in user, when the token carries it.
   int? get myId;
 
+  /// Address and token for the native chat preview, which loads its messages
+  /// itself (empty where there is none).
+  String get apiBase;
+  String get apiToken;
+
   /// Total of unread messages.
   Future<int> unread();
 
@@ -46,9 +52,49 @@ abstract class ChatRest {
   Future<ChatMessage> sendMessage(
     int conversationId,
     String text,
-    String clientId,
-  );
+    String clientId, {
+    int? replyTo,
+  });
   Future<void> markRead(int conversationId, int upToId);
+
+  /// Deletes the messages of a chat: only for me, or for both people.
+  Future<void> deleteConversation(int conversationId, {bool forAll = false});
+
+  /// Changes the text of my message.
+  Future<ChatMessage> editMessage(int messageId, String text);
+
+  /// Deletes one message: for both people, or only for me.
+  Future<void> deleteMessage(int messageId, {bool forAll = false});
+
+  /// Switches the notifications of a chat off / on (for me).
+  Future<void> setMuted(int conversationId, bool muted);
+
+  // ── groups ──
+  Future<ChatConversation> createGroup(
+    String title,
+    List<int> memberIds, {
+    Uint8List? photo,
+  });
+
+  /// The group's card with every member.
+  Future<ChatConversation> group(int conversationId);
+
+  Future<ChatConversation> updateGroup(
+    int conversationId, {
+    String? title,
+    Uint8List? photo,
+    bool removePhoto = false,
+  });
+
+  Future<void> addMembers(int conversationId, List<int> userIds);
+
+  /// Removes a person, or leaves the group (my own id).
+  Future<void> removeMember(int conversationId, int userId);
+
+  Future<void> setMemberRole(int conversationId, int userId, String role);
+
+  /// Deletes the whole group for everybody (the owner).
+  Future<void> deleteGroup(int conversationId);
 }
 
 /// REST side of the chat. [jwtToken] is the value kept after login: either the
@@ -70,6 +116,12 @@ class ChatApi implements ChatRest {
   }
 
   Map<String, String> get headers => {'Authorization': 'Bearer $token'};
+
+  @override
+  String get apiBase => _base;
+
+  @override
+  String get apiToken => token;
 
   /// The id of the signed-in user, read from the JWT (`user_id`).
   @override
@@ -102,6 +154,170 @@ class ChatApi implements ChatRest {
       throw const ChatApiException(null);
     }
     return _decode(res);
+  }
+
+  Future<dynamic> _delete(String path, [Map<String, String>? query]) async {
+    final http.Response res;
+    try {
+      res = await http
+          .delete(
+            Uri.parse('$_base$path').replace(queryParameters: query),
+            headers: headers,
+          )
+          .timeout(_timeout);
+    } catch (_) {
+      throw const ChatApiException(null);
+    }
+    return _decode(res);
+  }
+
+  @override
+  Future<void> deleteConversation(
+    int conversationId, {
+    bool forAll = false,
+  }) async {
+    await _delete('/conversations/$conversationId/', {
+      if (forAll) 'for_all': '1',
+    });
+  }
+
+  @override
+  Future<ChatMessage> editMessage(int messageId, String text) async {
+    final http.Response res;
+    try {
+      res = await http
+          .patch(
+            Uri.parse('$_base/messages/$messageId/'),
+            headers: {...headers, 'Content-Type': 'application/json'},
+            body: jsonEncode({'text': text}),
+          )
+          .timeout(_timeout);
+    } catch (_) {
+      throw const ChatApiException(null);
+    }
+    final data = _decode(res);
+    return ChatMessage.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  @override
+  Future<void> deleteMessage(int messageId, {bool forAll = false}) async {
+    await _delete('/messages/$messageId/', {if (forAll) 'for_all': '1'});
+  }
+
+  @override
+  Future<ChatConversation> createGroup(
+    String title,
+    List<int> memberIds, {
+    Uint8List? photo,
+  }) async {
+    final data = photo == null
+        ? await _post('/groups/', {'title': title, 'member_ids': memberIds})
+        : await _multipart('POST', '/groups/', {
+            'title': title,
+            'member_ids': jsonEncode(memberIds),
+          }, photo);
+    return ChatConversation.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  @override
+  Future<ChatConversation> group(int conversationId) async {
+    final data = await _get('/groups/$conversationId/');
+    return ChatConversation.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  @override
+  Future<ChatConversation> updateGroup(
+    int conversationId, {
+    String? title,
+    Uint8List? photo,
+    bool removePhoto = false,
+  }) async {
+    final fields = {
+      if (title != null) 'title': title,
+      if (removePhoto) 'remove_photo': 'true',
+    };
+    final data = await _multipart(
+      'PATCH',
+      '/groups/$conversationId/',
+      fields,
+      photo,
+    );
+    return ChatConversation.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  @override
+  Future<void> addMembers(int conversationId, List<int> userIds) async {
+    await _post('/groups/$conversationId/members/', {'user_ids': userIds});
+  }
+
+  @override
+  Future<void> removeMember(int conversationId, int userId) async {
+    await _delete('/groups/$conversationId/members/$userId/');
+  }
+
+  @override
+  Future<void> setMemberRole(
+    int conversationId,
+    int userId,
+    String role,
+  ) async {
+    await _send('PATCH', '/groups/$conversationId/members/$userId/', {
+      'role': role,
+    });
+  }
+
+  @override
+  Future<void> deleteGroup(int conversationId) async {
+    await _delete('/groups/$conversationId/');
+  }
+
+  /// A request with a JSON body (PATCH).
+  Future<dynamic> _send(
+    String method,
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final http.Response res;
+    try {
+      final req = http.Request(method, Uri.parse('$_base$path'))
+        ..headers.addAll({...headers, 'Content-Type': 'application/json'})
+        ..body = jsonEncode(body);
+      res = await http.Response.fromStream(await req.send().timeout(_timeout));
+    } catch (_) {
+      throw const ChatApiException(null);
+    }
+    return _decode(res);
+  }
+
+  /// A form request, with the group's photo when there is one.
+  Future<dynamic> _multipart(
+    String method,
+    String path,
+    Map<String, String> fields,
+    Uint8List? photo,
+  ) async {
+    final http.Response res;
+    try {
+      final req = http.MultipartRequest(method, Uri.parse('$_base$path'))
+        ..headers.addAll(headers)
+        ..fields.addAll(fields);
+      if (photo != null) {
+        req.files.add(
+          http.MultipartFile.fromBytes('photo', photo, filename: 'group.jpg'),
+        );
+      }
+      res = await http.Response.fromStream(
+        await req.send().timeout(const Duration(seconds: 60)),
+      );
+    } catch (_) {
+      throw const ChatApiException(null);
+    }
+    return _decode(res);
+  }
+
+  @override
+  Future<void> setMuted(int conversationId, bool muted) async {
+    await _post('/conversations/$conversationId/mute/', {'muted': muted});
   }
 
   Future<dynamic> _post(String path, Map<String, dynamic> body) async {
@@ -146,7 +362,7 @@ class ChatApi implements ChatRest {
   /// My chats that have messages, newest first.
   @override
   Future<List<ChatConversation>> conversations() async {
-    final data = await _get('/conversations/');
+    final data = await _get('/conversations/', {'groups': '1'});
     return (data as List)
         .whereType<Map>()
         .map((e) => ChatConversation.fromJson(e.cast<String, dynamic>()))
@@ -194,11 +410,13 @@ class ChatApi implements ChatRest {
   Future<ChatMessage> sendMessage(
     int conversationId,
     String text,
-    String clientId,
-  ) async {
+    String clientId, {
+    int? replyTo,
+  }) async {
     final data = await _post('/conversations/$conversationId/messages/', {
       'text': text,
       'client_id': clientId,
+      if (replyTo != null) 'reply_to': replyTo,
     });
     return ChatMessage.fromJson((data as Map).cast<String, dynamic>());
   }

@@ -27,6 +27,7 @@ class AdaptivePopupMenuItem<T> extends AdaptivePopupMenuEntry {
     this.isDestructive = false,
     this.selected = false,
     this.value,
+    this.children = const [],
   });
 
   /// Display label for the item
@@ -57,6 +58,34 @@ class AdaptivePopupMenuItem<T> extends AdaptivePopupMenuEntry {
 
   /// Optional value of type T associated with this item
   final T? value;
+
+  /// A submenu: choosing this item opens a second menu with these items
+  /// (a nested native `UIMenu` on iOS 26+). The item itself is not selectable.
+  final List<AdaptivePopupMenuItem<T>> children;
+}
+
+/// [items] with every submenu's items placed right after their parent, and the
+/// index of each one's parent (-1 at the top level). The native side rebuilds
+/// the tree from it; selections report the index in this flat list.
+({List<AdaptivePopupMenuEntry> entries, List<int> parents})
+_flattenMenu<T>(List<AdaptivePopupMenuEntry> items) {
+  final entries = <AdaptivePopupMenuEntry>[];
+  final parents = <int>[];
+  void add(AdaptivePopupMenuEntry e, int parent) {
+    final at = entries.length;
+    entries.add(e);
+    parents.add(parent);
+    if (e is AdaptivePopupMenuItem<T>) {
+      for (final c in e.children) {
+        add(c, at);
+      }
+    }
+  }
+
+  for (final e in items) {
+    add(e, -1);
+  }
+  return (entries: entries, parents: parents);
 }
 
 /// A visual divider between popup menu items
@@ -290,8 +319,9 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
     final enabled = <bool>[];
     final isDestructive = <bool>[];
     final isSelected = <bool>[];
+    final flat = _flattenMenu<T>(widget.items);
 
-    for (final e in widget.items) {
+    for (final e in flat.entries) {
       if (e is AdaptivePopupMenuDivider) {
         labels.add(e.title ?? '');
         subtitles.add('');
@@ -323,6 +353,7 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
         'enabled': enabled,
         'isDestructive': isDestructive,
         'isSelected': isSelected,
+        'parents': flat.parents,
       });
     } catch (_) {}
   }
@@ -355,8 +386,9 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
       final enabled = <bool>[];
       final isDestructiveList = <bool>[];
       final isSelectedList = <bool>[];
+      final flat = _flattenMenu<T>(widget.items);
 
-      for (final e in widget.items) {
+      for (final e in flat.entries) {
         if (e is AdaptivePopupMenuDivider) {
           labels.add(e.title ?? '');
           subtitles.add('');
@@ -394,12 +426,13 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
         'enabled': enabled,
         'isDestructive': isDestructiveList,
         'isSelected': isSelectedList,
+        'parents': flat.parents,
         'isDark': _isDark,
         if (_effectiveTint != null) 'tint': _colorToARGB(_effectiveTint!),
       };
 
       // Create a unique key based on button label/icon and items to force recreation on change
-      final itemsKey = widget.items
+      final itemsKey = flat.entries
           .map((item) {
             if (item is AdaptivePopupMenuItem<T>) {
               return '${item.label}_${item.subtitle}_${item.icon}_${item.enabled}_${item.selected}_${item.value}_${item.imageBytes?.length}';
@@ -531,16 +564,17 @@ class _IOS26PopupMenuButtonState<T> extends State<IOS26PopupMenuButton<T>> {
         final selectableItems = <AdaptivePopupMenuEntry>[];
         final originalIndices = <int>[];
 
-        for (int i = 0; i < widget.items.length; i++) {
-          if (widget.items[i] is AdaptivePopupMenuItem<T>) {
-            selectableItems.add(widget.items[i]);
+        final entries = _flattenMenu<T>(widget.items).entries;
+        for (int i = 0; i < entries.length; i++) {
+          if (entries[i] is AdaptivePopupMenuItem<T>) {
+            selectableItems.add(entries[i]);
             originalIndices.add(i);
           }
         }
 
         if (idx >= 0 && idx < selectableItems.length) {
           final originalIndex = originalIndices[idx];
-          final selectedEntry = widget.items[originalIndex];
+          final selectedEntry = entries[originalIndex];
           if (selectedEntry is AdaptivePopupMenuItem<T>) {
             widget.onSelected(originalIndex, selectedEntry);
           }

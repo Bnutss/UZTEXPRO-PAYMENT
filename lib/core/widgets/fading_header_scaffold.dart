@@ -40,6 +40,7 @@ class FadingHeaderScaffold extends StatelessWidget {
     this.filterActive = false,
     this.onFilterTap,
     this.filterSfSymbol = 'line.3.horizontal.decrease',
+    this.filterIcon = Icons.tune_rounded,
     this.bottom,
     this.bottomHeight = 0,
     this.bottomNavigationBar,
@@ -83,6 +84,10 @@ class FadingHeaderScaffold extends StatelessWidget {
   /// (e.g. opens a picker sheet). [filterActive] still puts the dot on it.
   final VoidCallback? onFilterTap;
   final String filterSfSymbol;
+
+  /// The icon of the tap button ([onFilterTap]); the chat list uses it for
+  /// "new group".
+  final IconData filterIcon;
 
   /// Floating widgets under the title row (view toggle, filter chips). They
   /// are part of the header and fade the same way. [bottomHeight] is their
@@ -169,6 +174,7 @@ class FadingHeaderScaffold extends StatelessWidget {
               onFilterTap: onFilterTap,
               filterActive: filterActive,
               filterSfSymbol: filterSfSymbol,
+              filterIcon: filterIcon,
               onSearch: onToggleSearch,
             ),
           ),
@@ -372,6 +378,7 @@ class _HeaderActionsCapsule extends StatelessWidget {
     required this.onFilterTap,
     required this.filterActive,
     required this.filterSfSymbol,
+    required this.filterIcon,
     required this.onSearch,
   });
 
@@ -381,6 +388,7 @@ class _HeaderActionsCapsule extends StatelessWidget {
   final VoidCallback? onFilterTap;
   final bool filterActive;
   final String filterSfSymbol;
+  final IconData filterIcon;
   final VoidCallback? onSearch;
 
   static const _slot = 46.0;
@@ -414,6 +422,21 @@ class _HeaderActionsCapsule extends StatelessWidget {
             ),
           );
 
+    // iOS 26: the buttons are native too (SF Symbol buttons over the native
+    // glass capsule), not icons drawn by Flutter.
+    final nativeIcons = Platform.isIOS && PlatformInfo.isIOS26OrHigher();
+    Widget nativeIcon(String symbol, VoidCallback onTap) =>
+        AdaptiveButton.sfSymbol(
+          onPressed: onTap,
+          sfSymbol: SFSymbol(symbol, size: 20, color: _ink),
+          style: AdaptiveButtonStyle.plain,
+          size: AdaptiveButtonSize.medium,
+          padding: EdgeInsets.zero,
+          minSize: const Size(_slot, _slot),
+          borderRadius: BorderRadius.circular(_slot / 2),
+          useSmoothRectangleBorder: false,
+        );
+
     Widget filter() {
       if (hasMenu) {
         return AdaptivePopupMenuButton.icon<int>(
@@ -438,14 +461,18 @@ class _HeaderActionsCapsule extends StatelessWidget {
           },
         );
       }
+      if (nativeIcons) {
+        return nativeIcon(filterSfSymbol, () {
+          HapticFeedback.lightImpact();
+          onFilterTap!();
+        });
+      }
       return InkResponse(
         onTap: () {
           HapticFeedback.lightImpact();
           onFilterTap!();
         },
-        child: const Center(
-          child: Icon(Icons.tune_rounded, color: _ink, size: 22),
-        ),
+        child: Center(child: Icon(filterIcon, color: _ink, size: 22)),
       );
     }
 
@@ -464,15 +491,24 @@ class _HeaderActionsCapsule extends StatelessWidget {
                 SizedBox(
                   width: _slot,
                   height: _slot,
-                  child: InkResponse(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      onSearch!();
-                    },
-                    child: const Center(
-                      child: Icon(Icons.search_rounded, color: _ink, size: 22),
-                    ),
-                  ),
+                  child: nativeIcons
+                      ? nativeIcon('magnifyingglass', () {
+                          HapticFeedback.lightImpact();
+                          onSearch!();
+                        })
+                      : InkResponse(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            onSearch!();
+                          },
+                          child: const Center(
+                            child: Icon(
+                              Icons.search_rounded,
+                              color: _ink,
+                              size: 22,
+                            ),
+                          ),
+                        ),
                 ),
             ],
           ),

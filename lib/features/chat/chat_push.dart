@@ -21,10 +21,13 @@ import 'chat_models.dart';
 
 /// A conversation to open: from the `data` of a chat push.
 class ChatPushTarget {
-  const ChatPushTarget(this.conversationId, this.peer);
+  const ChatPushTarget(this.conversationId, this.peer, {this.isGroup = false});
 
   final int conversationId;
   final ChatUser peer;
+
+  /// A group: [peer] stands in for it (its title).
+  final bool isGroup;
 }
 
 int? _asInt(Object? v) => v is num ? v.toInt() : int.tryParse('$v');
@@ -35,6 +38,17 @@ ChatPushTarget? parseChatPush(Map<String, dynamic> data) {
   final conversation = _asInt(data['conversation']);
   final sender = _asInt(data['sender']);
   if (conversation == null || sender == null) return null;
+  if (data['group'] == true || data['group'] == 'true') {
+    return ChatPushTarget(
+      conversation,
+      ChatUser.groupStandIn(
+        conversation,
+        (data['title'] ?? '').toString(),
+        null,
+      ),
+      isGroup: true,
+    );
+  }
   final name = (data['sender_name'] ?? data['title'] ?? '').toString();
   return ChatPushTarget(conversation, ChatUser(id: sender, name: name));
 }

@@ -76,7 +76,12 @@ class ChatRow extends StatelessWidget {
     required this.onTap,
     this.time,
     this.unread = 0,
+    this.muted = false,
   });
+
+  /// Notifications of this chat are off: a crossed bell by the name, and a
+  /// grey (not orange) unread badge.
+  final bool muted;
 
   final ChatUser user;
   final String subtitle;
@@ -124,6 +129,14 @@ class ChatRow extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (muted) ...[
+                          const SizedBox(width: 5),
+                          const Icon(
+                            Icons.notifications_off_rounded,
+                            size: 15,
+                            color: kChatMuted,
+                          ),
+                        ],
                         if (time != null) ...[
                           const SizedBox(width: 8),
                           Text(
@@ -160,7 +173,9 @@ class ChatRow extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 6),
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: AppColors.brandOrange,
+                              color: muted
+                                  ? const Color(0xFFB4B4BA)
+                                  : AppColors.brandOrange,
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
@@ -193,19 +208,39 @@ class ChatMessageBlock extends StatelessWidget {
     required this.icon,
     required this.text,
     this.color = kChatMuted,
+    this.svgAsset,
+    this.centered = false,
   });
 
   final IconData icon;
   final String text;
   final Color color;
 
+  /// Our own icon instead of [icon] (the one of the tab bar).
+  final String? svgAsset;
+
+  /// Sits in the middle of the free area: no top offset.
+  final bool centered;
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 56, left: 32, right: 32),
+      padding: EdgeInsets.only(top: centered ? 0 : 56, left: 32, right: 32),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 54, color: const Color(0xFFC7C7CC)),
+          if (svgAsset != null)
+            SvgPicture.asset(
+              svgAsset!,
+              width: 64,
+              height: 64,
+              colorFilter: const ColorFilter.mode(
+                Color(0xFFC7C7CC),
+                BlendMode.srcIn,
+              ),
+            )
+          else
+            Icon(icon, size: 54, color: const Color(0xFFC7C7CC)),
           const SizedBox(height: 12),
           Text(
             text,
@@ -219,7 +254,7 @@ class ChatMessageBlock extends StatelessWidget {
 }
 
 /// Colour of the wallpaper's paper: behind the picture, and while it loads.
-const Color kChatWallpaperBase = Color(0xFFE4F3F5);
+const Color kChatWallpaperBase = Color(0xFFFFF1E6);
 
 /// The chat wallpaper: a picture that fills the screen, slightly blurred so
 /// that the bubbles and the glass controls stand out from it, and fixed in

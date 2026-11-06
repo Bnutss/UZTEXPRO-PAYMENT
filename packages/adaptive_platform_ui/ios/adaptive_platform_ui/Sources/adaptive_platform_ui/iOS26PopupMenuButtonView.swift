@@ -16,6 +16,11 @@ class iOS26PopupMenuButtonView: NSObject, FlutterPlatformView {
     private var enabled: [Bool] = []
     private var isDestructive: [Bool] = []
     private var isSelected: [Bool] = []
+    private var parents: [Int] = []
+    private var longPressMode = false
+    /// Items with children that were opened: their children are shown right
+    /// in the same menu (it is updated in place, not replaced).
+    private var expanded: Set<Int> = []
 
     init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
         self.channel = FlutterMethodChannel(name: "adaptive_platform_ui/ios26_popup_menu_button_\(viewId)", binaryMessenger: messenger)
@@ -37,6 +42,7 @@ class iOS26PopupMenuButtonView: NSObject, FlutterPlatformView {
         var enabled: [NSNumber] = []
         var isDestructive: [NSNumber] = []
         var isSelected: [NSNumber] = []
+        var parentList: [NSNumber] = []
         var isCustomWidget: Bool = false
         var triggerOnLongPress: Bool = false
 
@@ -58,6 +64,7 @@ class iOS26PopupMenuButtonView: NSObject, FlutterPlatformView {
             enabled = (dict["enabled"] as? [NSNumber]) ?? []
             isDestructive = (dict["isDestructive"] as? [NSNumber]) ?? []
             isSelected = (dict["isSelected"] as? [NSNumber]) ?? []
+            parentList = (dict["parents"] as? [NSNumber]) ?? []
         }
 
         super.init()
@@ -90,6 +97,8 @@ class iOS26PopupMenuButtonView: NSObject, FlutterPlatformView {
         self.enabled = enabled.map { $0.boolValue }
         self.isDestructive = isDestructive.map { $0.boolValue }
         self.isSelected = isSelected.map { $0.boolValue }
+        self.parents = parentList.map { $0.intValue }
+        self.longPressMode = triggerOnLongPress
 
         self.isRoundButton = makeRound
         currentButtonStyle = buttonStyle
@@ -115,6 +124,10 @@ class iOS26PopupMenuButtonView: NSObject, FlutterPlatformView {
 
         if #available(iOS 14.0, *) {
             button.showsMenuAsPrimaryAction = !triggerOnLongPress
+            if triggerOnLongPress {
+                // Every opening starts collapsed.
+                hapticGenerator.prepare()
+            }
         } else {
             button.addTarget(self, action: #selector(onButtonPressedLegacy(_:)), for: .touchUpInside)
         }
@@ -152,6 +165,7 @@ class iOS26PopupMenuButtonView: NSObject, FlutterPlatformView {
                     self.enabled = ((args["enabled"] as? [NSNumber]) ?? []).map { $0.boolValue }
                     self.isDestructive = ((args["isDestructive"] as? [NSNumber]) ?? []).map { $0.boolValue }
                     self.isSelected = ((args["isSelected"] as? [NSNumber]) ?? []).map { $0.boolValue }
+                    self.parents = ((args["parents"] as? [NSNumber]) ?? []).map { $0.intValue }
                     self.rebuildMenu()
                     result(nil)
                 } else { result(FlutterError(code: "bad_args", message: "Missing menu items", details: nil)) }
@@ -190,8 +204,30 @@ class iOS26PopupMenuButtonView: NSObject, FlutterPlatformView {
         }
     }
 
+    private let hapticGenerator = UIImpactFeedbackGenerator(style: .medium)
+
+    /// Sets the menu of the button. For a long-press menu the items are handed
+    /// over by a deferred element: UIKit asks for them at the very moment the
+    /// menu opens, which is the moment to tick the phone (no timer needed) and
+    /// to start every opening collapsed.
     private func rebuildMenu() {
-        // iOS 14+ native menu
+        guard #available(iOS 14.0, *) else { return }
+        if longPressMode, #available(iOS 15.0, *) {
+            button.menu = UIMenu(title: "", children: [
+                UIDeferredMenuElement.uncached { [weak self] completion in
+                    guard let self = self else { completion([]); return }
+                    self.expanded.removeAll()
+                    self.hapticGenerator.impactOccurred()
+                    self.hapticGenerator.prepare()
+                    completion(self.menuChildren())
+                }
+            ])
+        } else {
+            button.menu = UIMenu(title: "", children: menuChildren())
+        }
+    }
+
+    private func menuChildren() -> [UIMenuElement] {
         if #available(iOS 14.0, *) {
             var groups: [[UIMenuElement]] = []
             var groupTitles: [String] = []
@@ -210,17 +246,19 @@ class iOS26PopupMenuButtonView: NSObject, FlutterPlatformView {
                 }
             }
 
-            // Count only selectable items for indexing
-            var selectableIndex = 0
-
+            // Selectable items are numbered in list order (dividers skipped);
+            // Dart maps the number back to the item, submenu items included.
+            var selIndexes: [Int] = []
+            var counter = 0
             for i in 0..<count {
                 let isDiv = i < dividers.count ? dividers[i] : false
-                if isDiv {
-                    flushGroup()
-                    pendingTitle = i < labels.count ? labels[i] : ""
-                    continue
-                }
+                selIndexes.append(isDiv ? -1 : counter)
+                if !isDiv { counter += 1 }
+            }
 
+            func parentOf(_ i: Int) -> Int { i < parents.count ? parents[i] : -1 }
+
+            func element(_ i: Int) -> UIMenuElement {
                 let title = i < labels.count ? labels[i] : ""
                 let subtitle = i < subtitles.count ? subtitles[i] : ""
 
@@ -235,11 +273,29 @@ class iOS26PopupMenuButtonView: NSObject, FlutterPlatformView {
                 let isEnabled = i < enabled.count ? enabled[i] : true
                 let isDestructiveItem = i < isDestructive.count ? isDestructive[i] : false
                 let isSelectedItem = i < isSelected.count ? isSelected[i] : false
-                let currentSelectableIndex = selectableIndex
-                selectableIndex += 1
+                let currentSelectableIndex = selIndexes[i]
 
                 var attrs: UIMenuElement.Attributes = isEnabled ? [] : [.disabled]
                 if isDestructiveItem { attrs.insert(.destructive) }
+
+                // An item with items of its own is a submenu: choosing it opens
+                // a second menu.
+                let kids = (0..<count).filter { parentOf($0) == i }.map { element($0) }
+                if !kids.isEmpty {
+                    if #available(iOS 16.0, *) {
+                        if expanded.contains(i) {
+                            // Opened: the choices sit in this same menu.
+                            return UIMenu(title: "", options: [.displayInline], children: kids)
+                        }
+                        // Closed: a tap keeps the menu on screen and opens it.
+                        let opener = UIAction(title: title, image: image, attributes: attrs.union(.keepsMenuPresented)) { [weak self] _ in
+                            self?.expandInPlace(i)
+                        }
+                        return opener
+                    }
+                    return UIMenu(title: title, image: image, options: isDestructiveItem ? [.destructive] : [], children: kids)
+                }
+
                 let action: UIAction
                 if #available(iOS 15.0, *), !subtitle.isEmpty {
                     action = UIAction(title: title, subtitle: subtitle, image: image, attributes: attrs) { [weak self] _ in
@@ -252,15 +308,34 @@ class iOS26PopupMenuButtonView: NSObject, FlutterPlatformView {
                 }
                 // Show the system trailing checkmark for the selected item.
                 action.state = isSelectedItem ? .on : .off
-                current.append(action)
+                return action
+            }
+
+            for i in 0..<count {
+                let isDiv = i < dividers.count ? dividers[i] : false
+                if isDiv {
+                    flushGroup()
+                    pendingTitle = i < labels.count ? labels[i] : ""
+                    continue
+                }
+                if parentOf(i) != -1 { continue }
+                current.append(element(i))
             }
             flushGroup()
 
-            let children: [UIMenuElement] = groups.enumerated().map { index, group in
+            return groups.enumerated().map { index, group in
                 UIMenu(title: groupTitles[index], options: .displayInline, children: group)
             }
-            button.menu = UIMenu(title: "", children: children)
         }
+        return []
+    }
+
+    /// Opens an item's children inside the menu that is already on screen.
+    @available(iOS 16.0, *)
+    private func expandInPlace(_ i: Int) {
+        expanded.insert(i)
+        let updated = UIMenu(title: "", children: menuChildren())
+        button.contextMenuInteraction?.updateVisibleMenu { _ in updated }
     }
 
     @objc private func onButtonPressedLegacy(_ sender: UIButton) {

@@ -1,3 +1,4 @@
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -7,11 +8,22 @@ import '../../core/widgets/fading_header_scaffold.dart';
 import '../auth/widgets/logo_stroke_loader.dart';
 import 'chat_api.dart';
 import 'chat_glass.dart';
+import 'chat_group_page.dart';
 import 'chat_models.dart';
+import 'chat_system.dart';
+import 'chat_profile_page.dart';
 import 'chat_socket.dart';
 import 'chat_sounds.dart';
 import 'chat_thread_controller.dart';
 import 'chat_widgets.dart';
+
+/// A route without a transition: chat screens open and close at once, as in
+/// Telegram.
+Route<void> chatInstantRoute(WidgetBuilder builder) => PageRouteBuilder<void>(
+  transitionDuration: Duration.zero,
+  reverseTransitionDuration: Duration.zero,
+  pageBuilder: (context, _, _) => builder(context),
+);
 
 /// A conversation with one person: messages (live), the input, "typing…".
 ///
@@ -26,7 +38,12 @@ class ChatThreadPage extends StatefulWidget {
     this.conversationId,
     this.sounds,
     this.onRead,
+    this.mutedChats,
+    this.isGroup = false,
   });
+
+  /// The chat is a group: [peer] stands in for it ([ChatUser.groupStandIn]).
+  final bool isGroup;
 
   final ChatRest api;
   final ChatLink link;
@@ -37,6 +54,9 @@ class ChatThreadPage extends StatefulWidget {
 
   /// "Message sent" sound.
   final ChatSounds? sounds;
+
+  /// Shared with the hub: ids of chats with notifications off.
+  final Set<int>? mutedChats;
 
   /// The peer's messages were marked read (the unread total may have changed).
   final VoidCallback? onRead;
@@ -52,10 +72,18 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     peer: widget.peer,
     conversationId: widget.conversationId,
     onReadMarked: widget.onRead,
+    isGroup: widget.isGroup,
   );
+  bool _closing = false;
   final _input = TextEditingController();
   final _scroll = ScrollController();
   bool _hasText = false;
+
+  /// The message being edited (the input holds its text), if any.
+  ChatMessage? _editing;
+
+  /// The message being answered (swipe or menu), if any.
+  ChatMessage? _replying;
 
   /// The input bar floats over the messages (they scroll under its glass, as
   /// under the header), so the list needs to know how tall the bar is: it grows
@@ -85,7 +113,8 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
       }
     });
     _input.addListener(() {
-      _c.onTextChanged(_input.text);
+      if (_editing == null)
+        _c.onTextChanged(_input.text); // no "typing…" while editing
       final has = _input.text.trim().isNotEmpty;
       if (has != _hasText) setState(() => _hasText = has);
     });
@@ -99,12 +128,155 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     super.dispose();
   }
 
+  void _startEdit(ChatMessage m) {
+    setState(() => _editing = m);
+    _input.value = TextEditingValue(
+      text: m.text,
+      selection: TextSelection.collapsed(offset: m.text.length),
+    );
+  }
+
+  void _cancelEdit() {
+    final wasEditing = _editing != null;
+    setState(() {
+      _editing = null;
+      _replying = null;
+    });
+    // Cancelling a reply keeps what was typed; cancelling an edit drops it.
+    if (wasEditing) _input.clear();
+  }
+
+  void _startReply(ChatMessage m) {
+    if (m.isLocal || m.state != ChatSendState.sent) return;
+    setState(() {
+      _editing = null;
+      _replying = m;
+    });
+  }
+
+  String _authorOf(int senderId, S s) {
+    if (widget.isGroup) {
+      if (senderId == widget.api.myId) return s.chatYou;
+      return _c.names[senderId] ?? s.chatMemberFallback;
+    }
+    return senderId == widget.peer.id ? widget.peer.shortName : s.chatYou;
+  }
+
+  /// What sits under the name: connecting / who is typing / how many members
+  /// (a group), or connecting / typing / online / last seen (a person).
+  String _statusLine(S s) {
+    if (!widget.link.connected.value) return s.chatConnecting;
+    if (widget.isGroup) {
+      if (_c.peerTyping) {
+        return s.chatTypingNames([
+          for (final id in _c.typingIds)
+            _shortOf(_c.names[id] ?? s.chatMemberFallback),
+        ]);
+      }
+      final n = _c.group?.membersCount ?? 0;
+      return n > 0 ? s.chatMembersCount(n) : '';
+    }
+    return _c.peerTyping
+        ? s.chatTyping
+        : _c.peerOnline
+        ? s.chatOnline
+        : s.chatLastSeen(_c.peerLastSeen);
+  }
+
+  /// "Surname N." of a full name, for a short line.
+  static String _shortOf(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    return parts.length < 2 ? name.trim() : '${parts[0]} ${parts[1][0]}.';
+  }
+
+  Future<void> _saveEdit() async {
+    final m = _editing;
+    if (m == null) return;
+    final text = _input.text;
+    if (text.trim().isEmpty) return;
+    HapticFeedback.lightImpact();
+    setState(() => _editing = null);
+    _input.clear();
+    await _c.editMessage(m, text);
+  }
+
+  /// Long press on a bubble: a native popup menu with icons. "Delete" opens
+  /// a second menu with the choice (for me / for everyone).
+  List<AdaptivePopupMenuEntry> _menuFor(ChatMessage m, bool mine, S s) {
+    final ios26 = PlatformInfo.isIOS26OrHigher();
+    final stored = !m.isLocal && m.state == ChatSendState.sent;
+    return [
+      if (stored)
+        AdaptivePopupMenuItem<_MsgAction>(
+          label: s.chatMenuReply,
+          icon: ios26 ? 'arrowshape.turn.up.left' : Icons.reply_rounded,
+          value: _MsgAction.reply,
+        ),
+      AdaptivePopupMenuItem<_MsgAction>(
+        label: s.chatMenuCopy,
+        icon: ios26 ? 'doc.on.doc' : Icons.copy_rounded,
+        value: _MsgAction.copy,
+      ),
+      if (mine && stored)
+        AdaptivePopupMenuItem<_MsgAction>(
+          label: s.chatMenuEdit,
+          icon: ios26 ? 'pencil' : Icons.edit_rounded,
+          value: _MsgAction.edit,
+        ),
+      if (stored)
+        AdaptivePopupMenuItem<_MsgAction>(
+          label: s.chatMenuDelete,
+          icon: ios26 ? 'trash' : Icons.delete_outline_rounded,
+          isDestructive: true,
+          children: [
+            AdaptivePopupMenuItem<_MsgAction>(
+              label: s.chatMenuDeleteForMe,
+              icon: ios26 ? 'person' : Icons.person_outline_rounded,
+              isDestructive: true,
+              value: _MsgAction.deleteForMe,
+            ),
+            // In a group "for everybody" is for the author and the admins.
+            if (!widget.isGroup || mine || _c.isAdmin)
+              AdaptivePopupMenuItem<_MsgAction>(
+                label: s.chatMenuDeleteForAll,
+                icon: ios26 ? 'person.2' : Icons.people_outline_rounded,
+                isDestructive: true,
+                value: _MsgAction.deleteForAll,
+              ),
+          ],
+        ),
+    ];
+  }
+
+  void _onMenu(ChatMessage m, _MsgAction? action) {
+    switch (action) {
+      case _MsgAction.reply:
+        _startReply(m);
+      case _MsgAction.copy:
+        Clipboard.setData(ClipboardData(text: m.text));
+        HapticFeedback.selectionClick();
+      case _MsgAction.edit:
+        _startEdit(m);
+      case _MsgAction.deleteForMe:
+        _c.deleteMessage(m, forAll: false);
+      case _MsgAction.deleteForAll:
+        _c.deleteMessage(m, forAll: true);
+      case null:
+        break;
+    }
+  }
+
   void _send() {
+    if (_editing != null) {
+      _saveEdit();
+      return;
+    }
     final text = _input.text;
     if (text.trim().isEmpty) return;
     HapticFeedback.lightImpact();
     widget.sounds?.sent();
-    _c.send(text);
+    _c.send(text, replyTo: _replying);
+    if (_replying != null) setState(() => _replying = null);
     _input.clear();
     if (_scroll.hasClients) {
       _scroll.animateTo(
@@ -115,26 +287,101 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     }
   }
 
+  Future<bool> _toggleMuted() async {
+    final ok = await _c.toggleMuted();
+    final id = _c.conversationId;
+    if (ok && id != null) {
+      final set = widget.mutedChats;
+      if (set != null) _c.muted ? set.add(id) : set.remove(id);
+    }
+    return ok;
+  }
+
+  Future<bool> _deleteChat(bool forAll) async {
+    final ok = await _c.deleteChat(forAll: forAll);
+    if (ok) widget.onRead?.call(); // the list and the badge follow the server
+    return ok;
+  }
+
+  /// The person's card: its own full screen page (photo, status, phone,
+  /// department, position).
+  void _openProfile(S s, String? status) {
+    HapticFeedback.selectionClick();
+    if (widget.isGroup) {
+      Navigator.of(context).push(
+        chatInstantRoute(
+          (_) => ChatGroupPage(
+            controller: _c,
+            api: widget.api,
+            link: widget.link,
+            statusOf: () => _statusLine(s),
+            onChanged: widget.onRead,
+          ),
+        ),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      chatInstantRoute(
+        (_) => ChatProfilePage(
+          user: widget.peer,
+          listenable: Listenable.merge([_c, widget.link.connected]),
+          canManage: _c.conversationId != null,
+          isMuted: () => _c.muted,
+          onToggleMute: _toggleMuted,
+          onDelete: _deleteChat,
+          statusOf: () => !widget.link.connected.value
+              ? s.chatConnecting
+              : _c.peerTyping
+              ? s.chatTyping
+              : _c.peerOnline
+              ? s.chatOnline
+              : s.chatLastSeen(_c.peerLastSeen),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
     return ListenableBuilder(
       listenable: Listenable.merge([_c, widget.link.connected]),
       builder: (context, _) {
-        // Only the name; a line under it only while something is going on.
+        // The name, and under it: connecting / typing / online / last seen.
         // Without a connection "typing…" is stale, so "Connecting…" wins.
-        final String? status = !widget.link.connected.value
-            ? s.chatConnecting
-            : _c.peerTyping
-            ? s.chatTyping
-            : null;
+        final line = _statusLine(s);
+        final String? status = line.isEmpty ? null : line;
+        // Removed from the group / the group was deleted: leave the screen.
+        // This screen alone closes everything: the group card (and anything
+        // above the chat) first, then the chat, so two screens never both pop
+        // "the top route" and take the wrong one.
+        final myRoute = ModalRoute.of(context);
+        if (_c.removed && !_closing) {
+          _closing = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            final nav = Navigator.of(context);
+            if (myRoute != null) nav.popUntil((r) => r == myRoute);
+            widget.onRead?.call();
+            if (nav.canPop()) nav.pop();
+          });
+        }
         return FadingHeaderScaffold(
-          title: widget.peer.name,
-          center: ChatNameCapsule(name: widget.peer.name, status: status),
+          title: widget.peer.shortName,
+          center: ChatNameCapsule(
+            name: widget.peer.shortName,
+            status: status,
+            muted: _c.muted,
+            onTap: () => _openProfile(s, status),
+          ),
           trailing: [
             Padding(
               padding: const EdgeInsets.only(right: 12),
-              child: ChatAvatarButton(user: widget.peer),
+              child: ChatAvatarButton(
+                user: widget.peer,
+                onTap: () => _openProfile(s, status),
+              ),
             ),
           ],
           background: kChatWallpaperBase,
@@ -165,6 +412,13 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
                         hint: s.chatInputHint,
                         canSend: _hasText,
                         onSend: _send,
+                        editTitle: _editing != null
+                            ? s.chatEditing
+                            : _replying == null
+                            ? null
+                            : s.chatReplyTo(_authorOf(_replying!.sender, s)),
+                        editText: (_editing ?? _replying)?.text,
+                        onCancelEdit: _cancelEdit,
                       ),
                     ),
                   ),
@@ -233,13 +487,26 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
         }
         final e = entries[entries.length - 1 - index];
         if (e.day != null) return _DayChip(label: _dayLabel(e.day!, s));
+        if (e.message!.isSystem) {
+          return _DayChip(label: _systemText(e.message!, s));
+        }
         return _Bubble(
           message: e.message!,
           mine: _c.isMine(e.message!),
+          senderLabel: widget.isGroup && !_c.isMine(e.message!) && e.firstInRun
+              ? _authorOf(e.message!.sender, s)
+              : null,
           tail: e.lastInRun,
           gapAbove: e.firstInRun,
           onRetry: () => _c.retry(e.message!),
           notSentHint: s.chatNotSent,
+          editedLabel: s.chatEdited,
+          menu: _menuFor(e.message!, _c.isMine(e.message!), s),
+          onMenu: (a) => _onMenu(e.message!, a),
+          quoteAuthor: e.message!.reply == null
+              ? null
+              : _authorOf(e.message!.reply!.sender, s),
+          onReply: () => _startReply(e.message!),
         );
       },
     );
@@ -258,11 +525,11 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
       final sameRunAsPrev =
           prev != null &&
           _sameDay(prev.createdAt, m.createdAt) &&
-          _c.isMine(prev) == _c.isMine(m);
+          _sameSender(prev, m);
       final sameRunAsNext =
           next != null &&
           _sameDay(m.createdAt, next.createdAt) &&
-          _c.isMine(next) == _c.isMine(m);
+          _sameSender(next, m);
       out.add(
         _Entry.message(
           m,
@@ -273,6 +540,18 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     }
     return out;
   }
+
+  /// Bubbles of one sender in a row are grouped. A service line breaks a run;
+  /// in a group two people who are not me are told apart by id.
+  bool _sameSender(ChatMessage a, ChatMessage b) {
+    if (a.isSystem || b.isSystem) return false;
+    final am = _c.isMine(a), bm = _c.isMine(b);
+    if (am != bm) return false;
+    return am || !widget.isGroup || a.sender == b.sender;
+  }
+
+  String _systemText(ChatMessage m, S s) =>
+      chatSystemText(m, s, widget.api.myId);
 
   static bool _sameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
@@ -332,6 +611,8 @@ class _DayChip extends StatelessWidget {
   }
 }
 
+enum _MsgAction { reply, copy, edit, deleteForMe, deleteForAll }
+
 class _Bubble extends StatelessWidget {
   const _Bubble({
     required this.message,
@@ -340,8 +621,21 @@ class _Bubble extends StatelessWidget {
     required this.gapAbove,
     required this.onRetry,
     required this.notSentHint,
+    required this.editedLabel,
+    required this.menu,
+    required this.onMenu,
+    required this.quoteAuthor,
+    required this.onReply,
+    this.senderLabel,
   });
 
+  /// In a group: who wrote it (the first bubble of a person's run).
+  final String? senderLabel;
+  final String? quoteAuthor;
+  final VoidCallback onReply;
+  final String editedLabel;
+  final List<AdaptivePopupMenuEntry> menu;
+  final void Function(_MsgAction? action) onMenu;
   final ChatMessage message;
   final bool mine;
   final bool tail;
@@ -353,10 +647,11 @@ class _Bubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final m = message;
     final failed = m.state == ChatSendState.failed;
-    final fg = mine ? Colors.white : kChatInk;
-    final meta = mine ? Colors.white.withOpacity(0.75) : kChatMuted;
-    const big = Radius.circular(18);
-    const small = Radius.circular(5);
+    // Telegram's palette: my messages light green, the peer's white.
+    const fg = kChatInk;
+    final meta = mine ? const Color(0xFF5DAA55) : kChatMuted;
+    const big = Radius.circular(20);
+    const small = Radius.circular(6);
     final radius = BorderRadius.only(
       topLeft: big,
       topRight: big,
@@ -368,27 +663,59 @@ class _Bubble extends StatelessWidget {
 
     final bubble = Container(
       constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.78,
+        maxWidth: MediaQuery.of(context).size.width * 0.84,
       ),
-      padding: const EdgeInsets.fromLTRB(12, 7, 10, 6),
+      padding: const EdgeInsets.fromLTRB(14, 9, 12, 8),
       decoration: BoxDecoration(
-        color: mine ? AppColors.brandOrange : Colors.white,
+        color: mine ? const Color(0xFFE1FFC7) : Colors.white,
         borderRadius: radius,
       ),
-      child: Wrap(
-        alignment: WrapAlignment.end,
-        crossAxisAlignment: WrapCrossAlignment.end,
-        spacing: 8,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(m.text, style: TextStyle(fontSize: 16, height: 1.25, color: fg)),
-          Row(
-            mainAxisSize: MainAxisSize.min,
+          if (senderLabel != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Text(
+                senderLabel!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: _senderColor(m.sender),
+                ),
+              ),
+            ),
+          if (m.reply != null && quoteAuthor != null)
+            _Quote(
+              author: quoteAuthor!,
+              text: m.reply!.text,
+              color: mine ? const Color(0xFF5DAA55) : AppColors.brandOrange,
+            ),
+          Wrap(
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.end,
+            spacing: 8,
             children: [
-              Text(time, style: TextStyle(fontSize: 11, color: meta)),
-              if (mine) ...[
-                const SizedBox(width: 3),
-                _Status(message: m, color: meta),
-              ],
+              Text(
+                m.text,
+                style: const TextStyle(fontSize: 17, height: 1.28, color: fg),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    m.edited ? '$editedLabel $time' : time,
+                    style: TextStyle(fontSize: 12, color: meta),
+                  ),
+                  if (mine) ...[
+                    const SizedBox(width: 3),
+                    _Status(message: m, color: meta),
+                  ],
+                ],
+              ),
             ],
           ),
         ],
@@ -396,7 +723,7 @@ class _Bubble extends StatelessWidget {
     );
 
     return Padding(
-      padding: EdgeInsets.only(top: gapAbove ? 6 : 1.5),
+      padding: EdgeInsets.only(top: gapAbove ? 8 : 2),
       child: Column(
         crossAxisAlignment: mine
             ? CrossAxisAlignment.end
@@ -404,9 +731,17 @@ class _Bubble extends StatelessWidget {
         children: [
           Align(
             alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-            child: failed
-                ? GestureDetector(onTap: onRetry, child: bubble)
-                : bubble,
+            child: _SwipeToReply(
+              enabled: !m.isLocal && !failed,
+              onReply: onReply,
+              child: AdaptivePopupMenuButton.widget<_MsgAction>(
+                items: menu,
+                triggerOnLongPress: true,
+                onTap: failed ? onRetry : null,
+                onSelected: (_, entry) => onMenu(entry.value),
+                child: bubble,
+              ),
+            ),
           ),
           if (failed)
             GestureDetector(
@@ -444,10 +779,165 @@ class _Status extends StatelessWidget {
         icon = Icons.schedule_rounded;
       case ChatSendState.failed:
         icon = Icons.error_rounded;
-        c = const Color(0xFFFFD6D2);
+        c = const Color(0xFFD32F2F);
       case ChatSendState.sent:
         icon = message.read ? Icons.done_all_rounded : Icons.done_rounded;
     }
-    return Icon(icon, size: 15, color: c);
+    return Icon(icon, size: 16, color: c);
   }
+}
+
+/// The quoted message above an answer (a coloured bar, the author, the text).
+class _Quote extends StatelessWidget {
+  const _Quote({required this.author, required this.text, required this.color});
+
+  final String author;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 5),
+      padding: const EdgeInsets.fromLTRB(8, 4, 10, 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border(left: BorderSide(color: color, width: 3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            author,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: color,
+              height: 1.2,
+            ),
+          ),
+          Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 14, color: kChatInk, height: 1.2),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Drag a message to the left to answer it: the bubble follows the finger, an
+/// arrow shows up, a tick tells that letting go will answer.
+class _SwipeToReply extends StatefulWidget {
+  const _SwipeToReply({
+    required this.child,
+    required this.onReply,
+    required this.enabled,
+  });
+
+  final Widget child;
+  final VoidCallback onReply;
+  final bool enabled;
+
+  @override
+  State<_SwipeToReply> createState() => _SwipeToReplyState();
+}
+
+class _SwipeToReplyState extends State<_SwipeToReply> {
+  static const _trigger = 56.0;
+  static const _max = 80.0;
+
+  double _dx = 0;
+  bool _dragging = false;
+  bool _armed = false;
+
+  void _update(DragUpdateDetails d) {
+    final next = (_dx + d.delta.dx).clamp(-_max, 0.0);
+    final armed = next <= -_trigger;
+    if (armed && !_armed) HapticFeedback.mediumImpact();
+    setState(() {
+      _dx = next;
+      _dragging = true;
+      _armed = armed;
+    });
+  }
+
+  void _end() {
+    final fire = _armed;
+    setState(() {
+      _dx = 0;
+      _dragging = false;
+      _armed = false;
+    });
+    if (fire) widget.onReply();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.enabled) return widget.child;
+    final progress = (-_dx / _trigger).clamp(0.0, 1.0);
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragUpdate: _update,
+      onHorizontalDragEnd: (_) => _end(),
+      onHorizontalDragCancel: _end,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.centerRight,
+        children: [
+          Positioned(
+            right: -34,
+            child: Opacity(
+              opacity: progress,
+              child: Transform.scale(
+                scale: 0.6 + 0.4 * progress,
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.reply_rounded,
+                    size: 19,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          AnimatedContainer(
+            duration: _dragging
+                ? Duration.zero
+                : const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            transform: Matrix4.translationValues(_dx, 0, 0),
+            child: widget.child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A person's name colour in a group (the same colour every time).
+Color _senderColor(int id) {
+  const palette = [
+    Color(0xFFE17076),
+    Color(0xFFEDA86C),
+    Color(0xFFA695E7),
+    Color(0xFF7BC862),
+    Color(0xFF6EC9CB),
+    Color(0xFF65AADD),
+    Color(0xFFEE7AAE),
+    Color(0xFFCC7A3E),
+  ];
+  return palette[id.abs() % palette.length];
 }

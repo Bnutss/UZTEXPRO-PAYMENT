@@ -4,6 +4,7 @@ import 'package:uztexpro_payment/features/chat/chat_sounds.dart';
 class _Player implements ChatSoundPlayer {
   final played = <String>[];
   bool fail = false;
+
   @override
   Future<void> play(String asset) async {
     played.add(asset);
@@ -23,7 +24,7 @@ void main() {
   });
 
   test('the sound files are the ones in assets/sound', () {
-    expect(kSendSound, 'sound/telegram_soundin.mp3');
+    expect(kSendSound, 'sound/dice.mp3');
     expect(kIncomingSound, 'sound/sound_17216.mp3');
   });
 

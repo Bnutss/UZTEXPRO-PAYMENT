@@ -23,12 +23,6 @@ class S {
   String get noData =>
       _t({'ru': 'Нет данных', 'en': 'No data', 'uz': "Ma'lumot yo'q"});
 
-  String get paymentSystem => _t({
-    'ru': 'Производственная платформа',
-    'en': 'Production platform',
-    'uz': "Ishlab chiqarish platformasi",
-  });
-
   // Menu Page
   String get menuPayments =>
       _t({'ru': 'Платежи', 'en': 'Payments', 'uz': "To'lovlar"});
@@ -1364,11 +1358,17 @@ class S {
   String get contactsTitle =>
       _t({'ru': 'Контакты', 'en': 'Contacts', 'uz': 'Kontaktlar'});
 
-  String get chatsEmpty =>
-      _t({'ru': 'Чатов пока нет', 'en': 'No chats yet', 'uz': 'Hozircha chatlar yo‘q'});
+  String get chatsEmpty => _t({
+    'ru': 'Чатов пока нет',
+    'en': 'No chats yet',
+    'uz': 'Hozircha chatlar yo‘q',
+  });
 
-  String get chatsSearchHint =>
-      _t({'ru': 'Поиск чатов', 'en': 'Search chats', 'uz': 'Chatlarni qidirish'});
+  String get chatsSearchHint => _t({
+    'ru': 'Поиск чатов',
+    'en': 'Search chats',
+    'uz': 'Chatlarni qidirish',
+  });
 
   String get contactsSearchHint => _t({
     'ru': 'Поиск контактов',
@@ -1382,7 +1382,305 @@ class S {
     'uz': 'Yuklab bo‘lmadi. Qayta urinish uchun torting',
   });
 
-  String get chatTyping => _t({'ru': 'печатает…', 'en': 'typing…', 'uz': 'yozmoqda…'});
+  String get chatTyping =>
+      _t({'ru': 'печатает…', 'en': 'typing…', 'uz': 'yozmoqda…'});
+
+  String get chatMedia => _t({'ru': 'Медиа', 'en': 'Media', 'uz': 'Media'});
+  String get chatVoice =>
+      _t({'ru': 'Голосовые', 'en': 'Voice', 'uz': 'Ovozli'});
+  String get chatNothingYet => _t({
+    'ru': 'Пока пусто',
+    'en': 'Nothing here yet',
+    'uz': 'Hozircha bo‘sh',
+  });
+
+  String chatMembersCount(int n) {
+    final ru = n % 10 == 1 && n % 100 != 11
+        ? 'участник'
+        : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14))
+        ? 'участника'
+        : 'участников';
+    return _t({'ru': '$n $ru', 'en': '$n members', 'uz': '$n ta a’zo'});
+  }
+
+  String chatTypingNames(List<String> names) {
+    if (names.length == 1) {
+      return _t({
+        'ru': '${names[0]} печатает…',
+        'en': '${names[0]} is typing…',
+        'uz': '${names[0]} yozmoqda…',
+      });
+    }
+    if (names.length == 2) {
+      return _t({
+        'ru': '${names[0]}, ${names[1]} печатают…',
+        'en': '${names[0]}, ${names[1]} are typing…',
+        'uz': '${names[0]}, ${names[1]} yozmoqda…',
+      });
+    }
+    return _t({
+      'ru': 'Несколько человек печатают…',
+      'en': 'Several people are typing…',
+      'uz': 'Bir necha kishi yozmoqda…',
+    });
+  }
+
+  String get chatMemberFallback =>
+      _t({'ru': 'Участник', 'en': 'Member', 'uz': 'A’zo'});
+
+  /// A service line of a group, from what the server sent. [actor] / [user]
+  /// are names, with "You" already put in for me ([actorIsMe] / [userIsMe]
+  /// pick the verb form).
+  String chatSystemLine({
+    required String event,
+    required String actor,
+    required bool actorIsMe,
+    required String user,
+    required bool userIsMe,
+    required String title,
+    required String fallback,
+  }) {
+    switch (event) {
+      case 'created':
+        return _t({
+          'ru': actorIsMe
+              ? 'Вы создали группу «$title»'
+              : '$actor создал(а) группу «$title»',
+          'en': '$actor created the group “$title”',
+          'uz': '$actor “$title” guruhini yaratdi',
+        });
+      case 'added':
+        return _t({
+          'ru': actorIsMe
+              ? 'Вы добавили $user'
+              : '$actor добавил(а) ${userIsMe ? 'Вас' : user}',
+          'en': '$actor added $user',
+          'uz': '$actor $user ni qo‘shdi',
+        });
+      case 'removed':
+        return _t({
+          'ru': actorIsMe
+              ? 'Вы удалили $user'
+              : '$actor удалил(а) ${userIsMe ? 'Вас' : user}',
+          'en': '$actor removed $user',
+          'uz': '$actor $user ni chiqarib yubordi',
+        });
+      case 'left':
+        return _t({
+          'ru': userIsMe ? 'Вы покинули группу' : '$user покинул(а) группу',
+          'en': '$user left the group',
+          'uz': '$user guruhni tark etdi',
+        });
+      case 'renamed':
+        return _t({
+          'ru': actorIsMe
+              ? 'Вы изменили название на «$title»'
+              : '$actor изменил(а) название на «$title»',
+          'en': '$actor renamed the group to “$title”',
+          'uz': '$actor guruh nomini “$title” ga o‘zgartirdi',
+        });
+      case 'photo':
+        return _t({
+          'ru': actorIsMe
+              ? 'Вы изменили фото группы'
+              : '$actor изменил(а) фото группы',
+          'en': '$actor changed the group photo',
+          'uz': '$actor guruh rasmini o‘zgartirdi',
+        });
+    }
+    return fallback;
+  }
+
+  String get chatAddMembers =>
+      _t({'ru': 'Добавить', 'en': 'Add', 'uz': 'Qo‘shish'});
+  String get chatAddMembersTitle => _t({
+    'ru': 'Добавить участников',
+    'en': 'Add members',
+    'uz': 'A’zolarni qo‘shish',
+  });
+  String get chatEditGroup =>
+      _t({'ru': 'изменить', 'en': 'edit', 'uz': 'tahrirlash'});
+  String get chatLeave => _t({'ru': 'выйти', 'en': 'leave', 'uz': 'chiqish'});
+  String get chatAddShort =>
+      _t({'ru': 'добавить', 'en': 'add', 'uz': 'qo‘shish'});
+  String get chatMembers =>
+      _t({'ru': 'Участники', 'en': 'Members', 'uz': 'A’zolar'});
+  String get chatRoleOwner =>
+      _t({'ru': 'владелец', 'en': 'owner', 'uz': 'egasi'});
+  String get chatRoleAdmin => _t({'ru': 'админ', 'en': 'admin', 'uz': 'admin'});
+  String get chatMakeAdmin =>
+      _t({'ru': 'Сделать админом', 'en': 'Make admin', 'uz': 'Admin qilish'});
+  String get chatRemoveAdmin => _t({
+    'ru': 'Снять с админов',
+    'en': 'Remove as admin',
+    'uz': 'Adminlikdan olish',
+  });
+  String get chatRemoveFromGroup => _t({
+    'ru': 'Удалить из группы',
+    'en': 'Remove from group',
+    'uz': 'Guruhdan chiqarish',
+  });
+  String get chatLeaveTitle => _t({
+    'ru': 'Покинуть группу?',
+    'en': 'Leave the group?',
+    'uz': 'Guruhdan chiqasizmi?',
+  });
+  String get chatLeaveConfirm =>
+      _t({'ru': 'Покинуть', 'en': 'Leave', 'uz': 'Chiqish'});
+  String get chatDeleteGroup => _t({
+    'ru': 'Удалить группу',
+    'en': 'Delete group',
+    'uz': 'Guruhni o‘chirish',
+  });
+  String get chatDeleteGroupTitle => _t({
+    'ru': 'Удалить группу для всех?',
+    'en': 'Delete the group for everybody?',
+    'uz': 'Guruh hamma uchun o‘chirilsinmi?',
+  });
+  String get chatRename =>
+      _t({'ru': 'Название группы', 'en': 'Group name', 'uz': 'Guruh nomi'});
+  String get chatChangePhoto => _t({
+    'ru': 'Изменить фото',
+    'en': 'Change photo',
+    'uz': 'Rasmni o‘zgartirish',
+  });
+  String get chatRemovePhoto => _t({
+    'ru': 'Удалить фото',
+    'en': 'Remove photo',
+    'uz': 'Rasmni o‘chirish',
+  });
+  String get chatActionFailed => _t({
+    'ru': 'Не удалось. Попробуйте ещё раз',
+    'en': 'Failed. Try again',
+    'uz': 'Amalga oshmadi. Qayta urinib ko‘ring',
+  });
+
+  String get chatNewGroup =>
+      _t({'ru': 'Новая группа', 'en': 'New group', 'uz': 'Yangi guruh'});
+  String get chatCreate =>
+      _t({'ru': 'Создать', 'en': 'Create', 'uz': 'Yaratish'});
+  String get chatGroupName =>
+      _t({'ru': 'Название группы', 'en': 'Group name', 'uz': 'Guruh nomi'});
+  String get chatNext => _t({'ru': 'Далее', 'en': 'Next', 'uz': 'Keyingi'});
+
+  String get chatMuteAction =>
+      _t({'ru': 'Выключить звук', 'en': 'Mute', 'uz': 'Ovozsiz qilish'});
+  String get chatUnmuteAction =>
+      _t({'ru': 'Включить звук', 'en': 'Unmute', 'uz': 'Ovozni yoqish'});
+  String get chatMuteShort =>
+      _t({'ru': 'Без звука', 'en': 'Mute', 'uz': 'Ovozsiz'});
+  String get chatUnmuteShort =>
+      _t({'ru': 'Со звуком', 'en': 'Unmute', 'uz': 'Ovozli'});
+  String get chatDeleteChatAction =>
+      _t({'ru': 'Удалить чат', 'en': 'Delete chat', 'uz': 'Chatni o‘chirish'});
+  String get chatLeaveGroupAction => _t({
+    'ru': 'Выйти из группы',
+    'en': 'Leave group',
+    'uz': 'Guruhdan chiqish',
+  });
+  String get chatDeleteShort =>
+      _t({'ru': 'Удалить', 'en': 'Delete', 'uz': 'O‘chirish'});
+  String get chatLeaveShort =>
+      _t({'ru': 'Выйти', 'en': 'Leave', 'uz': 'Chiqish'});
+
+  String get chatNoMessagesYet => _t({
+    'ru': 'Сообщений пока нет',
+    'en': 'No messages yet',
+    'uz': 'Hozircha xabar yo‘q',
+  });
+
+  String get chatMenuReply =>
+      _t({'ru': 'Ответить', 'en': 'Reply', 'uz': 'Javob berish'});
+  String chatReplyTo(String name) =>
+      _t({'ru': 'Ответ $name', 'en': 'Reply to $name', 'uz': '$name ga javob'});
+
+  String get chatMenuCopy =>
+      _t({'ru': 'Скопировать', 'en': 'Copy', 'uz': 'Nusxalash'});
+  String get chatMenuEdit =>
+      _t({'ru': 'Изменить', 'en': 'Edit', 'uz': 'Tahrirlash'});
+  String get chatMenuDelete =>
+      _t({'ru': 'Удалить', 'en': 'Delete', 'uz': 'O‘chirish'});
+  String get chatMenuDeleteForMe => _t({
+    'ru': 'Удалить у меня',
+    'en': 'Delete for me',
+    'uz': 'Menda o‘chirish',
+  });
+  String get chatMenuDeleteForAll => _t({
+    'ru': 'Удалить у всех',
+    'en': 'Delete for everyone',
+    'uz': 'Hammada o‘chirish',
+  });
+  String get chatEditing =>
+      _t({'ru': 'Изменение', 'en': 'Editing', 'uz': 'Tahrirlash'});
+  String get chatEdited => _t({'ru': 'изм.', 'en': 'edited', 'uz': 'tahr.'});
+
+  String get chatSound => _t({'ru': 'звук', 'en': 'sound', 'uz': 'ovoz'});
+  String get chatSoundOff =>
+      _t({'ru': 'без звука', 'en': 'muted', 'uz': 'ovozsiz'});
+  String get chatDelete =>
+      _t({'ru': 'удалить', 'en': 'delete', 'uz': 'o‘chirish'});
+  String get chatDeleteTitle => _t({
+    'ru': 'Удалить чат?',
+    'en': 'Delete chat?',
+    'uz': 'Chat o‘chirilsinmi?',
+  });
+  String get chatDeleteMessage => _t({
+    'ru': 'Это действие нельзя отменить.',
+    'en': 'This cannot be undone.',
+    'uz': 'Bu amalni bekor qilib bo‘lmaydi.',
+  });
+  String chatDeleteForBoth(String name) => _t({
+    'ru': 'Удалить у меня и у $name',
+    'en': 'Delete for me and $name',
+    'uz': 'Menda va $name da o‘chirish',
+  });
+  String get chatDeleteForMe => _t({
+    'ru': 'Удалить только у себя',
+    'en': 'Delete only for me',
+    'uz': 'Faqat menda o‘chirish',
+  });
+
+  String get chatCall => _t({'ru': 'звонок', 'en': 'call', 'uz': 'qo‘ng‘iroq'});
+  String get chatCopy => _t({'ru': 'копировать', 'en': 'copy', 'uz': 'nusxa'});
+  String get chatCopied => _t({
+    'ru': 'Номер скопирован',
+    'en': 'Number copied',
+    'uz': 'Raqam nusxalandi',
+  });
+
+  String get chatOnline => _t({'ru': 'в сети', 'en': 'online', 'uz': 'onlayn'});
+
+  /// "last seen today at 14:05" / "yesterday at …" / "12.10 at …".
+  String chatLastSeen(DateTime? at) {
+    if (at == null) {
+      return _t({
+        'ru': 'был(а) недавно',
+        'en': 'last seen recently',
+        'uz': 'yaqinda edi',
+      });
+    }
+    final now = DateTime.now();
+    final day = DateTime(at.year, at.month, at.day);
+    final today = DateTime(now.year, now.month, now.day);
+    String two(int v) => v.toString().padLeft(2, '0');
+    final time = '${two(at.hour)}:${two(at.minute)}';
+    final diff = today.difference(day).inDays;
+    if (diff == 0) {
+      return _t({
+        'ru': 'был(а) в $time',
+        'en': 'last seen at $time',
+        'uz': '$time da edi',
+      });
+    }
+    final when = diff == 1
+        ? _t({'ru': 'вчера', 'en': 'yesterday', 'uz': 'kecha'})
+        : '${two(at.day)}.${two(at.month)}';
+    return _t({
+      'ru': 'был(а) $when',
+      'en': 'last seen $when',
+      'uz': '$when edi',
+    });
+  }
 
   String get chatConnecting =>
       _t({'ru': 'Подключение…', 'en': 'Connecting…', 'uz': 'Ulanmoqda…'});
@@ -1421,8 +1719,11 @@ class S {
 
   String get chatYou => _t({'ru': 'Вы', 'en': 'You', 'uz': 'Siz'});
 
-  String get chatNothingFound =>
-      _t({'ru': 'Ничего не найдено', 'en': 'Nothing found', 'uz': 'Hech narsa topilmadi'});
+  String get chatNothingFound => _t({
+    'ru': 'Ничего не найдено',
+    'en': 'Nothing found',
+    'uz': 'Hech narsa topilmadi',
+  });
 
   String get contactsEmpty => _t({
     'ru': 'Контактов пока нет',

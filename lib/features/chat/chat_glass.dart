@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/ui_blocks.dart';
 import 'chat_models.dart';
+import 'chat_spellcheck.dart';
 import 'chat_widgets.dart';
 
 // The conversation screen as in Telegram on iOS 26: the controls sit on native
@@ -26,6 +28,53 @@ double _textWidth(BuildContext context, String text, TextStyle style) {
   return p.width;
 }
 
+/// A frosted-glass capsule made with Flutter (blur + translucent white), for
+/// the input: a native glass button there buzzed at every touch and swallowed
+/// the touches of the text field, while this one is silent and passive.
+Widget _frosted({
+  required double width,
+  required double height,
+  required Widget child,
+  VoidCallback? onTap,
+}) {
+  final radius = BorderRadius.circular(math.min(height / 2, _slot / 2 + 2));
+  return GestureDetector(
+    onTap: onTap,
+    behavior: HitTestBehavior.opaque,
+    child: Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.10),
+            blurRadius: 14,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.66),
+              borderRadius: radius,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.85),
+                width: 1,
+              ),
+            ),
+            child: child,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 /// A glass capsule / circle of a fixed size holding [child]. A tall one (the
 /// input with several lines) gets the system's dynamic corners (a rounded
 /// rectangle) instead of the ends turning into huge half circles.
@@ -37,67 +86,110 @@ Widget _glass({
 }) {
   final radius = math.min(height / 2, _slot / 2);
   if (!Platform.isIOS) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(radius),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(radius),
+        ),
+        child: child,
       ),
-      child: child,
     );
   }
-  return AdaptiveButton.child(
-    onPressed: onTap ?? () {},
-    color: kChatInk,
-    style: AdaptiveButtonStyle.glass,
-    size: AdaptiveButtonSize.medium,
-    useSmoothRectangleBorder: height > _slot + 1,
-    padding: EdgeInsets.zero,
-    borderRadius: BorderRadius.circular(radius),
-    minSize: Size(width, height),
-    child: SizedBox(width: width, height: height, child: child),
+  // The package's child button fills all the width it is given (its child sits
+  // in a Center inside a Stack), so the size is pinned from outside.
+  return SizedBox(
+    width: width,
+    height: height,
+    child: AdaptiveButton.child(
+      onPressed: onTap ?? () {},
+      color: kChatInk,
+      style: AdaptiveButtonStyle.glass,
+      size: AdaptiveButtonSize.medium,
+      useSmoothRectangleBorder: height > _slot + 1,
+      padding: EdgeInsets.zero,
+      borderRadius: BorderRadius.circular(radius),
+      minSize: Size(width, height),
+      child: SizedBox(width: width, height: height, child: child),
+    ),
   );
 }
 
 /// The name of the person, centered in the header. [status] (typing…,
 /// connecting…) appears under it only while there is one.
 class ChatNameCapsule extends StatelessWidget {
-  const ChatNameCapsule({super.key, required this.name, this.status});
+  const ChatNameCapsule({
+    super.key,
+    required this.name,
+    this.status,
+    this.onTap,
+    this.muted = false,
+  });
 
+  /// Notifications are off: a small crossed bell after the name.
+  final bool muted;
+
+  final VoidCallback? onTap;
   final String name;
   final String? status;
 
   static const _nameStyle = TextStyle(
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: FontWeight.w700,
     color: kChatInk,
+    height: 1.15,
   );
-  static const _statusStyle = TextStyle(fontSize: 12, color: kChatMuted);
+  static const _statusStyle = TextStyle(
+    fontSize: 11.5,
+    color: AppColors.brandOrange,
+    height: 1.15,
+  );
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, box) {
-        final maxW = box.maxWidth.isFinite ? box.maxWidth : 240.0;
+        final maxW = math.min(
+          box.maxWidth.isFinite ? box.maxWidth : 170.0,
+          170.0,
+        );
         final text = math.max(
-          _textWidth(context, name, _nameStyle),
+          _textWidth(context, name, _nameStyle) + (muted ? 19 : 0),
           status == null ? 0.0 : _textWidth(context, status!, _statusStyle),
         );
-        final width = math.min(maxW, math.max(96.0, text + 44));
+        final width = math.min(maxW, math.max(80.0, text + 32));
         return _glass(
           width: width,
           height: _slot,
+          onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: _nameStyle,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: _nameStyle,
+                      ),
+                    ),
+                    if (muted) ...[
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.notifications_off_rounded,
+                        size: 15,
+                        color: kChatMuted,
+                      ),
+                    ],
+                  ],
                 ),
                 if (status != null)
                   Text(
@@ -117,7 +209,9 @@ class ChatNameCapsule extends StatelessWidget {
 
 /// The person's photo in a round glass ring, right of the name.
 class ChatAvatarButton extends StatelessWidget {
-  const ChatAvatarButton({super.key, required this.user});
+  const ChatAvatarButton({super.key, required this.user, this.onTap});
+
+  final VoidCallback? onTap;
 
   final ChatUser user;
 
@@ -126,6 +220,7 @@ class ChatAvatarButton extends StatelessWidget {
     return _glass(
       width: _slot,
       height: _slot,
+      onTap: onTap,
       child: Center(
         child: ClipOval(
           child: PersonAvatar(
@@ -149,7 +244,16 @@ class ChatInputBar extends StatefulWidget {
     required this.hint,
     required this.canSend,
     required this.onSend,
+    this.editTitle,
+    this.editText,
+    this.onCancelEdit,
   });
+
+  /// Editing a message: a strip with the old text sits on top of the field,
+  /// inside the same capsule (as in Telegram).
+  final String? editTitle;
+  final String? editText;
+  final VoidCallback? onCancelEdit;
 
   final TextEditingController controller;
   final String hint;
@@ -176,10 +280,23 @@ class _ChatInputBarState extends State<ChatInputBar> {
   static const _rightPad = _button + _inset + 8;
 
   @override
+  void didUpdateWidget(ChatInputBar old) {
+    super.didUpdateWidget(old);
+    // Editing starts: the keyboard comes up on the text being edited.
+    if (old.editTitle == null && widget.editTitle != null) {
+      _focus.requestFocus();
+    }
+  }
+
+  @override
   void dispose() {
     _focus.dispose();
     super.dispose();
   }
+
+  /// Height of the strip with the old text (editing only).
+  static const _editStrip = 44.0;
+  bool get _editing => widget.editTitle != null;
 
   /// Height of the capsule for the current text.
   double _heightFor(BuildContext context, double textWidth) {
@@ -208,7 +325,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
           return ListenableBuilder(
             listenable: widget.controller,
             builder: (context, _) {
-              final h = _heightFor(context, width - _leftPad - _rightPad);
+              final h =
+                  _heightFor(context, width - _leftPad - _rightPad) +
+                  (_editing ? _editStrip : 0);
               // The send button is a SIBLING of the glass in this Stack, not
               // its content: the package draws the content of a glass button
               // under IgnorePointer, and a native view there is never
@@ -219,7 +338,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: _glass(
+                      child: _frosted(
                         width: width,
                         height: h,
                         onTap: _focus.requestFocus,
@@ -228,32 +347,128 @@ class _ChatInputBarState extends State<ChatInputBar> {
                             left: _leftPad,
                             right: _rightPad,
                           ),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextField(
-                              controller: widget.controller,
-                              focusNode: _focus,
-                              minLines: 1,
-                              maxLines: _maxLines,
-                              textCapitalization: TextCapitalization.sentences,
-                              keyboardType: TextInputType.multiline,
-                              style: _style,
-                              cursorColor: AppColors.brandOrange,
-                              decoration: InputDecoration(
-                                hintText: widget.hint,
-                                hintStyle: _style.copyWith(color: kChatMuted),
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                filled: false,
-                                isDense: true,
-                                contentPadding: EdgeInsets.zero,
-                              ),
+                          child: Column(
+                            children: [
+                              if (_editing)
+                                SizedBox(
+                                  height: _editStrip,
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: 8,
+                                      right: 30,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 3,
+                                          height: 30,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.brandOrange,
+                                            borderRadius: BorderRadius.circular(
+                                              2,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                widget.editTitle!,
+                                                maxLines: 1,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppColors.brandOrange,
+                                                  height: 1.2,
+                                                ),
+                                              ),
+                                              Text(
+                                                widget.editText ?? '',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  color: kChatInk,
+                                                  height: 1.2,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // The text field is a SIBLING above the glass, not its content:
+                    // inside the glass button it sat under IgnorePointer, so it
+                    // got no long press, selection or paste, and a tap went to
+                    // the native button (which buzzes). Here it is a real iOS
+                    // text field: caret, selection, paste menu, and the system
+                    // spell check with its red dotted underline.
+                    Positioned(
+                      left: 0,
+                      right: _rightPad,
+                      top: _editing ? _editStrip : 0,
+                      bottom: 0,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextField(
+                          controller: widget.controller,
+                          focusNode: _focus,
+                          minLines: 1,
+                          maxLines: _maxLines,
+                          textCapitalization: TextCapitalization.sentences,
+                          keyboardType: TextInputType.multiline,
+                          autocorrect: true,
+                          enableSuggestions: true,
+                          spellCheckConfiguration: chatSpellCheck(),
+                          style: _style,
+                          cursorColor: AppColors.brandOrange,
+                          decoration: InputDecoration(
+                            hintText: widget.hint,
+                            hintStyle: _style.copyWith(color: kChatMuted),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            filled: false,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.only(
+                              left: _leftPad,
                             ),
                           ),
                         ),
                       ),
                     ),
+                    // Cancel: a sibling of the glass too (its own content gets
+                    // no touches).
+                    if (_editing)
+                      Positioned(
+                        right: 10,
+                        top: 8,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: widget.onCancelEdit,
+                          child: const SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 20,
+                              color: kChatMuted,
+                            ),
+                          ),
+                        ),
+                      ),
                     Positioned(
                       right: _inset,
                       bottom: _inset,

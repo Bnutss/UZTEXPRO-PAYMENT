@@ -6,5 +6,9 @@
 	     app is signed for TestFlight / the App Store. -->
 	<key>aps-environment</key>
 	<string>development</string>
+	<!-- Communication notifications: the sender's photo at the left of a chat
+	     notification, with the app icon on it (see NotificationService). -->
+	<key>com.apple.developer.usernotifications.communication</key>
+	<true/>
 </dict>
 </plist>

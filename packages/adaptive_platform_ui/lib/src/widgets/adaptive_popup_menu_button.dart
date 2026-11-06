@@ -75,6 +75,17 @@ class AdaptivePopupMenuButton<T> {
     VoidCallback? onTap,
     required Widget child,
   }) {
+    // Only iOS 26+ opens a submenu natively; elsewhere its items are listed
+    // right in the menu.
+    if (!PlatformInfo.isIOS26OrHigher()) {
+      items = [
+        for (final e in items)
+          if (e is AdaptivePopupMenuItem<T> && e.children.isNotEmpty)
+            ...e.children
+          else
+            e,
+      ];
+    }
     assert(
       onTap == null || triggerOnLongPress,
       'onTap is only used with triggerOnLongPress: true (tap fires onTap, '

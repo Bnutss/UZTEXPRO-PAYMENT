@@ -30,6 +30,7 @@ abstract class ChatLink {
     int? to,
     required String text,
     required String clientId,
+    int? replyTo,
   });
 
   void typing(int conversation);
@@ -211,11 +212,13 @@ class ChatSocket implements ChatLink {
     int? to,
     required String text,
     required String clientId,
+    int? replyTo,
   }) => _send({
     'action': 'send',
     if (conversation != null) 'conversation': conversation else 'to': to,
     'text': text,
     'client_id': clientId,
+    if (replyTo != null) 'reply_to': replyTo,
   });
 
   @override

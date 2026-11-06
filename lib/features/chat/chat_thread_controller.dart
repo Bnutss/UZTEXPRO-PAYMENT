@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 
@@ -22,11 +23,18 @@ class ChatThreadController extends ChangeNotifier {
     this.typingTimeout = const Duration(seconds: 4),
     this.pageSize = 50,
     this.onReadMarked,
+    this.isGroup = false,
   }) : _convId = conversationId;
 
   final ChatRest rest;
   final ChatLink link;
+
+  /// For a group, a stand-in carrying its title and photo
+  /// ([ChatUser.groupStandIn]).
   final ChatUser peer;
+
+  /// A group chat: many people write, `peer` is the group itself.
+  final bool isGroup;
 
   /// If the socket has not echoed a message within this time, it is sent again
   /// over HTTP (the server saves one message per client id).
@@ -55,7 +63,37 @@ class ChatThreadController extends ChangeNotifier {
   bool loadingMore = false;
   bool hasMore = false;
   bool historyFailed = false;
-  bool peerTyping = false;
+
+  /// Somebody is typing (in a group, anybody but me).
+  bool get peerTyping => _typing.isNotEmpty;
+
+  /// Who is typing: user id → the timer that ends it.
+  final Map<int, Timer> _typing = {};
+
+  /// Names by user id, from the messages and the member list (group).
+  final Map<int, String> names = {};
+
+  /// Ids of the people typing now.
+  Iterable<int> get typingIds => _typing.keys;
+
+  /// The group's card (members, my role), once loaded.
+  ChatConversation? group;
+
+  /// I was removed from the group, or it was deleted: the screen closes.
+  bool removed = false;
+
+  bool get isAdmin => group?.isAdmin ?? false;
+
+  /// The peer's presence: fresh from the server when the chat opens, and
+  /// "online" as soon as they type or write.
+  late bool peerOnline = peer.online;
+  late DateTime? peerLastSeen = peer.lastSeen;
+
+  /// Notifications of this chat are off (for me).
+  bool muted = false;
+
+  /// The chat was deleted (by me or by the peer): the screen should close.
+  bool deleted = false;
 
   StreamSubscription<ChatEvent>? _sub;
   bool _wasConnected = false;
@@ -63,10 +101,13 @@ class ChatThreadController extends ChangeNotifier {
   int _localSeq = 0;
   int _lastReadSent = 0;
   DateTime? _lastTypingSent;
-  Timer? _typingTimer;
   final Map<String, Timer> _pendingTimers = {};
 
-  bool isMine(ChatMessage m) => m.sender != peer.id;
+  /// Direct: everything not from the peer is mine. Group: what I wrote (a local
+  /// copy has sender 0, the server's echo has my real id).
+  bool isMine(ChatMessage m) => isGroup
+      ? (m.sender == 0 || (rest.myId != null && m.sender == rest.myId))
+      : m.sender != peer.id;
 
   // ── life cycle ────────────────────────────────────────────────────────
 
@@ -74,7 +115,42 @@ class ChatThreadController extends ChangeNotifier {
     _sub = link.events.listen(_onEvent);
     _wasConnected = link.connected.value;
     link.connected.addListener(_onConnection);
+    unawaited(isGroup ? _loadGroup() : _refreshPresence());
     await _loadLatest(initial: true);
+  }
+
+  /// The group's card: members, my role, the mute flag.
+  Future<void> _loadGroup() async {
+    final id = _convId;
+    if (id == null) return;
+    try {
+      final g = await rest.group(id);
+      group = g;
+      muted = g.muted;
+      for (final m in g.members) {
+        names[m.id] = m.name;
+      }
+      _changed();
+    } catch (e) {
+      // A group I am no longer in (or that was deleted) answers 404.
+      if (e is ChatApiException && e.statusCode == 404) {
+        removed = true;
+        _changed();
+      }
+    }
+  }
+
+  Future<void> reloadGroup() => _loadGroup();
+
+  Future<void> _refreshPresence() async {
+    try {
+      final conv = await _open();
+      _convId ??= conv.id;
+      peerOnline = conv.peer.online;
+      peerLastSeen = conv.peer.lastSeen;
+      muted = conv.muted;
+      _changed();
+    } catch (_) {}
   }
 
   @override
@@ -82,7 +158,9 @@ class ChatThreadController extends ChangeNotifier {
     _disposed = true;
     _sub?.cancel();
     link.connected.removeListener(_onConnection);
-    _typingTimer?.cancel();
+    for (final t in _typing.values) {
+      t.cancel();
+    }
     for (final t in _pendingTimers.values) {
       t.cancel();
     }
@@ -93,13 +171,142 @@ class ChatThreadController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
+  // ── chat actions ──────────────────────────────────────────────────────
+
+  Future<bool> toggleMuted() async {
+    final id = _convId;
+    if (id == null) return false;
+    final next = !muted;
+    try {
+      await rest.setMuted(id, next);
+    } catch (_) {
+      return false;
+    }
+    muted = next;
+    _changed();
+    return true;
+  }
+
+  /// Saves a new text of my message.
+  Future<bool> editMessage(ChatMessage m, String text) async {
+    final body = text.trim();
+    if (body.isEmpty || m.isLocal) return false;
+    if (body == m.text) return true;
+    try {
+      _upsert(await rest.editMessage(m.id, body));
+    } catch (_) {
+      return false;
+    }
+    _changed();
+    return true;
+  }
+
+  Future<bool> deleteMessage(ChatMessage m, {required bool forAll}) async {
+    if (m.isLocal) return false;
+    try {
+      await rest.deleteMessage(m.id, forAll: forAll);
+    } catch (_) {
+      return false;
+    }
+    _messages.removeWhere((x) => x.id == m.id);
+    _changed();
+    return true;
+  }
+
+  /// Deletes the chat's messages (only mine, or for both people).
+  Future<bool> deleteChat({required bool forAll}) async {
+    final id = _convId;
+    if (id == null) return false;
+    try {
+      await rest.deleteConversation(id, forAll: forAll);
+    } catch (_) {
+      return false;
+    }
+    _messages.clear();
+    hasMore = false;
+    deleted = true;
+    _changed();
+    return true;
+  }
+
+  // ── group actions ─────────────────────────────────────────────────────
+
+  Future<bool> _groupCall(Future<void> Function(int id) call) async {
+    final id = _convId;
+    if (id == null) return false;
+    try {
+      await call(id);
+    } catch (_) {
+      return false;
+    }
+    await _loadGroup();
+    return true;
+  }
+
+  Future<bool> renameGroup(String title) =>
+      _groupCall((id) => rest.updateGroup(id, title: title));
+
+  Future<bool> changeGroupPhoto(Uint8List photo) =>
+      _groupCall((id) => rest.updateGroup(id, photo: photo));
+
+  Future<bool> removeGroupPhoto() =>
+      _groupCall((id) => rest.updateGroup(id, removePhoto: true));
+
+  Future<bool> addMembers(List<int> ids) =>
+      _groupCall((id) => rest.addMembers(id, ids));
+
+  Future<bool> removeMember(int userId) =>
+      _groupCall((id) => rest.removeMember(id, userId));
+
+  Future<bool> setRole(int userId, String role) =>
+      _groupCall((id) => rest.setMemberRole(id, userId, role));
+
+  /// Leaves the group (my own id).
+  Future<bool> leaveGroup() async {
+    final id = _convId;
+    final me = rest.myId;
+    if (id == null || me == null) return false;
+    try {
+      await rest.removeMember(id, me);
+    } catch (e) {
+      if (!(e is ChatApiException && e.statusCode == 404)) return false;
+    }
+    removed = true;
+    _changed();
+    return true;
+  }
+
+  /// Deletes the whole group for everybody (the owner).
+  Future<bool> deleteGroup() async {
+    final id = _convId;
+    if (id == null) return false;
+    try {
+      await rest.deleteGroup(id);
+    } catch (e) {
+      // Already gone (deleted on another phone): that is what was wanted.
+      if (!(e is ChatApiException && e.statusCode == 404)) return false;
+    }
+    removed = true;
+    _changed();
+    return true;
+  }
+
   // ── history ───────────────────────────────────────────────────────────
 
   Future<void> _ensureConversation() async {
     if (_convId != null) return;
-    final conv = await rest.openConversation(peer.id);
+    final conv = await _open();
     _convId ??= conv.id;
   }
+
+  /// One "open the chat" request is shared by whoever needs it first (the
+  /// history and the presence both start at once).
+  Future<ChatConversation>? _opening;
+  Future<ChatConversation> _open() =>
+      _opening ??= rest.openConversation(peer.id).catchError((Object e) {
+        _opening = null;
+        throw e;
+      });
 
   Future<void> _loadLatest({bool initial = false}) async {
     try {
@@ -167,6 +374,7 @@ class ChatThreadController extends ChangeNotifier {
   /// Adds a message or replaces the one it confirms (same id, or the same
   /// client id for my own copy that was shown before the server knew it).
   void _upsert(ChatMessage m) {
+    if (m.senderName.isNotEmpty && m.sender > 0) names[m.sender] = m.senderName;
     var i = m.id > 0 ? _messages.indexWhere((x) => x.id == m.id) : -1;
     if (i < 0 && m.clientId.isNotEmpty) {
       // The local copy has no real sender id: match on "mine / the peer's".
@@ -194,6 +402,33 @@ class ChatThreadController extends ChangeNotifier {
 
   void _onEvent(ChatEvent e) {
     switch (e.type) {
+      case 'message_edited':
+        final m = ChatMessage.fromJson(e.data);
+        if (m.conversation == _convId) {
+          _upsert(m);
+          _changed();
+        }
+      case 'message_deleted':
+        if ((e.data['conversation'] as num?)?.toInt() == _convId) {
+          _messages.removeWhere((m) => m.id == (e.data['id'] as num?)?.toInt());
+          _changed();
+        }
+      case 'cleared':
+        if ((e.data['conversation'] as num?)?.toInt() == _convId) {
+          _messages.clear();
+          hasMore = false;
+          _clearTyping();
+          _changed();
+        }
+      case 'conversation_removed':
+        if ((e.data['conversation'] as num?)?.toInt() == _convId) {
+          removed = true;
+          _changed();
+        }
+      case 'conversations_changed':
+        if (isGroup && (e.data['conversation'] as num?)?.toInt() == _convId) {
+          unawaited(_loadGroup());
+        }
       case 'message':
         _onMessage(ChatMessage.fromJson(e.data));
       case 'typing':
@@ -209,7 +444,7 @@ class ChatThreadController extends ChangeNotifier {
     if (_convId != null) return conversation == _convId;
     // The chat is not known yet: take events of the peer, and the echo of my
     // own first message.
-    final mine = sender != peer.id;
+    final mine = isGroup ? false : sender != peer.id;
     final ok = !mine || _messages.any((x) => x.clientId == clientId);
     if (ok) _convId = conversation;
     return ok;
@@ -219,7 +454,10 @@ class ChatThreadController extends ChangeNotifier {
     if (!_adopt(m.conversation, sender: m.sender, clientId: m.clientId)) return;
     _pendingTimers.remove(m.clientId)?.cancel();
     _upsert(m);
-    if (!isMine(m)) peerTyping = false;
+    if (!isMine(m)) {
+      _stopTyping(m.sender);
+      peerOnline = true;
+    }
     _changed();
     _markReadIfNeeded();
   }
@@ -227,22 +465,39 @@ class ChatThreadController extends ChangeNotifier {
   void _onTyping(Map<String, dynamic> d) {
     final user = (d['user'] as num?)?.toInt();
     final conv = (d['conversation'] as num?)?.toInt();
-    if (user != peer.id || conv == null) return;
-    if (!_adopt(conv, sender: peer.id)) return;
-    peerTyping = true;
-    _typingTimer?.cancel();
-    _typingTimer = Timer(typingTimeout, () {
-      peerTyping = false;
+    if (user == null || conv == null) return;
+    if (isGroup) {
+      if (user == rest.myId || conv != _convId) return;
+    } else {
+      if (user != peer.id) return;
+      if (!_adopt(conv, sender: peer.id)) return;
+      peerOnline = true;
+    }
+    _typing[user]?.cancel();
+    _typing[user] = Timer(typingTimeout, () {
+      _typing.remove(user);
       _changed();
     });
     _changed();
+  }
+
+  void _stopTyping(int user) {
+    _typing.remove(user)?.cancel();
+  }
+
+  void _clearTyping() {
+    for (final t in _typing.values) {
+      t.cancel();
+    }
+    _typing.clear();
   }
 
   void _onRead(Map<String, dynamic> d) {
     final conv = (d['conversation'] as num?)?.toInt();
     final reader = (d['reader'] as num?)?.toInt();
     final upTo = (d['up_to'] as num?)?.toInt() ?? 0;
-    if (conv != _convId || reader != peer.id) return;
+    if (conv != _convId) return;
+    if (isGroup ? reader == rest.myId : reader != peer.id) return;
     var any = false;
     for (var i = 0; i < _messages.length; i++) {
       final m = _messages[i];
@@ -304,7 +559,7 @@ class ChatThreadController extends ChangeNotifier {
 
   /// Shows the message at once and sends it: over the socket when it is open,
   /// otherwise (or when the socket does not confirm in time) over HTTP.
-  void send(String text) {
+  void send(String text, {ChatMessage? replyTo}) {
     final body = text.trim();
     if (body.isEmpty) return;
     final local = ChatMessage(
@@ -317,6 +572,13 @@ class ChatThreadController extends ChangeNotifier {
       createdAt: DateTime.now(),
       read: false,
       state: ChatSendState.sending,
+      reply: replyTo == null || replyTo.isLocal
+          ? null
+          : ChatReply(
+              id: replyTo.id,
+              sender: replyTo.sender,
+              text: replyTo.text,
+            ),
     );
     _messages.add(local);
     _messages.sort(_compare);
@@ -339,6 +601,7 @@ class ChatThreadController extends ChangeNotifier {
           to: _convId == null ? peer.id : null,
           text: local.text,
           clientId: local.clientId,
+          replyTo: local.reply?.id,
         );
     if (viaSocket) {
       _pendingTimers[local.clientId] = Timer(
@@ -363,6 +626,7 @@ class ChatThreadController extends ChangeNotifier {
         _convId!,
         local.text,
         local.clientId,
+        replyTo: local.reply?.id,
       );
       _upsert(saved);
       _changed();

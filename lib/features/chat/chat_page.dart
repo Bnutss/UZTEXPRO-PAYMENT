@@ -7,13 +7,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/localization/app_strings.dart';
+import '../../core/widgets/routeless_alert.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_refresh.dart';
 import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/floating_notch_bar.dart';
 import '../auth/widgets/logo_stroke_loader.dart';
 import 'chat_api.dart';
+import 'chat_group_picker.dart';
 import 'chat_hub.dart';
+import 'chat_list_actions.dart';
+import 'chat_system.dart';
 import 'chat_models.dart';
 import 'chat_push.dart' show ChatPushTarget;
 import 'chat_socket.dart';
@@ -55,14 +59,16 @@ class _ChatPageState extends State<ChatPage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => ChatThreadPage(
+          chatInstantRoute(
+            (_) => ChatThreadPage(
               api: _api,
               link: _link,
               peer: target.peer,
               conversationId: target.conversationId,
               sounds: widget.hub.sounds,
+              mutedChats: widget.hub.mutedConversations,
               onRead: widget.hub.requestRefresh,
+              isGroup: target.isGroup,
             ),
           ),
         );
@@ -174,6 +180,7 @@ class _TabBody extends StatelessWidget {
     required this.emptyIcon,
     required this.emptyText,
     required this.rows,
+    this.emptySvg,
     this.plain = false,
   });
 
@@ -183,6 +190,7 @@ class _TabBody extends StatelessWidget {
   final String? error;
   final IconData emptyIcon;
   final String emptyText;
+  final String? emptySvg;
   final List<Widget> rows;
 
   /// Rows straight on the page (no white card), edge to edge.
@@ -201,28 +209,50 @@ class _TabBody extends StatelessWidget {
         icon: Icons.cloud_off_rounded,
         text: error!,
         color: const Color(0xFFD32F2F),
+        centered: true,
       );
     } else if (rows.isEmpty) {
-      content = ChatMessageBlock(icon: emptyIcon, text: emptyText);
+      content = ChatMessageBlock(
+        icon: emptyIcon,
+        svgAsset: emptySvg,
+        text: emptyText,
+        centered: true,
+      );
     } else {
       content = ChatListCard(plain: plain, children: rows);
     }
 
+    // A hint or an error sits in the middle of the free area (between the
+    // header and the tab bar), not under the header.
+    final centered = !(loading && rows.isEmpty) && rows.isEmpty;
     return AppRefresh(
       topOffset: topInset,
       onRefresh: onRefresh,
-      child: ListView(
-        physics: const BouncingScrollPhysics(
-          parent: AlwaysScrollableScrollPhysics(),
-        ),
-        // Bottom space: the tab bar floats over the page.
-        padding: EdgeInsets.fromLTRB(
-          plain ? 0 : 16,
-          topInset + 4,
-          plain ? 0 : 16,
-          110,
-        ),
-        children: [content],
+      child: LayoutBuilder(
+        builder: (context, box) {
+          const bottom = 110.0; // the tab bar floats over the page
+          final free = box.maxHeight - topInset - 4 - bottom;
+          return ListView(
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            padding: EdgeInsets.fromLTRB(
+              plain ? 0 : 16,
+              topInset + 4,
+              plain ? 0 : 16,
+              bottom,
+            ),
+            children: [
+              if (centered)
+                SizedBox(
+                  height: free > 0 ? free : 0,
+                  child: Center(child: content),
+                )
+              else
+                content,
+            ],
+          );
+        },
       ),
     );
   }
@@ -306,12 +336,13 @@ class _ContactsTabState extends State<_ContactsTab> {
   void _open(ChatUser user) {
     HapticFeedback.selectionClick();
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ChatThreadPage(
+      chatInstantRoute(
+        (_) => ChatThreadPage(
           api: widget.api,
           link: widget.link,
           peer: user,
           sounds: widget.hub.sounds,
+          mutedChats: widget.hub.mutedConversations,
           onRead: widget.hub.requestRefresh,
         ),
       ),
@@ -364,6 +395,9 @@ class _ChatsTabState extends State<_ChatsTab> {
   final _search = TextEditingController();
   bool _searching = false;
 
+  /// The row that is swiped open (one at a time).
+  final _openRow = ValueNotifier<int?>(null);
+
   List<ChatConversation> _chats = [];
   bool _loading = true;
   String? _error;
@@ -385,6 +419,7 @@ class _ChatsTabState extends State<_ChatsTab> {
     _events?.cancel();
     widget.link.connected.removeListener(_onConnection);
     _search.dispose();
+    _openRow.dispose();
     super.dispose();
   }
 
@@ -402,6 +437,14 @@ class _ChatsTabState extends State<_ChatsTab> {
   /// grows when it is from the other person. A chat not in the list yet (the
   /// first message) is picked up by a reload.
   void _onEvent(ChatEvent e) {
+    if (e.type == 'cleared' ||
+        e.type == 'message_edited' ||
+        e.type == 'message_deleted' ||
+        e.type == 'conversations_changed' ||
+        e.type == 'conversation_removed') {
+      _load(silent: true);
+      return;
+    }
     if (e.type != 'message') return;
     final m = ChatMessage.fromJson(e.data);
     final i = _chats.indexWhere((c) => c.id == m.conversation);
@@ -410,7 +453,10 @@ class _ChatsTabState extends State<_ChatsTab> {
       return;
     }
     final c = _chats[i];
-    final incoming = m.sender == c.peer.id;
+    final me = widget.api.myId;
+    final incoming = c.isGroup
+        ? (m.sender != 0 && (me == null || m.sender != me))
+        : m.sender == c.peer.id;
     setState(() {
       _chats = [
         c.copyWith(
@@ -444,6 +490,9 @@ class _ChatsTabState extends State<_ChatsTab> {
         _chats = chats;
         _loading = false;
       });
+      widget.hub.mutedConversations
+        ..clear()
+        ..addAll(chats.where((c) => c.muted).map((c) => c.id));
     } catch (e) {
       if (!mounted) return;
       // A silent refresh that fails keeps what is on the screen.
@@ -458,14 +507,16 @@ class _ChatsTabState extends State<_ChatsTab> {
   Future<void> _open(ChatConversation chat) async {
     HapticFeedback.selectionClick();
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ChatThreadPage(
+      chatInstantRoute(
+        (_) => ChatThreadPage(
           api: widget.api,
           link: widget.link,
           peer: chat.peer,
           conversationId: chat.id,
           sounds: widget.hub.sounds,
+          mutedChats: widget.hub.mutedConversations,
           onRead: widget.hub.requestRefresh,
+          isGroup: chat.isGroup,
         ),
       ),
     );
@@ -473,9 +524,322 @@ class _ChatsTabState extends State<_ChatsTab> {
     if (mounted) _load();
   }
 
+  // ── swipe / long-press actions ───────────────────────────────────────
+
+  void _fail() {
+    if (!mounted) return;
+    final s = S.of(context);
+    showNativeAlert(
+      context: context,
+      title: s.chatActionFailed,
+      actions: [
+        AlertAction(
+          title: s.close,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+      ],
+    );
+  }
+
+  /// A chat is gone from the list (deleted, left): drop it and refresh the badge.
+  void _drop(ChatConversation c) {
+    if (!mounted) return;
+    setState(() => _chats = _chats.where((x) => x.id != c.id).toList());
+    widget.hub.mutedConversations.remove(c.id);
+    widget.hub.requestRefresh();
+  }
+
+  Future<void> _toggleMute(ChatConversation c) async {
+    HapticFeedback.selectionClick();
+    final next = !c.muted;
+    try {
+      await widget.api.setMuted(c.id, next);
+    } catch (_) {
+      return _fail();
+    }
+    if (!mounted) return;
+    next
+        ? widget.hub.mutedConversations.add(c.id)
+        : widget.hub.mutedConversations.remove(c.id);
+    setState(() {
+      _chats = [
+        for (final x in _chats) x.id == c.id ? x.copyWith(muted: next) : x,
+      ];
+    });
+  }
+
+  /// A personal chat: delete for me, or for the other person too.
+  void _deleteDirect(ChatConversation c) {
+    final s = S.of(context);
+    showNativeAlert(
+      context: context,
+      title: s.chatDeleteTitle,
+      message: s.chatDeleteMessage,
+      actions: [
+        AlertAction(
+          title: s.cancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+        AlertAction(
+          title: s.chatDeleteForBoth(c.peer.shortName),
+          style: AlertActionStyle.destructive,
+          onPressed: () => _runDelete(c, forAll: true),
+        ),
+        AlertAction(
+          title: s.chatDeleteForMe,
+          style: AlertActionStyle.destructive,
+          onPressed: () => _runDelete(c, forAll: false),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _runDelete(ChatConversation c, {required bool forAll}) async {
+    try {
+      await widget.api.deleteConversation(c.id, forAll: forAll);
+    } catch (_) {
+      return _fail();
+    }
+    _drop(c);
+  }
+
+  void _confirmLeave(ChatConversation c) {
+    final s = S.of(context);
+    showNativeAlert(
+      context: context,
+      title: s.chatLeaveTitle,
+      message: c.peer.name,
+      actions: [
+        AlertAction(
+          title: s.cancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+        AlertAction(
+          title: s.chatLeaveConfirm,
+          style: AlertActionStyle.destructive,
+          onPressed: () => _runLeave(c),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _runLeave(ChatConversation c) async {
+    final me = widget.api.myId;
+    if (me == null) return _fail();
+    try {
+      await widget.api.removeMember(c.id, me);
+    } catch (e) {
+      if (!(e is ChatApiException && e.statusCode == 404)) return _fail();
+    }
+    _drop(c);
+  }
+
+  void _confirmDeleteGroup(ChatConversation c) {
+    final s = S.of(context);
+    showNativeAlert(
+      context: context,
+      title: s.chatDeleteGroupTitle,
+      message: c.peer.name,
+      actions: [
+        AlertAction(
+          title: s.cancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+        AlertAction(
+          title: s.chatDeleteGroup,
+          style: AlertActionStyle.destructive,
+          onPressed: () => _runDeleteGroup(c),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _runDeleteGroup(ChatConversation c) async {
+    try {
+      await widget.api.deleteGroup(c.id);
+    } catch (e) {
+      if (!(e is ChatApiException && e.statusCode == 404)) return _fail();
+    }
+    _drop(c);
+  }
+
+  /// The owner of a group chooses: leave it, or delete it for everybody.
+  void _ownerChoice(ChatConversation c) {
+    final s = S.of(context);
+    showNativeAlert(
+      context: context,
+      title: c.peer.name,
+      actions: [
+        AlertAction(
+          title: s.cancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+        AlertAction(
+          title: s.chatLeaveGroupAction,
+          style: AlertActionStyle.destructive,
+          onPressed: () => _confirmLeave(c),
+        ),
+        AlertAction(
+          title: s.chatDeleteGroup,
+          style: AlertActionStyle.destructive,
+          onPressed: () => _confirmDeleteGroup(c),
+        ),
+      ],
+    );
+  }
+
+  /// What can be done with a chat from the list.
+  /// Personal: delete. Group: leave; the owner may also delete the group.
+  /// The last one is the "full swipe" action.
+  List<ChatListAction> _actionsFor(ChatConversation c, S s) {
+    const red = Color(0xFFFF3B30);
+    final mute = ChatListAction(
+      icon: c.muted
+          ? Icons.notifications_rounded
+          : Icons.notifications_off_rounded,
+      sfSymbol: c.muted ? 'bell' : 'bell.slash',
+      label: c.muted ? s.chatUnmuteAction : s.chatMuteAction,
+      shortLabel: c.muted ? s.chatUnmuteShort : s.chatMuteShort,
+      color: const Color(0xFFFF9500),
+      onTap: () => _toggleMute(c),
+    );
+    if (!c.isGroup) {
+      return [
+        mute,
+        ChatListAction(
+          icon: Icons.delete_rounded,
+          sfSymbol: 'trash',
+          label: s.chatDeleteChatAction,
+          shortLabel: s.chatDeleteShort,
+          color: red,
+          destructive: true,
+          onTap: () => _deleteDirect(c),
+        ),
+      ];
+    }
+    final owner = c.myRole == 'owner';
+    return [
+      mute,
+      ChatListAction(
+        icon: owner ? Icons.delete_rounded : Icons.logout_rounded,
+        sfSymbol: owner ? 'trash' : 'rectangle.portrait.and.arrow.right',
+        label: s.chatLeaveGroupAction,
+        shortLabel: owner ? s.chatDeleteShort : s.chatLeaveShort,
+        color: red,
+        destructive: true,
+        // The owner picks (leave / delete); a member just leaves.
+        onTap: () => owner ? _ownerChoice(c) : _confirmLeave(c),
+      ),
+    ];
+  }
+
+  /// The long-press menu: like the swipe, but the owner sees both choices.
+  List<ChatListAction> _menuFor(ChatConversation c, S s) {
+    final base = _actionsFor(c, s);
+    if (c.isGroup && c.myRole == 'owner') {
+      return [
+        base.first,
+        ChatListAction(
+          icon: Icons.logout_rounded,
+          sfSymbol: 'rectangle.portrait.and.arrow.right',
+          label: s.chatLeaveGroupAction,
+          shortLabel: s.chatLeaveShort,
+          destructive: true,
+          onTap: () => _confirmLeave(c),
+        ),
+        ChatListAction(
+          icon: Icons.delete_rounded,
+          sfSymbol: 'trash',
+          label: s.chatDeleteGroup,
+          shortLabel: s.chatDeleteShort,
+          destructive: true,
+          onTap: () => _confirmDeleteGroup(c),
+        ),
+      ];
+    }
+    return base;
+  }
+
+  /// What the native preview needs: the chat, and how to load its messages.
+  Map<String, dynamic> _previewConfig(ChatConversation c, S s) => {
+    'conversationId': c.id,
+    'apiBase': widget.api.apiBase,
+    'token': widget.api.apiToken,
+    'myId': widget.api.myId ?? 0,
+    'peerId': c.peer.id,
+    'isGroup': c.isGroup,
+    'title': c.peer.name,
+    'photo': c.peer.photo ?? '',
+    'subtitle': c.isGroup
+        ? s.chatMembersCount(c.membersCount)
+        : (c.peer.online ? s.chatOnline : s.chatLastSeen(c.peer.lastSeen)),
+    'emptyText': s.chatNoMessagesYet,
+  };
+
+  /// "New group": the button is in place, the group itself comes next.
+  Future<void> _newGroup() async {
+    HapticFeedback.selectionClick();
+    final List<ChatUser> contacts;
+    try {
+      contacts = await widget.api.contacts();
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+    final draft = await pickGroupMembers(context, contacts);
+    if (draft == null || draft.ids.isEmpty || draft.name.isEmpty || !mounted) {
+      return;
+    }
+    final ChatConversation group;
+    try {
+      group = await widget.api.createGroup(
+        draft.name,
+        draft.ids,
+        photo: draft.photo,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      // A native alert: a snackbar can sit hidden behind the floating tab bar.
+      final s = S.of(context);
+      showNativeAlert(
+        context: context,
+        title: s.chatActionFailed,
+        message: e is ChatApiException && e.statusCode != null
+            ? '${e.statusCode}'
+            : null,
+        actions: [
+          AlertAction(
+            title: s.close,
+            style: AlertActionStyle.cancel,
+            onPressed: () {},
+          ),
+        ],
+      );
+      return;
+    }
+    if (!mounted) return;
+    await _open(group);
+  }
+
   String _preview(ChatConversation c, S s) {
     final m = c.lastMessage;
     if (m == null) return '';
+    if (m.isSystem) return chatSystemText(m, s, widget.api.myId);
+    if (c.isGroup) {
+      final me = widget.api.myId;
+      final mine = m.sender == 0 || (me != null && m.sender == me);
+      final who = mine
+          ? s.chatYou
+          : (m.senderName.isEmpty
+                ? s.chatMemberFallback
+                : m.senderName.split(' ').first);
+      return '$who: ${m.text}';
+    }
     // A chat of two people: anything not from the peer is mine.
     final mine = m.sender != c.peer.id;
     return mine ? '${s.chatYou}: ${m.text}' : m.text;
@@ -502,25 +866,99 @@ class _ChatsTabState extends State<_ChatsTab> {
       onToggleSearch: _toggleSearch,
       searchController: _search,
       searchHint: s.chatsSearchHint,
+      // The second button of the capsule next to search: a new group (the
+      // button only, for now).
+      onFilterTap: _newGroup,
+      filterIcon: Icons.add_rounded,
+      filterSfSymbol: 'plus',
       body: (context, topInset) => _TabBody(
         topInset: topInset,
         onRefresh: _load,
         loading: _loading,
         error: _error,
         emptyIcon: Icons.forum_outlined,
+        emptySvg: 'assets/icons/tg_chats.svg',
         emptyText: q.isEmpty ? s.chatsEmpty : s.chatNothingFound,
         plain: true,
         rows: [
           for (final c in shown)
-            ChatRow(
-              user: c.peer,
-              subtitle: _preview(c, s),
-              time: chatTimeLabel(c.lastMessage?.createdAt ?? c.updatedAt, s),
-              unread: c.unread,
-              onTap: () => _open(c),
+            ChatSwipeRow(
+              id: c.id,
+              open: _openRow,
+              actions: _actionsFor(c, s),
+              // Long press: iOS shows a native preview of the chat (scrolls)
+              // with the menu under it; elsewhere a plain menu.
+              child: _LongPressMenu(
+                native: (row) => showNativeChatPreview(
+                  preview: {
+                    ..._previewConfig(c, s),
+                    // The pressed row: the preview sits beside it, not on it.
+                    'rowTop': row.top,
+                    'rowBottom': row.bottom,
+                  },
+                  actions: _menuFor(c, s),
+                  onOpen: () => _open(c),
+                ),
+                fallbackActions: [
+                  for (final a in _menuFor(c, s))
+                    AdaptiveContextMenuAction(
+                      title: a.label,
+                      icon: a.icon,
+                      isDestructive: a.destructive,
+                      onPressed: a.onTap,
+                    ),
+                ],
+                child: ColoredBox(
+                  color: AppColors.groupedBackground,
+                  child: ChatRow(
+                    user: c.peer,
+                    subtitle: _preview(c, s),
+                    time: chatTimeLabel(
+                      c.lastMessage?.createdAt ?? c.updatedAt,
+                      s,
+                    ),
+                    unread: c.unread,
+                    muted: c.muted,
+                    onTap: () => _open(c),
+                  ),
+                ),
+              ),
             ),
         ],
       ),
     );
   }
+}
+
+/// A long press on a chat: the native preview on iOS (the last messages, a card
+/// that scrolls, the menu under it), a plain menu elsewhere.
+class _LongPressMenu extends StatelessWidget {
+  const _LongPressMenu({
+    required this.native,
+    required this.fallbackActions,
+    required this.child,
+  });
+
+  final Future<bool> Function(Rect row) native;
+  final List<AdaptiveContextMenuAction> fallbackActions;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (Platform.isIOS) {
+      return GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onLongPress: () => native(rowRect(context)),
+        child: child,
+      );
+    }
+    return AdaptiveContextMenu(actions: fallbackActions, child: child);
+  }
+}
+
+/// Where a widget is on the screen (in points).
+Rect rowRect(BuildContext context) {
+  final box = context.findRenderObject();
+  if (box is! RenderBox || !box.hasSize) return Rect.zero;
+  return box.localToGlobal(Offset.zero) & box.size;
 }

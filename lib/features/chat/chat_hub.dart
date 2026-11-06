@@ -45,6 +45,9 @@ class ChatHub with WidgetsBindingObserver {
   /// "Message sent" / "message came" sounds; the chat window plays them.
   final ChatSounds? sounds;
 
+  /// Chats whose notifications I switched off: no sound for them.
+  final Set<int> mutedConversations = {};
+
   /// How long to wait before asking the server for the number after a message
   /// came while the chat window is open: the open conversation marks it read
   /// in the meantime.
@@ -109,7 +112,10 @@ class ChatHub with WidgetsBindingObserver {
       // Inside the chat window: its screens show the message, a sound tells
       // that it came, and the total follows the server (the open conversation
       // marks the message read first).
-      if (me != null && sender != me) sounds?.incoming();
+      final conv = (e.data['conversation'] as num?)?.toInt();
+      if (me != null && sender != me && !mutedConversations.contains(conv)) {
+        sounds?.incoming();
+      }
       requestRefresh();
       return;
     }

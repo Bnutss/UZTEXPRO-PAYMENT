@@ -17,6 +17,30 @@ import 'package:flutter/services.dart';
 ///
 /// Returns false (and shows nothing) when the native alert is unavailable
 /// (not iOS 26+); the caller should fall back to its usual dialog then.
+/// A native alert that does not disturb the page under it: the routeless one on
+/// iOS 26+ (the page keeps its bars and colours), else the package's dialog.
+Future<void> showNativeAlert({
+  required BuildContext context,
+  required String title,
+  String? message,
+  required List<AlertAction> actions,
+}) async {
+  if (showRoutelessNativeAlert(
+    context,
+    title: title,
+    message: message,
+    actions: actions,
+  )) {
+    return;
+  }
+  await AdaptiveAlertDialog.show(
+    context: context,
+    title: title,
+    message: message,
+    actions: actions,
+  );
+}
+
 bool showRoutelessNativeAlert(
   BuildContext context, {
   required String title,
