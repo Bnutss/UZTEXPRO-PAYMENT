@@ -305,6 +305,8 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage>
     final days = _daysSince(order.confirmedAt);
     final status = _waitStatus(s, days);
     final shown = await showNativeSheet({
+      // Opens to the full height at once, not half the screen.
+      'tall': true,
       'name': s.shopPickupOrderTitle(order.id),
       'subtitle': order.buyerName,
       'heroSf': 'shippingbox.fill',

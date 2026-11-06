@@ -226,29 +226,9 @@ class _SettingsScreenState extends State<SettingsScreen>
             delegate: SliverChildListDelegate([_buildSettingsCard(s)]),
           ),
         ),
-        // The platform name sits at the very bottom, clear of the tab bar.
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                24,
-                16,
-                MediaQuery.paddingOf(context).bottom + 90,
-              ),
-              child: Text(
-                s.paymentSystem,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: _gradientEnd,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ),
+        // Room under the last card, clear of the tab bar.
+        SliverToBoxAdapter(
+          child: SizedBox(height: MediaQuery.paddingOf(context).bottom + 114),
         ),
       ],
     );
@@ -406,6 +386,12 @@ class _SettingsScreenState extends State<SettingsScreen>
         labels: labels,
         selectedIndex: selectedIndex,
         color: _gradientStart,
+        // The colours of the text are given, not worked out from the
+        // surroundings: otherwise the native control restyles itself every time
+        // the surroundings change (another page pushed over this one), and the
+        // three labels blinked. (As in the davrtruck app, which does not.)
+        textColor: const Color(0xFF1C1C1E),
+        selectedTextColor: Colors.white,
         onValueChanged: _selectLanguage,
       );
     }

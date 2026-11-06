@@ -259,6 +259,8 @@ class _AttendancePageState extends State<AttendancePage> {
       // button; the header's native glass buttons stay correct underneath.
       try {
         await _nativeSheet.invokeMethod<void>('showSheet', {
+          // Opens to the full height at once, not half the screen.
+          'tall': true,
           'name': entry.name,
           'subtitle': [entry.position, entry.department]
               .where((t) => t.isNotEmpty)

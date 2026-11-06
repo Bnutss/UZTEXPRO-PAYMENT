@@ -65,7 +65,25 @@ class _MenuPageState extends State<MenuPage>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
+  /// Index in [_tabs] (not a fixed tab number: a tab the person has no access
+  /// to is not in the bar at all).
   int _currentIndex = 0;
+
+  /// The tabs this person gets: "Home" and "Settings" always, the others only
+  /// when there is something in them (the same rules that fill them below).
+  late final List<_MenuTab> _tabs = [
+    _MenuTab.home,
+    if (_hasFullAccess ||
+        _canSeePayments ||
+        _canSeePasses ||
+        _canSignRequests)
+      _MenuTab.confirmations,
+    if (_hasFullAccess) _MenuTab.production,
+    if (_canSeeShop) _MenuTab.shop,
+    _MenuTab.settings,
+  ];
+
+  _MenuTab get _currentTab => _tabs[_currentIndex.clamp(0, _tabs.length - 1)];
 
   String? _usdRate;
   String? _rubRate;
@@ -522,20 +540,26 @@ class _MenuPageState extends State<MenuPage>
                       SizedBox(
                         height: nativeBar
                             ? 8
-                            : (_currentIndex == 4 ? 0 : _headerSpace),
+                            : (_currentTab == _MenuTab.settings
+                                  ? 0
+                                  : _headerSpace),
                       ),
                       Expanded(
                         child: IndexedStack(
                           clipBehavior: Clip.none,
                           index: _currentIndex,
                           children: [
-                            _buildHomeTab(s),
-                            _buildConfirmationsTab(s),
-                            _buildProductionTab(s),
-                            _buildShopTab(s),
-                            SettingsScreen(
-                              topInset: nativeBar ? 0 : _headerSpace,
-                            ),
+                            for (final tab in _tabs)
+                              switch (tab) {
+                                _MenuTab.home => _buildHomeTab(s),
+                                _MenuTab.confirmations =>
+                                  _buildConfirmationsTab(s),
+                                _MenuTab.production => _buildProductionTab(s),
+                                _MenuTab.shop => _buildShopTab(s),
+                                _MenuTab.settings => SettingsScreen(
+                                  topInset: nativeBar ? 0 : _headerSpace,
+                                ),
+                              },
                           ],
                         ),
                       ),
@@ -585,17 +609,11 @@ class _MenuPageState extends State<MenuPage>
           // Labels double as the native tab's accessibility label, so VoiceOver
           // reads them too.
           items: [
-            AdaptiveNavigationDestination(icon: 'house.fill', label: s.navHome),
-            AdaptiveNavigationDestination(
-              icon: 'checkmark.seal.fill',
-              label: s.navConfirmations,
-            ),
-            AdaptiveNavigationDestination(
-              icon: 'shippingbox.fill',
-              label: s.navProduction,
-            ),
-            AdaptiveNavigationDestination(icon: 'cart.fill', label: s.navShop),
-            AdaptiveNavigationDestination(icon: 'gear', label: s.navSettings),
+            for (final tab in _tabs)
+              AdaptiveNavigationDestination(
+                icon: tab.sfSymbol,
+                label: tab.label(s),
+              ),
           ],
           selectedIndex: _currentIndex,
           onTap: _onTabTap,
@@ -613,31 +631,8 @@ class _MenuPageState extends State<MenuPage>
                   selected: _currentIndex,
                   onSelected: _onTabTap,
                   items: [
-                    NotchBarItem(
-                      CupertinoIcons.house,
-                      CupertinoIcons.house_fill,
-                      s.navHome,
-                    ),
-                    NotchBarItem(
-                      CupertinoIcons.checkmark_seal,
-                      CupertinoIcons.checkmark_seal_fill,
-                      s.navConfirmations,
-                    ),
-                    NotchBarItem(
-                      CupertinoIcons.cube_box,
-                      CupertinoIcons.cube_box_fill,
-                      s.navProduction,
-                    ),
-                    NotchBarItem(
-                      CupertinoIcons.cart,
-                      CupertinoIcons.cart_fill,
-                      s.navShop,
-                    ),
-                    NotchBarItem(
-                      CupertinoIcons.gear,
-                      CupertinoIcons.gear_solid,
-                      s.navSettings,
-                    ),
+                    for (final tab in _tabs)
+                      NotchBarItem(tab.icon, tab.iconSelected, tab.label(s)),
                   ],
                 ),
         ),
@@ -665,16 +660,9 @@ class _MenuPageState extends State<MenuPage>
           duration: const Duration(milliseconds: 350),
           child: showRates
               ? _headerRateStrip(key: const ValueKey('rates'))
-              : Text(
-                  s.paymentSystem,
-                  key: const ValueKey('subtitle'),
-                  style: const TextStyle(
-                    color: Color(0xFF8A8A8E),
-                    fontSize: 11,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+              // Nothing under the name (the line height stays, so the header
+              // does not jump when the rates come and go).
+              : const SizedBox(key: ValueKey('subtitle'), height: 14),
         ),
       ],
     );
@@ -901,11 +889,6 @@ class _MenuPageState extends State<MenuPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSectionTitle(s.navHome),
-          const SizedBox(height: 4),
-          Text(
-            s.paymentSystem,
-            style: const TextStyle(color: Color(0xFF8A8A8E), fontSize: 13),
-          ),
           if (!_dashOverviewUnavailable &&
               (_dashOverviewLoading || _dashOverviewLoaded)) ...[
             const SizedBox(height: 26),
@@ -2249,4 +2232,47 @@ class _HeaderGlassCapsule extends StatelessWidget {
       ),
     );
   }
+}
+
+
+/// The tabs of the main window; which of them a person gets depends on their
+/// access (see `_MenuPageState._tabs`).
+enum _MenuTab {
+  home,
+  confirmations,
+  production,
+  shop,
+  settings;
+
+  String get sfSymbol => switch (this) {
+    home => 'house.fill',
+    confirmations => 'checkmark.seal.fill',
+    production => 'shippingbox.fill',
+    shop => 'cart.fill',
+    settings => 'gear',
+  };
+
+  IconData get icon => switch (this) {
+    home => CupertinoIcons.house,
+    confirmations => CupertinoIcons.checkmark_seal,
+    production => CupertinoIcons.cube_box,
+    shop => CupertinoIcons.cart,
+    settings => CupertinoIcons.gear,
+  };
+
+  IconData get iconSelected => switch (this) {
+    home => CupertinoIcons.house_fill,
+    confirmations => CupertinoIcons.checkmark_seal_fill,
+    production => CupertinoIcons.cube_box_fill,
+    shop => CupertinoIcons.cart_fill,
+    settings => CupertinoIcons.gear_solid,
+  };
+
+  String label(S s) => switch (this) {
+    home => s.navHome,
+    confirmations => s.navConfirmations,
+    production => s.navProduction,
+    shop => s.navShop,
+    settings => s.navSettings,
+  };
 }

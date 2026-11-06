@@ -238,6 +238,8 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage>
     final s = S.of(context);
     final issued = order.isIssued;
     final shown = await showNativeSheet({
+      // Opens to the full height at once, not half the screen.
+      'tall': true,
       'name': s.shopPickupOrderTitle(order.id),
       'subtitle': order.buyerName,
       'heroSf': issued ? 'checkmark.circle.fill' : 'hourglass',
@@ -294,6 +296,7 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage>
     final s = S.of(context);
     final photo = group.photoSources(_imgHeaders).firstOrNull;
     return showNativeSheet({
+      'tall': true,
       'name': group.name,
       'subtitle':
           '${group.orders.length} · ${_numberFormat.format(group.totalValue)} сум',

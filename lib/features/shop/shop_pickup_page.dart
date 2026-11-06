@@ -209,6 +209,8 @@ class _ShopPickupPageState extends State<ShopPickupPage>
     HapticFeedback.selectionClick();
     final s = S.of(context);
     final shown = await showNativeSheet({
+      // Opens to the full height at once, not half the screen.
+      'tall': true,
       'name': s.shopPickupOrderTitle(order.id),
       'subtitle': order.shopName,
       'heroSf': 'shippingbox.fill',
