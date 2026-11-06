@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -11,6 +12,7 @@ import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/app_segmented_control.dart';
 import '../../core/widgets/ui_blocks.dart';
 import '../auth/widgets/logo_stroke_loader.dart';
+import 'pvz_native_sheet.dart';
 import 'shop_api.dart';
 
 enum _RangePreset { today, week, month, custom }
@@ -231,8 +233,52 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage>
     });
   }
 
-  void _openDetail(PvzOrder order) {
+  Future<void> _openDetail(PvzOrder order) async {
     HapticFeedback.selectionClick();
+    final s = S.of(context);
+    final issued = order.isIssued;
+    final shown = await showNativeSheet({
+      'name': s.shopPickupOrderTitle(order.id),
+      'subtitle': order.buyerName,
+      'heroSf': issued ? 'checkmark.circle.fill' : 'hourglass',
+      'status': issued ? s.shopIssuedStatusIssued : s.shopIssuedStatusPending,
+      'statusColor': issued ? kSheetGreen : kSheetOrange,
+      'sections': [
+        {
+          'rows': [
+            pvzRow('person.fill', kSheetBlue, s.shopPickupBuyer, order.buyerName),
+            pvzRow(
+              'person.badge.key.fill',
+              kSheetIndigo,
+              s.shopPickupSeller,
+              order.sellerName,
+            ),
+            pvzRow(
+              'building.2',
+              kSheetOrange,
+              s.shopIssuedShopFilterTitle,
+              order.shopName,
+            ),
+            if (order.issuedByName != null)
+              pvzRow(
+                'checkmark.seal.fill',
+                kSheetGreen,
+                s.shopIssuedIssuedBy,
+                order.issuedByName!,
+              ),
+            if (order.issuedAt != null)
+              pvzRow(
+                'calendar',
+                kSheetGray,
+                s.shopIssuedIssuedAt,
+                pvzSheetDateTime(order.issuedAt!),
+              ),
+          ],
+        },
+        ...pvzItemSections(s, order, _numberFormat),
+      ],
+    });
+    if (shown || !mounted) return;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -240,6 +286,45 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage>
       builder: (_) =>
           _IssuedOrderDetailSheet(order: order, numberFormat: _numberFormat),
     );
+  }
+
+  /// Native sheet with all orders of one buyer; false when unavailable.
+  Future<bool> _openBuyer(_IssuedBuyerGroup group) async {
+    HapticFeedback.selectionClick();
+    final s = S.of(context);
+    final photo = group.photoSources(_imgHeaders).firstOrNull;
+    return showNativeSheet({
+      'name': group.name,
+      'subtitle':
+          '${group.orders.length} · ${_numberFormat.format(group.totalValue)} сум',
+      if (group.pendingCount > 0) 'status': '${s.shopIssuedStatusPending}: ${group.pendingCount}',
+      'statusColor': kSheetOrange,
+      if (photo != null) 'photoUrl': photo.url,
+      if (photo?.headers != null) 'headers': photo!.headers,
+      'sections': [
+        for (final o in group.orders)
+          {
+            'title':
+                '${s.shopPickupOrderTitle(o.id)} · ${o.isIssued ? s.shopIssuedStatusIssued : s.shopIssuedStatusPending} · ${pvzSheetDateTime((o.isIssued ? o.issuedAt : o.confirmedAt) ?? o.createAt)}',
+            'rows': [
+              for (final item in o.items)
+                {
+                  'label': '${item.article} — ${item.productName}',
+                  'subtitle':
+                      '${item.color} · ${item.sizeName} · ${_numberFormat.format(item.amount)} шт',
+                  'value': '${_numberFormat.format(item.subtotal)} сум',
+                  'accent': true,
+                },
+              {
+                'label': s.totalLabel,
+                'value': '${_numberFormat.format(o.totalValue)} сум',
+                'bold': true,
+                'accent': true,
+              },
+            ],
+          },
+      ],
+    });
   }
 
   @override
@@ -410,7 +495,11 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage>
                                 numberFormat: _numberFormat,
                                 s: s,
                                 expanded: _expandedBuyers.contains(group.key),
-                                onTap: () => _toggleBuyer(group.key),
+                                onTap: () async {
+                                  if (!await _openBuyer(group)) {
+                                    _toggleBuyer(group.key);
+                                  }
+                                },
                               ),
                               AnimatedSize(
                                 duration: const Duration(milliseconds: 220),
@@ -418,7 +507,7 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage>
                                 alignment: Alignment.topCenter,
                                 child: _expandedBuyers.contains(group.key)
                                     ? Container(
-                                        color: kInk.withOpacity(0.025),
+                                        color: Colors.white,
                                         child: Column(
                                           children: [
                                             for (final (j, order)
@@ -501,14 +590,17 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage>
               Container(
                 width: 28,
                 height: 28,
-                decoration: BoxDecoration(
-                  color: AppColors.brandRed.withOpacity(0.1),
-                  shape: BoxShape.circle,
+                alignment: Alignment.center,
+                decoration: ShapeDecoration(
+                  color: const Color(0xFF34C759),
+                  shape: RoundedSuperellipseBorder(
+                    borderRadius: BorderRadius.circular(7),
+                  ),
                 ),
                 child: const Icon(
                   Icons.account_balance_wallet_rounded,
                   size: 15,
-                  color: AppColors.brandRed,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(width: 10),
@@ -667,8 +759,10 @@ class _IssuedBuyerHeader extends StatelessWidget {
                 turns: expanded ? 0.5 : 0,
                 duration: const Duration(milliseconds: 220),
                 curve: Curves.easeOutCubic,
-                child: const Icon(
-                  Icons.keyboard_arrow_down_rounded,
+                child: Icon(
+                  Platform.isIOS
+                      ? Icons.chevron_right_rounded
+                      : Icons.keyboard_arrow_down_rounded,
                   size: 22,
                   color: kInkMuted,
                 ),
@@ -899,7 +993,7 @@ class _IssuedOrderDetailSheet extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: onSurface.withOpacity(0.04),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: outline.withOpacity(0.5)),
                 ),
@@ -961,7 +1055,7 @@ class _IssuedOrderDetailSheet extends StatelessWidget {
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: onSurface.withOpacity(0.04),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(

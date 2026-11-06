@@ -14,14 +14,10 @@ import '../../core/widgets/app_refresh.dart';
 import '../../core/widgets/app_segmented_control.dart';
 import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/stagger_in.dart';
+import 'pvz_native_sheet.dart';
 import 'shop_api.dart';
 
 enum _RangePreset { today, week, month, custom }
-
-class _ShopPickupColors {
-  static const Color g1 = AppColors.brandOrange;
-  static const Color g2 = AppColors.brandRed;
-}
 
 /// PVZ (pickup-point) order view: lists orders placed via uztexpro_store
 /// that are still waiting to be handed over at this employee's own shop.
@@ -209,8 +205,35 @@ class _ShopPickupPageState extends State<ShopPickupPage>
     _load();
   }
 
-  void _openDetail(PvzOrder order) {
+  Future<void> _openDetail(PvzOrder order) async {
     HapticFeedback.selectionClick();
+    final s = S.of(context);
+    final shown = await showNativeSheet({
+      'name': s.shopPickupOrderTitle(order.id),
+      'subtitle': order.shopName,
+      'heroSf': 'shippingbox.fill',
+      'sections': [
+        {
+          'rows': [
+            pvzRow('person.fill', kSheetBlue, s.shopPickupBuyer, order.buyerName),
+            pvzRow(
+              'person.badge.key.fill',
+              kSheetIndigo,
+              s.shopPickupSeller,
+              order.sellerName,
+            ),
+            pvzRow(
+              'calendar',
+              kSheetOrange,
+              s.dateLabel,
+              _formatDateTime(order.createAt),
+            ),
+          ],
+        },
+        ...pvzItemSections(s, order, _numberFormat),
+      ],
+    });
+    if (shown || !mounted) return;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -727,7 +750,7 @@ class _OrderDetailSheet extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: onSurface.withOpacity(0.04),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: outline.withOpacity(0.5)),
                 ),
@@ -771,7 +794,7 @@ class _OrderDetailSheet extends StatelessWidget {
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: onSurface.withOpacity(0.04),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -941,33 +964,26 @@ class _HeaderStatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: highlight ? _ShopPickupColors.g1.withOpacity(0.1) : Colors.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: highlight
-              ? _ShopPickupColors.g1.withOpacity(0.25)
-              : const Color(0xFFEDEDED),
-        ),
       ),
       child: Row(
         children: [
           Container(
-            width: 30,
-            height: 30,
+            width: 28,
+            height: 28,
             alignment: Alignment.center,
-            decoration: BoxDecoration(
+            decoration: ShapeDecoration(
               color: highlight
-                  ? _ShopPickupColors.g2.withOpacity(0.14)
-                  : const Color(0xFFF2F2F2),
-              shape: BoxShape.circle,
+                  ? const Color(0xFF34C759)
+                  : const Color(0xFF3478F6),
+              shape: RoundedSuperellipseBorder(
+                borderRadius: BorderRadius.circular(7),
+              ),
             ),
-            child: Icon(
-              icon,
-              size: 15,
-              color: highlight ? _ShopPickupColors.g2 : const Color(0xFF8A8A8E),
-            ),
+            child: Icon(icon, size: 15, color: Colors.white),
           ),
           const SizedBox(width: 9),
           Expanded(
@@ -992,9 +1008,7 @@ class _HeaderStatTile extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w800,
-                    color: highlight
-                        ? _ShopPickupColors.g2
-                        : const Color(0xFF1C1C1E),
+                    color: const Color(0xFF1C1C1E),
                   ),
                 ),
               ],

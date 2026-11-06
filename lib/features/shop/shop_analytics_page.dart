@@ -324,11 +324,13 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
                     s.shopIssuedAmountLabel,
                     _fmt.format(data.soldAmount),
                     icon: Icons.shopping_bag_outlined,
+                    color: const Color(0xFF3478F6),
                   ),
                   Metric(
                     s.shopAnalyticsSoldSum,
                     '${_fmt.format(data.soldValue)} сум',
                     icon: Icons.payments_outlined,
+                    color: const Color(0xFF34C759),
                     accent: true,
                   ),
                 ],
@@ -341,11 +343,13 @@ class _ShopAnalyticsPageState extends State<ShopAnalyticsPage> {
                     s.shopAnalyticsStockQty,
                     _fmt.format(data.stockAmount),
                     icon: Icons.inventory_2_outlined,
+                    color: const Color(0xFFFF9500),
                   ),
                   Metric(
                     s.shopAnalyticsStockValue,
                     '${_fmt.format(data.stockValue)} сум',
                     icon: Icons.warehouse_outlined,
+                    color: const Color(0xFF5856D6),
                   ),
                 ],
               ),
@@ -512,7 +516,7 @@ class _RankRow extends StatelessWidget {
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-            color: AppColors.brandOrange.withOpacity(0.12),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(11),
           ),
           child: const Icon(
@@ -528,7 +532,7 @@ class _RankRow extends StatelessWidget {
           height: 38,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: medal.withOpacity(0.14),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(11),
           ),
           child: Text(

@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:local_auth/local_auth.dart';
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import '../../core/storage/app_storage.dart';
 import 'package:uztexpro_payment/features/home/menu_page.dart';
 import 'package:uztexpro_payment/main.dart';
@@ -48,6 +47,9 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   final AppStorage storage = AppStorage();
 
   bool isLoading = false;
+  // Biometric sign-in has no button to show progress on, so it keeps the
+  // full-screen brand overlay.
+  bool _biometricLoading = false;
   bool isPasswordVisible = false;
   bool _canCheckBiometrics = false;
   bool _useBiometrics = false;
@@ -194,14 +196,14 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
           password != null &&
           username.isNotEmpty &&
           password.isNotEmpty) {
-        setState(() => isLoading = true);
+        setState(() => _biometricLoading = true);
         final result = await attemptLogIn(username, password);
         if (!mounted) return;
         if (result.jwt != null) {
           await storage.write(key: "jwt", value: result.jwt!);
           await _completeLogin(result.jwt!);
         } else {
-          setState(() => isLoading = false);
+          setState(() => _biometricLoading = false);
           _notify(result.wrongCredentials ? s.loginError : s.connectionError);
         }
       } else {
@@ -240,6 +242,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     if (!mounted) return;
     setState(() {
       isLoading = false;
+      _biometricLoading = false;
       _showSuccessTransition = true;
     });
     await Future.delayed(const Duration(milliseconds: 900));
@@ -275,7 +278,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
         body: Stack(
           children: [
             _buildLoginView(s),
-            if (isLoading || _showSuccessTransition)
+            if (_biometricLoading || _showSuccessTransition)
               BrandTransitionScreen(
                 title: _showSuccessTransition
                     ? s.loginSuccessTitle
@@ -524,18 +527,16 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     );
   }
 
+  // Drawn by Flutter on purpose: the native iOS 26 AdaptiveButton is a
+  // platform view that keeps showing "Sign in" on top of everything (even the
+  // loading state and the brand overlay) while a request is running.
   Widget _buildLoginButton(S s) {
-    return SizedBox(
-      height: 54,
-      child: AdaptiveButton(
-        onPressed: _login,
-        label: s.signIn,
-        color: primaryColor,
-        textColor: Colors.white,
-        style: AdaptiveButtonStyle.filled,
-        size: AdaptiveButtonSize.large,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return _LoginButton(
+      label: s.signIn,
+      loadingLabel: s.pleaseWait,
+      loading: isLoading,
+      color: primaryColor,
+      onPressed: _login,
     );
   }
 
@@ -635,5 +636,89 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
       setState(() => isLoading = false);
       _notify(s.connectionError);
     }
+  }
+}
+
+class _LoginButton extends StatefulWidget {
+  const _LoginButton({
+    required this.label,
+    required this.loadingLabel,
+    required this.loading,
+    required this.color,
+    required this.onPressed,
+  });
+
+  final String label;
+  final String loadingLabel;
+  final bool loading;
+  final Color color;
+  final VoidCallback onPressed;
+
+  @override
+  State<_LoginButton> createState() => _LoginButtonState();
+}
+
+class _LoginButtonState extends State<_LoginButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final loading = widget.loading;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: loading ? null : (_) => setState(() => _pressed = true),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTap: loading ? null : widget.onPressed,
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1,
+        duration: const Duration(milliseconds: 100),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: 54,
+          decoration: BoxDecoration(
+            color: widget.color.withOpacity(loading || _pressed ? 0.75 : 1),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          alignment: Alignment.center,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: loading
+                ? Row(
+                    key: const ValueKey('loading'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        widget.loadingLabel,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  )
+                : Text(
+                    widget.label,
+                    key: const ValueKey('label'),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
   }
 }

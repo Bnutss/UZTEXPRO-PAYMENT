@@ -1359,6 +1359,77 @@ class S {
   });
 
   // AI Assistant
+  String get chatTitle => _t({'ru': 'Чаты', 'en': 'Chats', 'uz': 'Chatlar'});
+
+  String get contactsTitle =>
+      _t({'ru': 'Контакты', 'en': 'Contacts', 'uz': 'Kontaktlar'});
+
+  String get chatsEmpty =>
+      _t({'ru': 'Чатов пока нет', 'en': 'No chats yet', 'uz': 'Hozircha chatlar yo‘q'});
+
+  String get chatsSearchHint =>
+      _t({'ru': 'Поиск чатов', 'en': 'Search chats', 'uz': 'Chatlarni qidirish'});
+
+  String get contactsSearchHint => _t({
+    'ru': 'Поиск контактов',
+    'en': 'Search contacts',
+    'uz': 'Kontaktlarni qidirish',
+  });
+
+  String get chatLoadError => _t({
+    'ru': 'Не удалось загрузить. Потяните, чтобы повторить',
+    'en': 'Could not load. Pull to retry',
+    'uz': 'Yuklab bo‘lmadi. Qayta urinish uchun torting',
+  });
+
+  String get chatTyping => _t({'ru': 'печатает…', 'en': 'typing…', 'uz': 'yozmoqda…'});
+
+  String get chatConnecting =>
+      _t({'ru': 'Подключение…', 'en': 'Connecting…', 'uz': 'Ulanmoqda…'});
+
+  String get chatToday => _t({'ru': 'Сегодня', 'en': 'Today', 'uz': 'Bugun'});
+
+  String get chatInputHint =>
+      _t({'ru': 'Сообщение', 'en': 'Message', 'uz': 'Xabar'});
+
+  String get chatNoMessages => _t({
+    'ru': 'Сообщений пока нет.\nНапишите первым',
+    'en': 'No messages yet.\nWrite first',
+    'uz': 'Hozircha xabarlar yo‘q.\nBirinchi yozing',
+  });
+
+  String get chatNotSent => _t({
+    'ru': 'Не отправлено. Нажмите, чтобы повторить',
+    'en': 'Not sent. Tap to retry',
+    'uz': 'Yuborilmadi. Qayta urinish uchun bosing',
+  });
+
+  String get chatNoAccess => _t({
+    'ru': 'Нет доступа к чату',
+    'en': 'No access to the chat',
+    'uz': 'Chatga ruxsat yo‘q',
+  });
+
+  String get chatOpenError => _t({
+    'ru': 'Не удалось открыть чат',
+    'en': 'Could not open the chat',
+    'uz': 'Chatni ochib bo‘lmadi',
+  });
+
+  String get chatYesterday =>
+      _t({'ru': 'Вчера', 'en': 'Yesterday', 'uz': 'Kecha'});
+
+  String get chatYou => _t({'ru': 'Вы', 'en': 'You', 'uz': 'Siz'});
+
+  String get chatNothingFound =>
+      _t({'ru': 'Ничего не найдено', 'en': 'Nothing found', 'uz': 'Hech narsa topilmadi'});
+
+  String get contactsEmpty => _t({
+    'ru': 'Контактов пока нет',
+    'en': 'No contacts yet',
+    'uz': 'Hozircha kontaktlar yo‘q',
+  });
+
   String get aiAssistantTitle =>
       _t({'ru': 'ИИ-ассистент', 'en': 'AI Assistant', 'uz': 'AI yordamchi'});
 

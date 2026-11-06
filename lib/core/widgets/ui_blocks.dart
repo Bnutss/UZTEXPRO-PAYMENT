@@ -82,7 +82,17 @@ class Metric {
   final IconData? icon;
   final bool accent;
 
-  const Metric(this.label, this.value, {this.icon, this.accent = false});
+  /// When set, the icon is drawn as a white glyph on a rounded square of this
+  /// colour (Settings / Telegram style) instead of a bare muted icon.
+  final Color? color;
+
+  const Metric(
+    this.label,
+    this.value, {
+    this.icon,
+    this.accent = false,
+    this.color,
+  });
 }
 
 /// A row of metrics separated by thin vertical dividers, e.g.
@@ -130,7 +140,21 @@ class _MetricCell extends StatelessWidget {
       children: [
         Row(
           children: [
-            if (metric.icon != null) ...[
+            if (metric.icon != null && metric.color != null) ...[
+              Container(
+                width: 20,
+                height: 20,
+                alignment: Alignment.center,
+                decoration: ShapeDecoration(
+                  color: metric.color,
+                  shape: RoundedSuperellipseBorder(
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                ),
+                child: Icon(metric.icon, size: 12, color: Colors.white),
+              ),
+              const SizedBox(width: 6),
+            ] else if (metric.icon != null) ...[
               Icon(
                 metric.icon,
                 size: 13,

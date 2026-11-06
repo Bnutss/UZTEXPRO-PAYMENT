@@ -13,7 +13,11 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  adaptive_platform_ui: ^1.0.2
+  # Vendored copy of adaptive_platform_ui 1.0.2: only the native tab bar is
+  # patched (symbol effect on the tapped icon), see
+  # packages/adaptive_platform_ui/.../iOS26TabBarPlatformView.swift.
+  adaptive_platform_ui:
+    path: packages/adaptive_platform_ui
   cupertino_icons: ^1.0.9
   flutter_secure_storage: ^10.3.1
   http: ^1.6.0
@@ -22,12 +26,16 @@ dependencies:
   shared_preferences: ^2.4.0
   url_launcher: ^6.3.2
   shimmer: ^3.0.0
+  # Push notifications about chat messages (iOS via APNs, Android without Google
+  # Play Services). The secret key lives on the backend only.
+  pushy_flutter: 2.0.49
   intl: ^0.20.2
   package_info_plus: ^8.1.0
   cached_network_image: ^3.4.1
   open_filex: ^4.7.0
   path_provider: ^2.1.6
   path_drawing: ^1.0.1
+  audioplayers: ^6.8.1
 
 dev_dependencies:
   flutter_test:
@@ -49,4 +57,7 @@ flutter:
     - assets/icon/logo.png
     - assets/models/logo3d.glb
     - assets/icons/face_id.svg
+    - assets/icons/tg_chats.svg
+    - assets/images/background.jpg
+    - assets/sound/
   uses-material-design: true

@@ -4,8 +4,12 @@ import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/widgets/confirm_dialog.dart';
 import '../../core/widgets/fade_route.dart';
+import '../chat/chat_hub.dart';
+import '../chat/chat_page.dart';
+import '../chat/chat_push.dart';
 import '../../core/widgets/floating_notch_bar.dart';
 import '../../core/widgets/logo_3d.dart';
 import '../../core/widgets/routeless_alert.dart';
@@ -95,9 +99,41 @@ class _MenuPageState extends State<MenuPage>
     'Content-Type': 'application/json',
   };
 
+  /// The chat of this session (one connection + the unread count for the badge
+  /// on the chat button); only for members of `mobile_chat`.
+  ChatHub? _chat;
+  ChatPushService? _push;
+  int _chatUnread = 0;
+
+  void _onChatUnread() {
+    final hub = _chat;
+    if (hub == null || !mounted) return;
+    if (hub.unread.value != _chatUnread) {
+      setState(() => _chatUnread = hub.unread.value);
+      // Nothing unread any more: no number on the app icon either.
+      if (_chatUnread == 0) _push?.clearBadge();
+    }
+  }
+
+  /// A notification was tapped: open that conversation (not while the chat
+  /// window is already on screen).
+  void _onPushOpen() {
+    final target = _push?.openRequest.value;
+    final hub = _chat;
+    if (target == null || hub == null || !mounted || hub.isChatOpen) return;
+    _openChat(openThread: target);
+  }
+
   @override
   void initState() {
     super.initState();
+    if (_canUseChat) {
+      _chat = ChatHub.forToken(widget.jwtToken)..start();
+      _chat!.unread.addListener(_onChatUnread);
+      _push = ChatPushService(api: _chat!.api, client: PushyClient());
+      _push!.openRequest.addListener(_onPushOpen);
+      _push!.start();
+    }
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
@@ -271,6 +307,10 @@ class _MenuPageState extends State<MenuPage>
 
   @override
   void dispose() {
+    _push?.openRequest.removeListener(_onPushOpen);
+    _push?.dispose();
+    _chat?.unread.removeListener(_onChatUnread);
+    _chat?.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _animationController.dispose();
     localeNotifier.removeListener(_onLocaleChanged);
@@ -327,6 +367,13 @@ class _MenuPageState extends State<MenuPage>
   bool get _canSeeAttendance =>
       _extractGroups(_parsedToken()).contains(_attendanceGroup);
 
+  /// Группа `mobile_chat` на бэкенде (app_update, чат): только её участники
+  /// видят кнопку чата и попадают в контакты. Строго по группе, суперпользователи
+  /// без неё тоже не видят чат.
+  static const _chatGroup = 'mobile_chat';
+
+  bool get _canUseChat => _extractGroups(_parsedToken()).contains(_chatGroup);
+
   void _openAttendance() {
     HapticFeedback.selectionClick();
     Navigator.of(context).push(
@@ -372,6 +419,9 @@ class _MenuPageState extends State<MenuPage>
 
   Future<void> _logoutNow() async {
     final nav = Navigator.of(context);
+    // The next person on this phone must not get this one's chat pushes. The
+    // request leaves at once; the logout does not wait for the answer.
+    unawaited(_push?.stop() ?? Future<void>.value());
     try {
       await storage.delete(key: "jwt");
     } catch (_) {}
@@ -661,6 +711,24 @@ class _MenuPageState extends State<MenuPage>
     );
   }
 
+  /// Buttons in the header capsule: timesheet and logout always, AI and chat
+  /// by access.
+  int get _headerButtonCount =>
+      2 + (_hasFullAccess ? 1 : 0) + (_canUseChat ? 1 : 0);
+
+  /// Opens the messenger window (Contacts / Chats tabs).
+  void _openChat({ChatPushTarget? openThread}) {
+    final hub = _chat;
+    if (hub == null) return;
+    HapticFeedback.lightImpact();
+    Navigator.push(
+      context,
+      FadeRoute(
+        builder: (_) => ChatPage(hub: hub, openThread: openThread),
+      ),
+    );
+  }
+
   /// iOS 26+: native Liquid Glass toolbar from adaptive_platform_ui. The three
   /// actions share one group, so the system draws them in a single glass
   /// capsule (like the iOS Photos bar). AI is shown only with full access.
@@ -678,7 +746,8 @@ class _MenuPageState extends State<MenuPage>
           child: Padding(
             padding: EdgeInsets.only(
               left: 62,
-              right: _hasFullAccess ? 170 : 125,
+              // 45 per button + 35, as the capsule is laid out by the system.
+              right: _headerButtonCount * 45.0 + 35,
             ),
             child: Align(
               alignment: Alignment.centerLeft,
@@ -700,6 +769,15 @@ class _MenuPageState extends State<MenuPage>
             icon: CupertinoIcons.sparkles,
             label: s.aiAssistantTitle,
             onPressed: _openAiAssistant,
+          ),
+        if (_canUseChat)
+          AdaptiveAppBarAction(
+            iosSymbol: 'TgChats',
+            icon: CupertinoIcons.chat_bubble_2_fill,
+            label: s.chatTitle,
+            tintColor: const Color(0xFF007AFF),
+            badge: _chatUnread,
+            onPressed: _openChat,
           ),
         AdaptiveAppBarAction(
           iosSymbol: 'rectangle.portrait.and.arrow.right',
@@ -727,6 +805,15 @@ class _MenuPageState extends State<MenuPage>
           icon: Icons.auto_awesome_rounded,
           label: s.aiAssistantTitle,
           onTap: _openAiAssistant,
+        ),
+      if (_canUseChat)
+        _CapsuleAction(
+          icon: Icons.forum_rounded,
+          svgAsset: 'assets/icons/tg_chats.svg',
+          color: const Color(0xFF007AFF),
+          label: s.chatTitle,
+          badge: _chatUnread,
+          onTap: _openChat,
         ),
       _CapsuleAction(
         icon: Icons.logout_rounded,
@@ -2057,9 +2144,17 @@ class _CapsuleAction {
     required this.label,
     required this.onTap,
     this.color = const Color(0xFF1C1C1E),
+    this.svgAsset,
+    this.badge = 0,
   });
 
   final IconData icon;
+
+  /// When set, drawn instead of [icon] (a custom vector, tinted with [color]).
+  final String? svgAsset;
+
+  /// Unread count in a red badge on the button; 0 shows none.
+  final int badge;
   final String label;
   final VoidCallback onTap;
   final Color color;
@@ -2111,7 +2206,44 @@ class _HeaderGlassCapsule extends StatelessWidget {
           child: SizedBox(
             width: _buttonWidth,
             height: _height,
-            child: Icon(a.icon, size: 22, color: a.color),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                a.svgAsset != null
+                    ? SvgPicture.asset(
+                        a.svgAsset!,
+                        width: 26,
+                        height: 26,
+                        colorFilter: ColorFilter.mode(a.color, BlendMode.srcIn),
+                      )
+                    : Icon(a.icon, size: 22, color: a.color),
+                if (a.badge > 0)
+                  Positioned(
+                    top: 4,
+                    right: 0,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 18),
+                      height: 18,
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF3B30),
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Text(
+                        a.badge > 99 ? '99+' : '${a.badge}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

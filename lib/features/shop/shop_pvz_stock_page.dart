@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -14,6 +15,7 @@ import '../../core/widgets/native_segments.dart';
 import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/ui_blocks.dart';
 import '../auth/widgets/logo_stroke_loader.dart';
+import 'pvz_native_sheet.dart';
 import 'shop_api.dart';
 
 enum _RangePreset { all, today, week, month, custom }
@@ -297,10 +299,40 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage>
   /// Orders open in place, several at once.
   final Set<int> _expandedOrders = {};
 
-  void _toggleOrder(int id) {
+  Future<void> _toggleOrder(PvzOrder order) async {
     HapticFeedback.selectionClick();
+    final s = S.of(context);
+    final days = _daysSince(order.confirmedAt);
+    final status = _waitStatus(s, days);
+    final shown = await showNativeSheet({
+      'name': s.shopPickupOrderTitle(order.id),
+      'subtitle': order.buyerName,
+      'heroSf': 'shippingbox.fill',
+      'status': days == null ? '—' : '$days ${s.shopStockDaysLabel}',
+      'statusColor': status.fg.toARGB32(),
+      'sections': [
+        {
+          'rows': [
+            pvzRow('person.badge.key.fill', kSheetIndigo, s.shopPickupSeller,
+                order.sellerName),
+            pvzRow('building.2', kSheetBlue, s.shopIssuedShopFilterTitle,
+                order.shopName),
+            pvzRow(
+              'clock',
+              kSheetOrange,
+              s.shopStockWaitingSince,
+              order.confirmedAt != null
+                  ? _stockFormatDateTime(order.confirmedAt!)
+                  : '—',
+            ),
+          ],
+        },
+        ...pvzItemSections(s, order, _numberFormat),
+      ],
+    });
+    if (shown || !mounted) return;
     setState(() {
-      if (!_expandedOrders.remove(id)) _expandedOrders.add(id);
+      if (!_expandedOrders.remove(order.id)) _expandedOrders.add(order.id);
     });
   }
 
@@ -489,7 +521,7 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage>
                             expanded: _expandedOrders.contains(
                               sortedOrders[i].id,
                             ),
-                            onTap: () => _toggleOrder(sortedOrders[i].id),
+                            onTap: () => _toggleOrder(sortedOrders[i]),
                           ),
                         ],
                       ],
@@ -539,17 +571,18 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage>
                 icon: Icons.receipt_long_rounded,
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: _SummaryCard(
                 label: s.shopStockQtyLabel,
                 value: _numberFormat.format(qty),
                 icon: Icons.inventory_2_rounded,
+                color: const Color(0xFFFF9500),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
@@ -557,16 +590,18 @@ class _ShopPvzStockPageState extends State<ShopPvzStockPage>
                 label: s.shopStockOverdueLabel,
                 value: '$overdue',
                 icon: Icons.warning_amber_rounded,
+                color: const Color(0xFF8E8E93),
                 highlight: overdue > 0,
-                highlightColor: const Color(0xFFDC2626),
+                highlightColor: const Color(0xFFFF3B30),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: _SummaryCard(
                 label: s.shopStockBuyersLabel,
                 value: '$buyers',
                 icon: Icons.people_alt_rounded,
+                color: const Color(0xFF34C759),
               ),
             ),
           ],
@@ -721,7 +756,9 @@ class _StockOrderTile extends StatelessWidget {
                     duration: const Duration(milliseconds: 220),
                     curve: Curves.easeOutCubic,
                     child: Icon(
-                      Icons.keyboard_arrow_down_rounded,
+                      Platform.isIOS
+                          ? Icons.chevron_right_rounded
+                          : Icons.keyboard_arrow_down_rounded,
                       size: 22,
                       color: onSurface.withValues(alpha: 0.4),
                     ),
@@ -797,7 +834,7 @@ class _StockOrderDetails extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(_kTextIndent, 0, 16, 12),
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
       decoration: BoxDecoration(
-        color: onSurface.withValues(alpha: 0.04),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -912,6 +949,7 @@ class _SummaryCard extends StatelessWidget {
     required this.icon,
     this.highlight = false,
     this.highlightColor,
+    this.color = const Color(0xFF3478F6),
   });
 
   final String label;
@@ -920,56 +958,62 @@ class _SummaryCard extends StatelessWidget {
   final bool highlight;
   final Color? highlightColor;
 
+  /// Colour of the icon square (same palette as the settings screen).
+  final Color color;
+
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final hc = highlightColor ?? _ShopStockColors.g2;
+    final tile = highlight ? (highlightColor ?? color) : color;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: highlight
-            ? hc.withOpacity(0.1)
-            : Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: highlight ? hc.withOpacity(0.35) : onSurface.withOpacity(0.12),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
           Container(
-            width: 30,
-            height: 30,
+            width: 28,
+            height: 28,
             alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: hc.withOpacity(0.12),
-              shape: BoxShape.circle,
+            decoration: ShapeDecoration(
+              color: tile,
+              shape: RoundedSuperellipseBorder(
+                borderRadius: BorderRadius.circular(7),
+              ),
             ),
-            child: Icon(icon, size: 16, color: hc),
+            child: Icon(icon, size: 15, color: Colors.white),
           ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: highlight ? hc : onSurface,
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.15,
+                    fontWeight: FontWeight.w800,
+                    color: highlight ? (highlightColor ?? color) : onSurface,
+                  ),
+                ),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    height: 1.2,
+                    color: onSurface.withOpacity(0.55),
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(fontSize: 11, color: onSurface.withOpacity(0.55)),
           ),
         ],
       ),

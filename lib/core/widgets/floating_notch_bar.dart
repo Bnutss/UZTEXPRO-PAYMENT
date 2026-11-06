@@ -8,7 +8,10 @@ class NotchBarItem {
   final IconData activeIcon;
   final String label;
 
-  const NotchBarItem(this.icon, this.activeIcon, this.label);
+  /// Unread count in a red badge on the item; 0 shows none.
+  final int badge;
+
+  const NotchBarItem(this.icon, this.activeIcon, this.label, {this.badge = 0});
 }
 
 /// Нижнее меню: плавающая панель с вырезом, в котором «сидит» круглая кнопка
@@ -178,10 +181,49 @@ class FloatingNotchBar extends StatelessWidget {
                         ),
                       ),
                     ),
+                  for (final (i, item) in items.indexed)
+                    if (item.badge > 0)
+                      Positioned(
+                        // Over the icon: on the lifted circle when selected.
+                        left: centerOf(i) + (i == selected ? 12 : 8),
+                        top: i == selected ? 2 : _lift + 8,
+                        child: IgnorePointer(child: _CountBadge(item.badge)),
+                      ),
                 ],
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+/// Small red unread counter (white ring, "99+" above 99).
+class _CountBadge extends StatelessWidget {
+  const _CountBadge(this.count);
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 18),
+      height: 18,
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF3B30),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: Colors.white, width: 1.5),
+      ),
+      child: Text(
+        count > 99 ? '99+' : '$count',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          height: 1,
         ),
       ),
     );

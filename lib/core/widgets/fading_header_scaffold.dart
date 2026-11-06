@@ -43,6 +43,8 @@ class FadingHeaderScaffold extends StatelessWidget {
     this.bottom,
     this.bottomHeight = 0,
     this.bottomNavigationBar,
+    this.center,
+    this.fade = true,
   });
 
   final String title;
@@ -52,6 +54,14 @@ class FadingHeaderScaffold extends StatelessWidget {
 
   /// Colour of the page and of the header fade (must match what is behind).
   final Color background;
+
+  /// Replaces the title (and [subtitle]) with a widget centered between the
+  /// back button and [trailing]: the conversation's name capsule.
+  final Widget? center;
+
+  /// The soft plate in the page colour behind the header. Off for a page with
+  /// a picture behind it (the chat wallpaper), where it would show as a band.
+  final bool fade;
 
   /// Extra widgets in the title row, left of the search button.
   final List<Widget> trailing;
@@ -102,42 +112,48 @@ class FadingHeaderScaffold extends StatelessWidget {
           child: AdaptiveBackButton(),
         ),
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(left: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF1C1C1E),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
+          child: center != null
+              // A little air between the capsule and the buttons beside it.
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Center(child: center),
+                )
+              : Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF1C1C1E),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 180),
+                        alignment: Alignment.topLeft,
+                        child: subtitle == null
+                            ? const SizedBox(width: double.infinity)
+                            : Text(
+                                subtitle!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFFE53935),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                  height: 1.2,
+                                ),
+                              ),
+                      ),
+                    ],
                   ),
                 ),
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 180),
-                  alignment: Alignment.topLeft,
-                  child: subtitle == null
-                      ? const SizedBox(width: double.infinity)
-                      : Text(
-                          subtitle!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFFE53935),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                            height: 1.2,
-                          ),
-                        ),
-                ),
-              ],
-            ),
-          ),
         ),
         ...trailing,
         // Filter and search share one glass capsule.
@@ -192,34 +208,35 @@ class FadingHeaderScaffold extends StatelessWidget {
             ),
             // Soft fade only behind the status bar + title row (not behind
             // [bottom]): solid at the top, gone before the filters begin.
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: statusBar + kFadingHeaderRowHeight + _fade,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        background,
-                        background,
-                        background.withValues(alpha: 0),
-                      ],
-                      stops: [
-                        0,
-                        (statusBar + kFadingHeaderRowHeight) /
-                            (statusBar + kFadingHeaderRowHeight + _fade) *
-                            0.85,
-                        1,
-                      ],
+            if (fade)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: statusBar + kFadingHeaderRowHeight + _fade,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          background,
+                          background,
+                          background.withValues(alpha: 0),
+                        ],
+                        stops: [
+                          0,
+                          (statusBar + kFadingHeaderRowHeight) /
+                              (statusBar + kFadingHeaderRowHeight + _fade) *
+                              0.85,
+                          1,
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
             Positioned(
               top: statusBar,
               left: 0,

@@ -51,6 +51,12 @@ class _ProMobile extends State<PROApp> {
           themeMode: ThemeMode.light,
           materialLightTheme: _lightMaterialTheme(),
           cupertinoLightTheme: _lightCupertinoTheme(),
+          // On iOS AdaptiveApp is a CupertinoApp, so materialLightTheme is
+          // never installed and Theme.of(context) falls back to a default
+          // Material theme tinted by the orange accent (surface #FFF8F5, not
+          // white). Install our own Material theme above the navigator.
+          builder: (context, child) =>
+              Theme(data: _lightMaterialTheme(), child: child!),
           locale: locale,
           // Without these, Material widgets (date pickers, etc.) fall back
           // to English regardless of `locale` above — the app can only

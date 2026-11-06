@@ -42,6 +42,8 @@ android {
 
     buildTypes {
         release {
+            // Keep rules of the push SDK (Pushy); harmless when R8 is off.
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             // Falls back to debug signing only if key.properties is missing
             // (e.g. a fresh checkout before the release keystore is set up)
             // so local `flutter build apk` still works out of the box.

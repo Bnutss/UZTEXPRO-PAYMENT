@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
@@ -17,6 +18,7 @@ import '../../core/widgets/app_refresh.dart';
 import '../../core/widgets/app_segmented_control.dart';
 import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/ui_blocks.dart';
+import '../settings/settings_rows.dart' show SettingsColors;
 import '../auth/widgets/logo_stroke_loader.dart';
 
 const _kInk = Color(0xFF1C1C1E);
@@ -247,8 +249,47 @@ class _AttendancePageState extends State<AttendancePage> {
     }
   }
 
-  void _openDetail(_AttendanceEntry entry) {
+  static const _nativeSheet = MethodChannel('uztexpro/native_sheet');
+
+  Future<void> _openDetail(_AttendanceEntry entry) async {
     HapticFeedback.selectionClick();
+    final s = S.of(context);
+    if (Platform.isIOS) {
+      // Real iOS sheet (UISheetPresentationController) with a system close
+      // button; the header's native glass buttons stay correct underneath.
+      try {
+        await _nativeSheet.invokeMethod<void>('showSheet', {
+          'name': entry.name,
+          'subtitle': [entry.position, entry.department]
+              .where((t) => t.isNotEmpty)
+              .join(' · '),
+          'isIn': entry.isIn,
+          'status': entry.isIn ? s.dashboardInTerritory : s.attendanceStatusOut,
+          'phone': entry.phone,
+          'photoUrl': entry.photoUrl,
+          'headers': _photoHeaders,
+          'sections': [
+            {
+              'rows': [
+                for (final t in _employeeTiles(s, entry))
+                  {
+                    'sf': t.sf,
+                    'label': t.label,
+                    'value': t.value,
+                    'color': _sheetIconColor(t.sf).toARGB32(),
+                  },
+              ],
+            },
+          ],
+        });
+        return;
+      } on MissingPluginException {
+        // Fall through to the Flutter sheet.
+      } on PlatformException {
+        // Fall through to the Flutter sheet.
+      }
+    }
+    if (!mounted) return;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -799,40 +840,7 @@ class _EmployeeSheet extends StatelessWidget {
       entry.position,
       entry.department,
     ].where((t) => t.isNotEmpty).join(' · ');
-    final hired = entry.employmentDate == null
-        ? null
-        : DateFormat('dd.MM.yyyy').format(entry.employmentDate!);
-    final lastMark = [
-      entry.time,
-      entry.place,
-    ].where((t) => t.isNotEmpty).join(' · ');
-
-    final tiles = <_InfoTile>[
-      if (entry.factory.isNotEmpty)
-        _InfoTile(
-          Icons.factory_rounded,
-          s.attendanceFilterFactory,
-          entry.factory,
-        ),
-      if (entry.department.isNotEmpty)
-        _InfoTile(
-          Icons.account_tree_rounded,
-          s.attendanceDepartment,
-          entry.department,
-        ),
-      if (entry.reportCard != null)
-        _InfoTile(Icons.tag_rounded, s.attendanceTabel, '${entry.reportCard}'),
-      if (hired != null)
-        _InfoTile(Icons.event_available_rounded, s.attendanceHired, hired),
-      if (entry.firstIn != null)
-        _InfoTile(Icons.login_rounded, s.attendanceFirstIn, entry.firstIn!),
-      if (lastMark.isNotEmpty)
-        _InfoTile(
-          entry.isIn ? Icons.my_location_rounded : Icons.logout_rounded,
-          s.attendanceLastMark,
-          lastMark,
-        ),
-    ];
+    final tiles = _employeeTiles(s, entry);
 
     final maxHeight = MediaQuery.of(context).size.height * 0.92;
     return Container(
@@ -974,7 +982,76 @@ class _InfoTile {
   final IconData icon;
   final String label;
   final String value;
-  const _InfoTile(this.icon, this.label, this.value);
+
+  /// SF Symbol name used by the native iOS sheet.
+  final String sf;
+  const _InfoTile(this.icon, this.label, this.value, [this.sf = 'info.circle']);
+}
+
+/// Tile colours of the native sheet, same palette as the settings screen.
+Color _sheetIconColor(String sf) => switch (sf) {
+  'building.2' => SettingsColors.blue,
+  'person.3' => SettingsColors.indigo,
+  'number' => SettingsColors.gray,
+  'calendar' => SettingsColors.orange,
+  'arrow.right.to.line' => SettingsColors.green,
+  'location' => SettingsColors.green,
+  _ => SettingsColors.gray,
+};
+
+/// Info rows of the employee card, shared by the Flutter and the native sheet.
+List<_InfoTile> _employeeTiles(S s, _AttendanceEntry entry) {
+  final hired = entry.employmentDate == null
+      ? null
+      : DateFormat('dd.MM.yyyy').format(entry.employmentDate!);
+  final lastMark = [
+    entry.time,
+    entry.place,
+  ].where((t) => t.isNotEmpty).join(' · ');
+  return [
+    if (entry.factory.isNotEmpty)
+      _InfoTile(
+        Icons.factory_rounded,
+        s.attendanceFilterFactory,
+        entry.factory,
+        'building.2',
+      ),
+    if (entry.department.isNotEmpty)
+      _InfoTile(
+        Icons.account_tree_rounded,
+        s.attendanceDepartment,
+        entry.department,
+        'person.3',
+      ),
+    if (entry.reportCard != null)
+      _InfoTile(
+        Icons.tag_rounded,
+        s.attendanceTabel,
+        '${entry.reportCard}',
+        'number',
+      ),
+    if (hired != null)
+      _InfoTile(
+        Icons.event_available_rounded,
+        s.attendanceHired,
+        hired,
+        'calendar',
+      ),
+    if (entry.firstIn != null)
+      _InfoTile(
+        Icons.login_rounded,
+        s.attendanceFirstIn,
+        entry.firstIn!,
+        'arrow.right.to.line',
+      ),
+    if (lastMark.isNotEmpty)
+      _InfoTile(
+        entry.isIn ? Icons.my_location_rounded : Icons.logout_rounded,
+        s.attendanceLastMark,
+        lastMark,
+        entry.isIn ? 'location' : 'arrow.left.to.line',
+      ),
+  ];
 }
 
 /// Two-column grid of compact info cards (keeps the sheet short).
