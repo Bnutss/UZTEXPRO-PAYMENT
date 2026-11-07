@@ -1,5 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 // The backend returns a relative media path (or a "nofoto" placeholder when
 // no photo was uploaded) — resolve it to an absolute URL, or null when
@@ -27,7 +30,19 @@ class ProductPhotoThumbnail extends StatelessWidget {
     this.showRing = false,
   });
 
-  void _openViewer(BuildContext context) {
+  Future<void> _openViewer(BuildContext context) async {
+    if (Platform.isIOS) {
+      try {
+        await const MethodChannel('uztexpro/native_sheet')
+            .invokeMethod('photoViewer', {'url': imageUrl});
+        return;
+      } on MissingPluginException {
+        // fall back to the Flutter viewer
+      } on PlatformException {
+        // fall back to the Flutter viewer
+      }
+      if (!context.mounted) return;
+    }
     Navigator.of(context).push(
       PageRouteBuilder(
         opaque: false,

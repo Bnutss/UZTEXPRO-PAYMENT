@@ -1641,7 +1641,139 @@ class S {
   });
 
   String get chatCall => _t({'ru': 'звонок', 'en': 'call', 'uz': 'qo‘ng‘iroq'});
-  String get chatCopy => _t({'ru': 'копировать', 'en': 'copy', 'uz': 'nusxa'});
+  String get chatVoiceMessage => _t({
+    'ru': 'Голосовое сообщение',
+    'en': 'Voice message',
+    'uz': 'Ovozli xabar',
+  });
+  String get chatVoiceFailed => _t({
+    'ru': 'Не удалось воспроизвести голосовое',
+    'en': 'Could not play the voice message',
+    'uz': 'Ovozli xabarni ijro etib bo‘lmadi',
+  });
+  String get chatGoToMessage => _t({
+    'ru': 'Перейти к сообщению',
+    'en': 'Go to message',
+    'uz': 'Xabarga o‘tish',
+  });
+  String get chatNoVoice => _t({
+    'ru': 'Голосовых пока нет',
+    'en': 'No voice messages yet',
+    'uz': 'Ovozli xabarlar yo‘q',
+  });
+  String get chatShowMore =>
+      _t({'ru': 'Показать ещё', 'en': 'Show more', 'uz': 'Yana ko‘rsatish'});
+  String get chatAttachGallery => _t({
+    'ru': 'Фото или видео',
+    'en': 'Photo or video',
+    'uz': 'Rasm yoki video',
+  });
+  String get chatAttachCamera =>
+      _t({'ru': 'Сделать фото', 'en': 'Take a photo', 'uz': 'Rasmga olish'});
+  String get chatAttachVideoCamera =>
+      _t({'ru': 'Снять видео', 'en': 'Record a video', 'uz': 'Video olish'});
+  String get chatAttachFile => _t({'ru': 'Файл', 'en': 'File', 'uz': 'Fayl'});
+  String get chatPhoto => _t({'ru': 'Фото', 'en': 'Photo', 'uz': 'Rasm'});
+  String get chatVideo => _t({'ru': 'Видео', 'en': 'Video', 'uz': 'Video'});
+  String get chatPreparing =>
+      _t({'ru': 'Подготовка…', 'en': 'Preparing…', 'uz': 'Tayyorlanmoqda…'});
+  String get chatFileGone => _t({
+    'ru': 'Файл удалён с сервера',
+    'en': 'File was removed from the server',
+    'uz': 'Fayl serverdan o‘chirilgan',
+  });
+  String get chatDownloadFailed => _t({
+    'ru': 'Не удалось скачать. Нажмите, чтобы повторить',
+    'en': 'Download failed. Tap to retry',
+    'uz': 'Yuklab bo‘lmadi. Qayta urinish uchun bosing',
+  });
+  String get chatAttachTooLarge => _t({
+    'ru':
+        'Файл слишком большой: фото до 10 МБ, видео до 50 МБ, документы до 20 МБ',
+    'en': 'File too large: photos up to 10 MB, videos 50 MB, documents 20 MB',
+    'uz': 'Fayl juda katta: rasm 10 MB, video 50 MB, hujjat 20 MB gacha',
+  });
+  String get chatAttachBadType => _t({
+    'ru': 'Этот тип файла не поддерживается',
+    'en': 'This file type is not supported',
+    'uz': 'Bu fayl turi qo‘llab-quvvatlanmaydi',
+  });
+  String get chatAttachFailed => _t({
+    'ru': 'Не удалось подготовить файл',
+    'en': 'Could not prepare the file',
+    'uz': 'Faylni tayyorlab bo‘lmadi',
+  });
+  String get chatRecents =>
+      _t({'ru': 'Недавние', 'en': 'Recents', 'uz': 'So‘nggilar'});
+  String get chatGalleryTab =>
+      _t({'ru': 'Галерея', 'en': 'Gallery', 'uz': 'Galereya'});
+  String get chatCameraTab =>
+      _t({'ru': 'Камера', 'en': 'Camera', 'uz': 'Kamera'});
+  String get chatSendMedia =>
+      _t({'ru': 'Отправить', 'en': 'Send', 'uz': 'Yuborish'});
+  String get chatPhotosDenied => _t({
+    'ru': 'Нет доступа к фото. Разрешите доступ в настройках',
+    'en': 'No access to photos. Allow it in Settings',
+    'uz': 'Rasmlarga ruxsat yo‘q. Sozlamalarda ruxsat bering',
+  });
+  String get chatOpenSettings =>
+      _t({'ru': 'Настройки', 'en': 'Settings', 'uz': 'Sozlamalar'});
+  String get chatCaptionHint => _t({
+    'ru': 'Добавить подпись…',
+    'en': 'Add a caption…',
+    'uz': 'Izoh qo‘shish…',
+  });
+  String get chatNoMedia => _t({
+    'ru': 'Фото и видео пока нет',
+    'en': 'No photos or videos yet',
+    'uz': 'Rasm va videolar yo‘q',
+  });
+  String get chatStorageTitle =>
+      _t({'ru': 'Память чата', 'en': 'Chat storage', 'uz': 'Chat xotirasi'});
+  String chatStorageSubtitle(String size) => _t({
+    'ru': 'Фото, видео и файлы: $size',
+    'en': 'Photos, videos and files: $size',
+    'uz': 'Rasm, video va fayllar: $size',
+  });
+  String get chatStorageClearTitle => _t({
+    'ru': 'Очистить память чата?',
+    'en': 'Clear chat storage?',
+    'uz': 'Chat xotirasi tozalansinmi?',
+  });
+  String get chatStorageClearMessage => _t({
+    'ru':
+        'Фото, видео и файлы чата будут удалены с телефона. Если сервер уже удалил оригинал, скачать его снова не получится.',
+    'en':
+        'Photos, videos and files of the chat will be deleted from this phone. If the server has already removed an original, it cannot be downloaded again.',
+    'uz':
+        'Chatdagi rasm, video va fayllar telefondan o‘chiriladi. Server asl nusxani allaqachon o‘chirgan bo‘lsa, uni qayta yuklab bo‘lmaydi.',
+  });
+  String get chatStorageClear =>
+      _t({'ru': 'Очистить', 'en': 'Clear', 'uz': 'Tozalash'});
+  String get chatStorageCleared => _t({
+    'ru': 'Память очищена',
+    'en': 'Storage cleared',
+    'uz': 'Xotira tozalandi',
+  });
+  String get chatSlideToCancel => _t({
+    'ru': 'Влево — отмена',
+    'en': 'Slide to cancel',
+    'uz': 'Bekor qilish — chapga',
+  });
+  String get chatMicDenied => _t({
+    'ru': 'Нет доступа к микрофону. Разрешите его в настройках',
+    'en': 'No microphone access. Allow it in Settings',
+    'uz': 'Mikrofonga ruxsat yo‘q. Sozlamalarda ruxsat bering',
+  });
+  String get chatHoldToRecord => _t({
+    'ru': 'Удерживайте, чтобы записать голосовое',
+    'en': 'Hold to record a voice message',
+    'uz': 'Ovoz yozish uchun bosib turing',
+  });
+  String get chatWrite =>
+      _t({'ru': 'написать', 'en': 'message', 'uz': 'yozish'});
+  String get chatCancel =>
+      _t({'ru': 'Отмена', 'en': 'Cancel', 'uz': 'Bekor qilish'});
   String get chatCopied => _t({
     'ru': 'Номер скопирован',
     'en': 'Number copied',

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uztexpro_payment/core/localization/locale_notifier.dart';
+import 'package:uztexpro_payment/features/chat/chat_media_widgets.dart';
+import 'package:uztexpro_payment/features/chat/chat_models.dart';
 import 'package:uztexpro_payment/features/chat/chat_sounds.dart';
 import 'package:uztexpro_payment/features/chat/chat_thread_page.dart';
 import 'package:uztexpro_payment/features/chat/chat_widgets.dart'
@@ -44,7 +46,51 @@ Future<void> open(
   await settle(t);
 }
 
+ChatMessage _photo(int id, int sender, String album, DateTime when) =>
+    ChatMessage(
+      id: id,
+      conversation: convId,
+      sender: sender,
+      text: '',
+      clientId: 'c$id',
+      createdAt: when,
+      read: false,
+      kind: 'image',
+      albumId: album,
+      media: const ChatMedia(name: 'a.jpg', width: 800, height: 600),
+    );
+
 void main() {
+  testWidgets('photos sent together are one album bubble', (t) async {
+    final now = DateTime.now();
+    final rest = FakeRest()
+      ..store.addAll([
+        _photo(1, peerId, 'alb', now.subtract(const Duration(minutes: 3))),
+        _photo(2, peerId, 'alb', now.subtract(const Duration(minutes: 3))),
+        _photo(3, peerId, 'alb', now.subtract(const Duration(minutes: 3))),
+        _photo(4, peerId, '', now.subtract(const Duration(minutes: 1))),
+      ]);
+    await open(t, rest, FakeLink());
+    // three photos with one album id: one album; the single photo is apart
+    expect(find.byType(AlbumBody), findsOneWidget);
+  });
+
+  test('album layout: every tile fits, and a touch finds its tile', () {
+    for (var n = 2; n <= 10; n++) {
+      final rects = AlbumLayout.rects(280, n);
+      expect(rects.length, n);
+      for (final r in rects) {
+        expect(r.left, greaterThanOrEqualTo(0));
+        expect(r.right, lessThanOrEqualTo(280.001));
+        expect(r.width, greaterThan(40));
+      }
+      expect(AlbumLayout.height(280, n), rects.last.bottom);
+      for (var i = 0; i < n; i++) {
+        expect(AlbumLayout.tileAt(280, n, rects[i].center), i);
+      }
+    }
+  });
+
   testWidgets(
     'shows the history with both senders, a day chip and the peer in the header',
     (t) async {
@@ -255,14 +301,25 @@ void main() {
     },
   );
 
-  testWidgets('the send button does nothing for blank input', (t) async {
+  testWidgets('the send arrow is inside the field and the microphone beside '
+      'it, both always there', (t) async {
     final link = FakeLink();
     await open(t, FakeRest(), link);
+    expect(find.byIcon(Icons.mic_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_upward_rounded), findsOneWidget);
+
+    // Blank input: the arrow does nothing.
     await t.enterText(find.byType(TextField), '   ');
     await t.pump();
     await t.tap(find.byIcon(Icons.arrow_upward_rounded));
     await settle(t);
     expect(link.sent, isEmpty);
+
+    // With text nothing is swapped: both are still there.
+    await t.enterText(find.byType(TextField), 'Hi');
+    await t.pump();
+    expect(find.byIcon(Icons.mic_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_upward_rounded), findsOneWidget);
   });
 
   testWidgets(

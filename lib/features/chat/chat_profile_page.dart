@@ -1,6 +1,7 @@
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/localization/app_strings.dart';
@@ -11,6 +12,8 @@ import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/native_segments.dart';
 import '../../core/widgets/ui_blocks.dart';
 import 'chat_models.dart';
+import 'chat_media_grid.dart';
+import 'chat_voice_list.dart';
 import 'chat_widgets.dart';
 
 /// The person's card, as in Telegram: a big round photo, the name and the
@@ -26,7 +29,26 @@ class ChatProfilePage extends StatefulWidget {
     this.isMuted,
     this.onToggleMute,
     this.onDelete,
+    this.onWrite,
+    this.showWrite = true,
+    this.showManage = true,
+    this.voiceFeed,
+    this.mediaFeed,
   });
+
+  /// The chat's photos and videos (the "Media" tab); null: nothing to list.
+  final MediaFeed? mediaFeed;
+
+  /// The chat's voice messages (the "Voice" tab); null: nothing to list.
+  final VoiceFeed? voiceFeed;
+
+  /// "Write": opens the chat with the person. Null: this profile was opened
+  /// from that very chat, so it simply goes back to it.
+  final VoidCallback? onWrite;
+  final bool showWrite;
+
+  /// Sound / delete tiles (a member's card from a group has no such chat).
+  final bool showManage;
 
   final ChatUser user;
 
@@ -60,18 +82,14 @@ class _ChatProfilePageState extends State<ChatProfilePage> {
     await launchUrl(Uri(scheme: 'tel', path: number));
   }
 
-  Future<void> _copy(BuildContext context, S s) async {
+  void _write() {
     HapticFeedback.selectionClick();
-    await Clipboard.setData(ClipboardData(text: user.phone));
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(s.chatCopied),
-          duration: const Duration(seconds: 1),
-        ),
-      );
+    final go = widget.onWrite;
+    if (go == null) {
+      Navigator.of(context).pop();
+    } else {
+      go();
+    }
   }
 
   Future<void> _toggleMute() async {
@@ -88,11 +106,6 @@ class _ChatProfilePageState extends State<ChatProfilePage> {
       message: s.chatDeleteMessage,
       actions: [
         AlertAction(
-          title: s.cancel,
-          style: AlertActionStyle.cancel,
-          onPressed: () {},
-        ),
-        AlertAction(
           title: s.chatDeleteForBoth(user.shortName),
           style: AlertActionStyle.destructive,
           onPressed: () => _delete(true),
@@ -101,6 +114,11 @@ class _ChatProfilePageState extends State<ChatProfilePage> {
           title: s.chatDeleteForMe,
           style: AlertActionStyle.destructive,
           onPressed: () => _delete(false),
+        ),
+        AlertAction(
+          title: s.chatCancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
         ),
       ],
     );
@@ -180,6 +198,16 @@ class _ChatProfilePageState extends State<ChatProfilePage> {
                   final muted = widget.isMuted?.call() ?? false;
                   return Row(
                     children: [
+                      if (widget.showWrite) ...[
+                        Expanded(
+                          child: _Action(
+                            svgIcon: 'assets/icons/tg_chats.svg',
+                            label: s.chatWrite,
+                            onTap: _write,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
                       if (hasPhone) ...[
                         Expanded(
                           child: _Action(
@@ -188,36 +216,30 @@ class _ChatProfilePageState extends State<ChatProfilePage> {
                             onTap: _call,
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        if (widget.showManage) const SizedBox(width: 8),
+                      ],
+                      if (widget.showManage) ...[
                         Expanded(
                           child: _Action(
-                            icon: Icons.copy_rounded,
-                            label: s.chatCopy,
-                            onTap: () => _copy(context, s),
+                            icon: muted
+                                ? Icons.notifications_off_rounded
+                                : Icons.notifications_rounded,
+                            label: muted ? s.chatSoundOff : s.chatSound,
+                            enabled: widget.canManage,
+                            onTap: _toggleMute,
                           ),
                         ),
                         const SizedBox(width: 8),
+                        Expanded(
+                          child: _Action(
+                            icon: Icons.delete_outline_rounded,
+                            label: s.chatDelete,
+                            color: const Color(0xFFFF3B30),
+                            enabled: widget.canManage,
+                            onTap: () => _confirmDelete(context, s),
+                          ),
+                        ),
                       ],
-                      Expanded(
-                        child: _Action(
-                          icon: muted
-                              ? Icons.notifications_off_rounded
-                              : Icons.notifications_rounded,
-                          label: muted ? s.chatSoundOff : s.chatSound,
-                          enabled: widget.canManage,
-                          onTap: _toggleMute,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _Action(
-                          icon: Icons.delete_outline_rounded,
-                          label: s.chatDelete,
-                          color: const Color(0xFFFF3B30),
-                          enabled: widget.canManage,
-                          onTap: () => _confirmDelete(context, s),
-                        ),
-                      ),
                     ],
                   );
                 },
@@ -250,15 +272,26 @@ class _ChatProfilePageState extends State<ChatProfilePage> {
                   onChanged: (i) => setState(() => _tab = i),
                 ),
               ),
-              // The shared media and voice messages will appear here.
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 40),
-                child: Text(
-                  s.chatNothingYet,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 15, color: kChatMuted),
+              if (_tab == 0 && widget.mediaFeed != null)
+                ProfileMediaGrid(
+                  key: const ValueKey('media'),
+                  feed: widget.mediaFeed!,
+                )
+              else if (_tab == 1 && widget.voiceFeed != null)
+                ProfileVoiceList(
+                  key: const ValueKey('voices'),
+                  feed: widget.voiceFeed!,
+                )
+              else
+                // The shared media will appear here.
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  child: Text(
+                    s.chatNothingYet,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 15, color: kChatMuted),
+                  ),
                 ),
-              ),
             ],
           ),
           Positioned(
@@ -276,14 +309,18 @@ class _ChatProfilePageState extends State<ChatProfilePage> {
 
 class _Action extends StatelessWidget {
   const _Action({
-    required this.icon,
+    this.icon,
+    this.svgIcon,
     required this.label,
     required this.onTap,
     this.color = ChatProfilePage._blue,
     this.enabled = true,
   });
 
-  final IconData icon;
+  final IconData? icon;
+
+  /// Our own icon (an svg asset) instead of a material one.
+  final String? svgIcon;
   final String label;
   final VoidCallback onTap;
   final Color color;
@@ -304,7 +341,15 @@ class _Action extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 22),
+              if (svgIcon != null)
+                SvgPicture.asset(
+                  svgIcon!,
+                  width: 22,
+                  height: 22,
+                  colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                )
+              else
+                Icon(icon, color: color, size: 22),
               const SizedBox(height: 3),
               Text(
                 label,

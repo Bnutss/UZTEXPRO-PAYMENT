@@ -81,6 +81,73 @@ class FakeLink implements ChatLink {
 class FakeRest implements ChatRest {
   final groupCalls = <String>[];
 
+  final mediaCalls = <String>[];
+
+  @override
+  Future<ChatMessage> sendMedia(
+    int conversationId,
+    ChatUpload upload,
+    String clientId, {
+    int? replyTo,
+    void Function(double progress)? onProgress,
+    ChatCancelToken? cancel,
+  }) async {
+    mediaCalls.add('send:$conversationId:${upload.kind}:$clientId');
+    onProgress?.call(1);
+    return ChatMessage(
+      id: 888,
+      conversation: conversationId,
+      sender: 1,
+      text: upload.caption,
+      clientId: clientId,
+      createdAt: DateTime(2026),
+      read: false,
+      kind: upload.kind,
+      media: ChatMedia(
+        name: upload.name,
+        width: upload.width,
+        height: upload.height,
+      ),
+    );
+  }
+
+  @override
+  Future<void> downloadMedia(
+    int messageId,
+    String destPath, {
+    void Function(double progress)? onProgress,
+    ChatCancelToken? cancel,
+  }) async => mediaCalls.add('download:$messageId');
+
+  @override
+  Future<void> ackDownloaded(int messageId) async =>
+      mediaCalls.add('ack:$messageId');
+
+  @override
+  Future<ChatMessage> sendVoice(
+    int conversationId,
+    String filePath,
+    int durationMs,
+    List<int> waveform,
+    String clientId, {
+    int? replyTo,
+  }) async {
+    groupCalls.add('voice:$conversationId:$clientId');
+    return ChatMessage(
+      id: 777,
+      conversation: conversationId,
+      sender: 1,
+      text: 'Voice',
+      clientId: clientId,
+      createdAt: DateTime(2026),
+      read: false,
+      kind: 'voice',
+      audioUrl: 'https://x/a.m4a',
+      durationMs: durationMs,
+      waveform: waveform,
+    );
+  }
+
   /// The group answers 404 (deleted / I was removed).
   bool groupGone = false;
 
@@ -234,10 +301,20 @@ class FakeRest implements ChatRest {
     int conversationId, {
     int? beforeId,
     int limit = 50,
+    String? kind,
   }) async {
     if (failMessages) throw const ChatApiException(null);
-    var rows = store.where((m) => beforeId == null || m.id < beforeId).toList()
-      ..sort((a, b) => a.id.compareTo(b.id));
+    var rows =
+        store
+            .where((m) => beforeId == null || m.id < beforeId)
+            .where(
+              (m) =>
+                  kind == null ||
+                  (kind == 'voice' && m.isVoice) ||
+                  (kind == 'media' && (m.isImage || m.isVideo)),
+            )
+            .toList()
+          ..sort((a, b) => a.id.compareTo(b.id));
     final more = rows.length > limit;
     rows = rows.length > limit ? rows.sublist(rows.length - limit) : rows;
     return ChatPageResult(rows, more);

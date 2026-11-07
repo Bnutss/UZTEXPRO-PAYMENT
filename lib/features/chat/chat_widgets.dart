@@ -77,7 +77,11 @@ class ChatRow extends StatelessWidget {
     this.time,
     this.unread = 0,
     this.muted = false,
+    this.subtitleColor,
   });
+
+  /// Colour of the line under the name (the "online" status is accented).
+  final Color? subtitleColor;
 
   /// Notifications of this chat are off: a crossed bell by the name, and a
   /// grey (not orange) unread badge.
@@ -161,7 +165,9 @@ class ChatRow extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 14,
-                              color: hasUnread ? kChatInk : kChatMuted,
+                              color:
+                                  subtitleColor ??
+                                  (hasUnread ? kChatInk : kChatMuted),
                             ),
                           ),
                         ),

@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 
 import 'chat_api.dart';
+import 'chat_media.dart';
 import 'chat_models.dart';
 import 'chat_socket.dart';
 
@@ -317,6 +319,13 @@ class ChatThreadController extends ChangeNotifier {
       }
       if (initial) hasMore = page.hasMore;
       historyFailed = false;
+      // Not awaited: it must never hold the history back.
+      unawaited(
+        ChatMediaStore.init().then((_) {
+          _autoFetchLoaded();
+          _changed(); // the files on the phone can be found now
+        }),
+      );
     } catch (_) {
       if (initial) historyFailed = true;
     } finally {
@@ -335,6 +344,18 @@ class ChatThreadController extends ChangeNotifier {
   }
 
   /// Older messages, when the user scrolls to the top.
+  /// Loads older pages until message [id] is among the loaded ones. False when
+  /// it never turned up (deleted, or the network failed).
+  Future<bool> loadUntil(int id) async {
+    while (!_messages.any((m) => m.id == id)) {
+      if (!hasMore || _disposed) return false;
+      final before = _messages.length;
+      await loadMore();
+      if (_messages.length == before) return false; // no progress
+    }
+    return true;
+  }
+
   Future<void> loadMore() async {
     if (loadingMore || !hasMore || _convId == null) return;
     final oldest = _messages
@@ -384,7 +405,12 @@ class ChatThreadController extends ChangeNotifier {
     }
     if (i >= 0) {
       final old = _messages[i];
-      _messages[i] = m.copyWith(read: m.read || old.read);
+      // The server's copy of my voice message has no local file: keep mine
+      // (it plays without a download).
+      _messages[i] = m.copyWith(
+        read: m.read || old.read,
+        localAudioPath: old.localAudioPath,
+      );
     } else {
       _messages.add(m);
     }
@@ -454,6 +480,7 @@ class ChatThreadController extends ChangeNotifier {
     if (!_adopt(m.conversation, sender: m.sender, clientId: m.clientId)) return;
     _pendingTimers.remove(m.clientId)?.cancel();
     _upsert(m);
+    _autoFetch(m);
     if (!isMine(m)) {
       _stopTyping(m.sender);
       peerOnline = true;
@@ -578,6 +605,7 @@ class ChatThreadController extends ChangeNotifier {
               id: replyTo.id,
               sender: replyTo.sender,
               text: replyTo.text,
+              kind: replyTo.kind,
             ),
     );
     _messages.add(local);
@@ -586,11 +614,190 @@ class ChatThreadController extends ChangeNotifier {
     _dispatch(local);
   }
 
+  /// Shows a recorded voice message at once and uploads it (over HTTP: the
+  /// socket carries text only). It is shown with the local file, so it plays
+  /// before the upload is done.
+  void sendVoice(
+    String path,
+    int durationMs,
+    List<int> waveform, {
+    ChatMessage? replyTo,
+  }) {
+    final local = ChatMessage(
+      id: -(++_localSeq),
+      conversation: _convId ?? 0,
+      sender: 0,
+      text: '',
+      clientId: _newClientId(),
+      createdAt: DateTime.now(),
+      read: false,
+      state: ChatSendState.sending,
+      kind: 'voice',
+      localAudioPath: path,
+      durationMs: durationMs,
+      waveform: waveform,
+      reply: replyTo == null || replyTo.isLocal
+          ? null
+          : ChatReply(
+              id: replyTo.id,
+              sender: replyTo.sender,
+              text: replyTo.text,
+              kind: replyTo.kind,
+            ),
+    );
+    _messages.add(local);
+    _messages.sort(_compare);
+    _changed();
+    unawaited(_restSendVoice(local));
+  }
+
+  Future<void> _restSendVoice(ChatMessage local) async {
+    if (_disposed) return;
+    try {
+      await _ensureConversation();
+      final saved = await rest.sendVoice(
+        _convId!,
+        local.localAudioPath!,
+        local.durationMs,
+        local.waveform,
+        local.clientId,
+        replyTo: local.reply?.id,
+      );
+      _upsert(saved);
+      _changed();
+    } catch (_) {
+      if (!_disposed && _stillPending(local.clientId)) {
+        _setState(local.clientId, ChatSendState.failed);
+      }
+    }
+  }
+
+  final Map<String, ChatUpload> _uploads = {};
+  final Map<String, ChatCancelToken> _cancels = {};
+
+  /// Shows a photo / video / document at once (from the copy this phone keeps)
+  /// and uploads it with a progress ring.
+  Future<void> sendMedia(ChatUpload u, {ChatMessage? replyTo}) async {
+    final size = File(u.filePath).lengthSync();
+    final local = ChatMessage(
+      id: -(++_localSeq),
+      conversation: _convId ?? 0,
+      sender: 0,
+      text: u.caption,
+      clientId: _newClientId(),
+      createdAt: DateTime.now(),
+      read: false,
+      state: ChatSendState.sending,
+      kind: u.kind,
+      albumId: u.albumId,
+      media: ChatMedia(
+        name: u.name,
+        size: size,
+        width: u.width,
+        height: u.height,
+        durationMs: u.durationMs,
+      ),
+      reply: replyTo == null || replyTo.isLocal
+          ? null
+          : ChatReply(
+              id: replyTo.id,
+              sender: replyTo.sender,
+              text: replyTo.text,
+              kind: replyTo.kind,
+            ),
+    );
+    await ChatMediaStore.init();
+    await ChatMediaStore.keepOutgoing(local, u.filePath, u.thumbPath);
+    if (_disposed) return;
+    _uploads[local.clientId] = u;
+    _messages.add(local);
+    _messages.sort(_compare);
+    _changed();
+    unawaited(_restSendMedia(local));
+  }
+
+  Future<void> _restSendMedia(ChatMessage local) async {
+    final upload = _uploads[local.clientId];
+    if (_disposed || upload == null) return;
+    final manager = ChatMediaManager.instance;
+    manager.setUpload(ChatMediaStore.key(local), 0);
+    final token = _cancels[local.clientId] = ChatCancelToken();
+    try {
+      await _ensureConversation();
+      final saved = await rest.sendMedia(
+        _convId!,
+        upload,
+        local.clientId,
+        cancel: token,
+        replyTo: local.reply?.id,
+        onProgress: (p) => manager.setUpload(ChatMediaStore.key(local), p),
+      );
+      _uploads.remove(local.clientId);
+      _upsert(saved);
+      _changed();
+    } on ChatCancelled {
+      // The person stopped it: the message is already gone (cancelUpload).
+    } catch (_) {
+      if (!_disposed && _stillPending(local.clientId)) {
+        _setState(local.clientId, ChatSendState.failed);
+      }
+    } finally {
+      _cancels.remove(local.clientId);
+      manager.setUpload(ChatMediaStore.key(local), null);
+    }
+  }
+
+  /// Stops an upload that is going on and takes the message out of the chat
+  /// (as Telegram does: a tap on the ring).
+  void cancelUpload(ChatMessage m) {
+    _cancels[m.clientId]?.cancel();
+    discardLocal(m);
+  }
+
+  /// Removes a message that never reached the server (a failed one, or one
+  /// whose upload was stopped), with the files kept for it on this phone.
+  void discardLocal(ChatMessage m) {
+    if (!m.isLocal) return;
+    _pendingTimers.remove(m.clientId)?.cancel();
+    _uploads.remove(m.clientId);
+    _messages.removeWhere((x) => x.isLocal && x.clientId == m.clientId);
+    ChatMediaManager.instance.setUpload(ChatMediaStore.key(m), null);
+    if (m.isMedia) {
+      for (final f in [ChatMediaStore.fileOf(m), ChatMediaStore.thumbOf(m)]) {
+        try {
+          f?.deleteSync();
+        } catch (_) {}
+      }
+    }
+    _changed();
+  }
+
+  /// Photos of others are fetched by themselves (small, and the server can
+  /// then drop its copy); videos and documents on a tap.
+  void _autoFetch(ChatMessage m) {
+    if (!m.isImage || isMine(m) || m.isLocal || _disposed) return;
+    if (m.media?.available != true || ChatMediaStore.has(m)) return;
+    unawaited(ChatMediaManager.instance.download(m, rest));
+  }
+
+  void _autoFetchLoaded() {
+    for (final m in _messages) {
+      _autoFetch(m);
+    }
+  }
+
   /// Tap on a failed message.
   void retry(ChatMessage failed) {
     if (failed.state != ChatSendState.failed) return;
     _setState(failed.clientId, ChatSendState.sending);
-    _dispatch(failed.copyWith(state: ChatSendState.sending));
+    final again = failed.copyWith(state: ChatSendState.sending);
+    if (failed.isVoice) {
+      unawaited(_restSendVoice(again));
+    } else if (failed.isMedia) {
+      unawaited(_restSendMedia(again));
+    } else {
+      _dispatch(again);
+    }
   }
 
   void _dispatch(ChatMessage local) {

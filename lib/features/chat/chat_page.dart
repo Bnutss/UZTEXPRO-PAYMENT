@@ -19,6 +19,7 @@ import 'chat_hub.dart';
 import 'chat_list_actions.dart';
 import 'chat_system.dart';
 import 'chat_models.dart';
+import 'chat_media_widgets.dart' show chatPreviewText;
 import 'chat_push.dart' show ChatPushTarget;
 import 'chat_socket.dart';
 import 'chat_thread_page.dart';
@@ -56,14 +57,17 @@ class _ChatPageState extends State<ChatPage> {
     widget.hub.unread.addListener(_onUnread);
     final target = widget.openThread;
     if (target != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        // The push carries only the id and the name: the photo, position and
+        // the rest of the profile come from the server first.
+        final peer = await _fullPeer(target);
         if (!mounted) return;
         Navigator.of(context).push(
           chatInstantRoute(
             (_) => ChatThreadPage(
               api: _api,
               link: _link,
-              peer: target.peer,
+              peer: peer,
               conversationId: target.conversationId,
               sounds: widget.hub.sounds,
               mutedChats: widget.hub.mutedConversations,
@@ -73,6 +77,19 @@ class _ChatPageState extends State<ChatPage> {
           ),
         );
       });
+    }
+  }
+
+  /// The whole profile of the person (or the group) a notification is about;
+  /// the bare one from the push when the server cannot be reached.
+  Future<ChatUser> _fullPeer(ChatPushTarget target) async {
+    try {
+      final c = target.isGroup
+          ? await _api.group(target.conversationId)
+          : await _api.openConversation(target.peer.id);
+      return c.peer;
+    } catch (_) {
+      return target.peer;
     }
   }
 
@@ -371,7 +388,12 @@ class _ContactsTabState extends State<_ContactsTab> {
         plain: true,
         rows: [
           for (final u in _users)
-            ChatRow(user: u, subtitle: u.subtitle, onTap: () => _open(u)),
+            ChatRow(
+              user: u,
+              subtitle: u.online ? s.chatOnline : s.chatLastSeen(u.lastSeen),
+              subtitleColor: u.online ? AppColors.brandOrange : null,
+              onTap: () => _open(u),
+            ),
         ],
       ),
     );
@@ -578,11 +600,6 @@ class _ChatsTabState extends State<_ChatsTab> {
       message: s.chatDeleteMessage,
       actions: [
         AlertAction(
-          title: s.cancel,
-          style: AlertActionStyle.cancel,
-          onPressed: () {},
-        ),
-        AlertAction(
           title: s.chatDeleteForBoth(c.peer.shortName),
           style: AlertActionStyle.destructive,
           onPressed: () => _runDelete(c, forAll: true),
@@ -591,6 +608,11 @@ class _ChatsTabState extends State<_ChatsTab> {
           title: s.chatDeleteForMe,
           style: AlertActionStyle.destructive,
           onPressed: () => _runDelete(c, forAll: false),
+        ),
+        AlertAction(
+          title: s.chatCancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
         ),
       ],
     );
@@ -613,14 +635,14 @@ class _ChatsTabState extends State<_ChatsTab> {
       message: c.peer.name,
       actions: [
         AlertAction(
-          title: s.cancel,
-          style: AlertActionStyle.cancel,
-          onPressed: () {},
-        ),
-        AlertAction(
           title: s.chatLeaveConfirm,
           style: AlertActionStyle.destructive,
           onPressed: () => _runLeave(c),
+        ),
+        AlertAction(
+          title: s.chatCancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
         ),
       ],
     );
@@ -645,14 +667,14 @@ class _ChatsTabState extends State<_ChatsTab> {
       message: c.peer.name,
       actions: [
         AlertAction(
-          title: s.cancel,
-          style: AlertActionStyle.cancel,
-          onPressed: () {},
-        ),
-        AlertAction(
           title: s.chatDeleteGroup,
           style: AlertActionStyle.destructive,
           onPressed: () => _runDeleteGroup(c),
+        ),
+        AlertAction(
+          title: s.chatCancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
         ),
       ],
     );
@@ -675,11 +697,6 @@ class _ChatsTabState extends State<_ChatsTab> {
       title: c.peer.name,
       actions: [
         AlertAction(
-          title: s.cancel,
-          style: AlertActionStyle.cancel,
-          onPressed: () {},
-        ),
-        AlertAction(
           title: s.chatLeaveGroupAction,
           style: AlertActionStyle.destructive,
           onPressed: () => _confirmLeave(c),
@@ -688,6 +705,11 @@ class _ChatsTabState extends State<_ChatsTab> {
           title: s.chatDeleteGroup,
           style: AlertActionStyle.destructive,
           onPressed: () => _confirmDeleteGroup(c),
+        ),
+        AlertAction(
+          title: s.chatCancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
         ),
       ],
     );
@@ -830,6 +852,7 @@ class _ChatsTabState extends State<_ChatsTab> {
     final m = c.lastMessage;
     if (m == null) return '';
     if (m.isSystem) return chatSystemText(m, s, widget.api.myId);
+    final text = chatPreviewText(m, s);
     if (c.isGroup) {
       final me = widget.api.myId;
       final mine = m.sender == 0 || (me != null && m.sender == me);
@@ -838,11 +861,11 @@ class _ChatsTabState extends State<_ChatsTab> {
           : (m.senderName.isEmpty
                 ? s.chatMemberFallback
                 : m.senderName.split(' ').first);
-      return '$who: ${m.text}';
+      return '$who: $text';
     }
     // A chat of two people: anything not from the peer is mine.
     final mine = m.sender != c.peer.id;
-    return mine ? '${s.chatYou}: ${m.text}' : m.text;
+    return mine ? '${s.chatYou}: $text' : text;
   }
 
   @override

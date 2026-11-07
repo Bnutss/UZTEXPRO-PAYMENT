@@ -1,6 +1,15 @@
+import 'dart:io' show Platform;
+import 'dart:math' as math;
+
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:flutter/cupertino.dart'
+    show
+        CupertinoActionSheet,
+        CupertinoActionSheetAction,
+        showCupertinoModalPopup;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:open_filex/open_filex.dart';
 
 import '../../core/localization/app_strings.dart';
 import '../../core/theme/app_colors.dart';
@@ -15,6 +24,15 @@ import 'chat_profile_page.dart';
 import 'chat_socket.dart';
 import 'chat_sounds.dart';
 import 'chat_thread_controller.dart';
+import 'chat_attach.dart';
+import 'chat_media.dart';
+import 'chat_media_grid.dart';
+import 'chat_media_preview.dart';
+import 'chat_media_viewers.dart';
+import 'chat_media_widgets.dart';
+import 'chat_voice.dart';
+import 'chat_voice_list.dart';
+import 'chat_voice_widgets.dart';
 import 'chat_widgets.dart';
 
 /// A route without a transition: chat screens open and close at once, as in
@@ -79,6 +97,14 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
   final _scroll = ScrollController();
   bool _hasText = false;
 
+  /// "Go to message" (from the voice list of a profile): the message to scroll
+  /// to, and the one flashing after the jump.
+  int? _jumpId;
+  bool _flash = false;
+  final _jumpKey = GlobalKey();
+  final _spy = _TouchSpy();
+  final Map<String, GlobalKey> _albumKeys = {};
+
   /// The message being edited (the input holds its text), if any.
   ChatMessage? _editing;
 
@@ -103,6 +129,7 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
   @override
   void initState() {
     super.initState();
+    ChatVoicePlayer.instance.nextResolver = _nextVoice;
     WidgetsBinding.instance.addPostFrameCallback((_) => _measureInput());
     _c.start();
     _scroll.addListener(() {
@@ -120,8 +147,26 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     });
   }
 
+  /// The next voice message after [m] in this chat (newer, in order), if any:
+  /// it plays by itself when [m] has been heard to the end.
+  ChatMessage? _nextVoice(ChatMessage m) {
+    final all = _c.messages; // oldest first
+    final key = ChatVoicePlayer.keyOf(m);
+    final at = all.indexWhere((x) => ChatVoicePlayer.keyOf(x) == key);
+    if (at < 0) return null;
+    for (var i = at + 1; i < all.length; i++) {
+      final x = all[i];
+      if (x.isVoice && x.state != ChatSendState.failed) return x;
+    }
+    return null;
+  }
+
   @override
   void dispose() {
+    if (ChatVoicePlayer.instance.nextResolver == _nextVoice) {
+      ChatVoicePlayer.instance.nextResolver = null;
+    }
+    ChatVoicePlayer.instance.stop(); // leaving the chat stops the voice
     _c.dispose();
     _input.dispose();
     _scroll.dispose();
@@ -205,6 +250,17 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
   List<AdaptivePopupMenuEntry> _menuFor(ChatMessage m, bool mine, S s) {
     final ios26 = PlatformInfo.isIOS26OrHigher();
     final stored = !m.isLocal && m.state == ChatSendState.sent;
+    // A message that could not be sent can only be thrown away.
+    if (m.isLocal && m.state == ChatSendState.failed) {
+      return [
+        AdaptivePopupMenuItem<_MsgAction>(
+          label: s.chatMenuDelete,
+          icon: ios26 ? 'trash' : Icons.delete_outline_rounded,
+          isDestructive: true,
+          value: _MsgAction.discard,
+        ),
+      ];
+    }
     return [
       if (stored)
         AdaptivePopupMenuItem<_MsgAction>(
@@ -212,12 +268,13 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
           icon: ios26 ? 'arrowshape.turn.up.left' : Icons.reply_rounded,
           value: _MsgAction.reply,
         ),
-      AdaptivePopupMenuItem<_MsgAction>(
-        label: s.chatMenuCopy,
-        icon: ios26 ? 'doc.on.doc' : Icons.copy_rounded,
-        value: _MsgAction.copy,
-      ),
-      if (mine && stored)
+      if (!m.isVoice)
+        AdaptivePopupMenuItem<_MsgAction>(
+          label: s.chatMenuCopy,
+          icon: ios26 ? 'doc.on.doc' : Icons.copy_rounded,
+          value: _MsgAction.copy,
+        ),
+      if (mine && stored && !m.isVoice)
         AdaptivePopupMenuItem<_MsgAction>(
           label: s.chatMenuEdit,
           icon: ios26 ? 'pencil' : Icons.edit_rounded,
@@ -248,21 +305,299 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     ];
   }
 
-  void _onMenu(ChatMessage m, _MsgAction? action) {
+  /// A tap on an album: which tile it fell on is worked out from the touch.
+  void _openAlbumAt(List<ChatMessage> album) {
+    final key = _albumKeys['${album.first.albumId}:${album.first.id}'];
+    final box = key?.currentContext?.findRenderObject();
+    final point = _spy.last;
+    if (box is! RenderBox || !box.hasSize || point == null) return;
+    final i = AlbumLayout.tileAt(
+      box.size.width,
+      album.length,
+      box.globalToLocal(point),
+    );
+    if (i != null) _openMedia(album[i]);
+  }
+
+  void _onMenu(
+    ChatMessage m,
+    _MsgAction? action, {
+    List<ChatMessage> album = const [],
+  }) {
+    // An album is one bubble: deleting it deletes all its photos.
+    final all = album.isEmpty ? [m] : album;
     switch (action) {
       case _MsgAction.reply:
         _startReply(m);
       case _MsgAction.copy:
-        Clipboard.setData(ClipboardData(text: m.text));
+        Clipboard.setData(
+          ClipboardData(
+            text: all
+                .firstWhere((x) => x.text.isNotEmpty, orElse: () => m)
+                .text,
+          ),
+        );
         HapticFeedback.selectionClick();
       case _MsgAction.edit:
         _startEdit(m);
+      case _MsgAction.discard:
+        for (final x in all) {
+          _c.discardLocal(x);
+        }
       case _MsgAction.deleteForMe:
-        _c.deleteMessage(m, forAll: false);
+        for (final x in all) {
+          _c.deleteMessage(x, forAll: false);
+        }
       case _MsgAction.deleteForAll:
-        _c.deleteMessage(m, forAll: true);
+        for (final x in all) {
+          _c.deleteMessage(x, forAll: true);
+        }
       case null:
         break;
+    }
+  }
+
+  void _snack(String text) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(text), duration: const Duration(seconds: 3)),
+      );
+  }
+
+  /// The paperclip: a sheet with where the file comes from, then the picked
+  /// photos / videos / documents are shrunk (a spinner meanwhile) and sent.
+  Future<void> _attach() async {
+    final s = S.of(context);
+    HapticFeedback.selectionClick();
+
+    // iOS: the native sheet, as in Telegram (it prepares the files itself).
+    AttachResult? result;
+    if (Platform.isIOS) {
+      result = await ChatAttach.nativeSheet({
+        'recents': s.chatRecents,
+        'gallery': s.chatGalleryTab,
+        'camera': s.chatCameraTab,
+        'file': s.chatAttachFile,
+        'send': s.chatSendMedia,
+        'preparing': s.chatPreparing,
+        'caption': s.chatCaptionHint,
+        'denied': s.chatPhotosDenied,
+        'settings': s.chatOpenSettings,
+      });
+      if (!mounted) return;
+    }
+    // Elsewhere (or no native sheet): a menu, then the pickers, and a preview
+    // with captions (the native sheet has its own).
+    final native = result != null;
+    result ??= await _attachViaMenu(s);
+    if (result == null || !mounted) return;
+    var uploads = result.ready;
+    if (!native && uploads.any((u) => u.kind != 'file')) {
+      final files = uploads.where((u) => u.kind == 'file').toList();
+      final media = uploads.where((u) => u.kind != 'file').toList();
+      final edited = await Navigator.of(context).push<List<ChatUpload>>(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => MediaPreviewPage(uploads: media),
+        ),
+      );
+      if (edited == null || !mounted) return;
+      uploads = [...edited, ...files];
+    }
+
+    if (result.problems.isNotEmpty) {
+      final p = result.problems.first;
+      _snack(
+        p == AttachProblem.tooLarge
+            ? s.chatAttachTooLarge
+            : p == AttachProblem.badType
+            ? s.chatAttachBadType
+            : s.chatAttachFailed,
+      );
+    }
+    if (uploads.isEmpty) return;
+    HapticFeedback.lightImpact();
+    widget.sounds?.sent();
+    // Several photos / videos sent together are one album in the chat.
+    final mediaCount = uploads.where((u) => u.kind != 'file').length;
+    if (mediaCount >= 2) {
+      final id = 'a${DateTime.now().microsecondsSinceEpoch}';
+      uploads = [for (final u in uploads) u.kind == 'file' ? u : u.inAlbum(id)];
+    }
+    final reply = _replying;
+    for (var i = 0; i < uploads.length; i++) {
+      // Only the first of several carries the quote of an answer.
+      _c.sendMedia(uploads[i], replyTo: i == 0 ? reply : null);
+    }
+    if (reply != null) setState(() => _replying = null);
+    if (_scroll.hasClients) {
+      _scroll.animateTo(
+        0,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  Future<AttachResult?> _attachViaMenu(S s) async {
+    final choice = await showCupertinoModalPopup<int>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(ctx, 0),
+            child: Text(s.chatAttachGallery),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(ctx, 1),
+            child: Text(s.chatAttachCamera),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(ctx, 2),
+            child: Text(s.chatAttachVideoCamera),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(ctx, 3),
+            child: Text(s.chatAttachFile),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.pop(ctx),
+          child: Text(s.chatCancel),
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return null;
+
+    var busy = false;
+    void showBusy() {
+      if (!mounted || busy) return;
+      busy = true;
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: Colors.black38,
+        useRootNavigator: true,
+        builder: (_) => PopScope(
+          canPop: false,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 22),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(
+                    width: 30,
+                    height: 30,
+                    child: CircularProgressIndicator(strokeWidth: 3),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    s.chatPreparing,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: kChatInk,
+                      decoration: TextDecoration.none,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final AttachResult result;
+    switch (choice) {
+      case 0:
+        result = await ChatAttach.gallery(onPicked: showBusy);
+      case 1:
+        result = await ChatAttach.cameraPhoto(onPicked: showBusy);
+      case 2:
+        result = await ChatAttach.cameraVideo(onPicked: showBusy);
+      default:
+        result = await ChatAttach.files(onPicked: showBusy);
+    }
+    if (busy && mounted) Navigator.of(context, rootNavigator: true).pop();
+    if (!mounted) return null;
+    return result;
+  }
+
+  /// A tap on a photo / video / document: opens it (fetching it first when it
+  /// is not on this phone yet).
+  Future<void> _openMedia(ChatMessage m) async {
+    final s = S.of(context);
+    final manager = ChatMediaManager.instance;
+    await ChatMediaStore.init();
+    final file = ChatMediaStore.fileOf(m);
+    if (file == null) return;
+    // A tap on the ring of a file that is going up / down stops it.
+    if (manager.progressOf(m) != null) {
+      HapticFeedback.selectionClick();
+      if (m.isLocal) {
+        _c.cancelUpload(m);
+      } else {
+        manager.cancelDownload(m);
+      }
+      return;
+    }
+    if (!file.existsSync()) {
+      if (m.isLocal) return;
+      final ok = await manager.download(m, widget.api);
+      if (!ok) {
+        if (mounted) {
+          _snack(manager.isGone(m) ? s.chatFileGone : s.chatDownloadFailed);
+        }
+        return;
+      }
+    }
+    if (!mounted) return;
+    HapticFeedback.selectionClick();
+    if (m.isImage) {
+      if (Platform.isIOS) {
+        try {
+          await const MethodChannel('uztexpro/native_sheet').invokeMethod(
+            'photoViewer',
+            {'url': Uri.file(file.path).toString(), 'title': m.media?.name},
+          );
+          return;
+        } catch (_) {}
+      }
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => PhotoViewerPage(file: file)),
+      );
+    } else if (m.isVideo) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          fullscreenDialog: true,
+          builder: (_) => VideoViewerPage(file: file),
+        ),
+      );
+    } else {
+      await OpenFilex.open(file.path);
+    }
+  }
+
+  void _sendVoice(VoiceClip clip) {
+    HapticFeedback.lightImpact();
+    widget.sounds?.sent();
+    _c.sendVoice(clip.path, clip.durationMs, clip.waveform, replyTo: _replying);
+    if (_replying != null) setState(() => _replying = null);
+    if (_scroll.hasClients) {
+      _scroll.animateTo(
+        0,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
     }
   }
 
@@ -303,6 +638,105 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     return ok;
   }
 
+  /// "Write" in a member's card: their personal chat.
+  void _writeTo(ChatUser user) {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(
+      chatInstantRoute(
+        (_) => ChatThreadPage(
+          api: widget.api,
+          link: widget.link,
+          peer: user,
+          sounds: widget.sounds,
+          mutedChats: widget.mutedChats,
+          onRead: widget.onRead,
+        ),
+      ),
+    );
+  }
+
+  /// What the "Voice" list of a profile needs from this chat.
+  VoiceFeed? _voiceFeed(S s) {
+    final id = _c.conversationId;
+    if (id == null) return null;
+    return VoiceFeed(
+      load: (before) =>
+          widget.api.messages(id, beforeId: before, limit: 30, kind: 'voice'),
+      authorOf: (m) => _authorOfMessage(m, s),
+      canDeleteForAll: (m) => !widget.isGroup || _c.isMine(m) || _c.isAdmin,
+      delete: (m, {required forAll}) => _c.deleteMessage(m, forAll: forAll),
+      goTo: _goToMessage,
+    );
+  }
+
+  /// What the "Media" grid of a profile needs from this chat.
+  MediaFeed? _mediaFeed() {
+    final id = _c.conversationId;
+    if (id == null) return null;
+    return MediaFeed(
+      load: (before) =>
+          widget.api.messages(id, beforeId: before, limit: 45, kind: 'media'),
+      canDeleteForAll: (m) => !widget.isGroup || _c.isMine(m) || _c.isAdmin,
+      delete: (m, {required forAll}) => _c.deleteMessage(m, forAll: forAll),
+      goTo: _goToMessage,
+      open: _openMedia,
+      api: widget.api,
+    );
+  }
+
+  String _authorOfMessage(ChatMessage m, S s) {
+    if (widget.isGroup || _c.isMine(m)) {
+      return _authorOf(m.sender == 0 ? (widget.api.myId ?? 0) : m.sender, s);
+    }
+    return widget.peer.shortName;
+  }
+
+  /// Closes the profile on top and scrolls the chat to [target] (loading
+  /// older pages first when it is far back), then makes it flash.
+  Future<void> _goToMessage(ChatMessage target) async {
+    final route = ModalRoute.of(context);
+    Navigator.of(context).popUntil((r) => r == route);
+    if (!await _c.loadUntil(target.id) || !mounted) return;
+    setState(() {
+      _jumpId = target.id;
+      _flash = false;
+    });
+    for (var i = 0; i < 18 && mounted; i++) {
+      await WidgetsBinding.instance.endOfFrame;
+      final ctx = _jumpKey.currentContext;
+      if (ctx != null && ctx.mounted) {
+        await Scrollable.ensureVisible(
+          ctx,
+          alignment: 0.5,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOut,
+        );
+        if (!mounted) return;
+        setState(() => _flash = true);
+        await Future<void>.delayed(const Duration(milliseconds: 1400));
+        if (!mounted) return;
+        setState(() => _flash = false);
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        if (mounted) setState(() => _jumpId = null);
+        return;
+      }
+      // Not built yet: jump to where it should be (a guess by the average
+      // height) and look again.
+      if (!_scroll.hasClients) return;
+      final entries = _entries(_c.messages);
+      final at = entries.indexWhere(
+        (e) => e.album.any((x) => x.id == target.id),
+      );
+      if (at < 0) return;
+      final fromBottom = entries.length - 1 - at;
+      final pos = _scroll.position;
+      final per =
+          (pos.maxScrollExtent + pos.viewportDimension) / entries.length;
+      _scroll.jumpTo((fromBottom * per).clamp(0.0, pos.maxScrollExtent));
+    }
+    if (mounted) setState(() => _jumpId = null);
+  }
+
   /// The person's card: its own full screen page (photo, status, phone,
   /// department, position).
   void _openProfile(S s, String? status) {
@@ -316,6 +750,9 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
             link: widget.link,
             statusOf: () => _statusLine(s),
             onChanged: widget.onRead,
+            onWrite: _writeTo,
+            voiceFeed: _voiceFeed(s),
+            mediaFeed: _mediaFeed(),
           ),
         ),
       );
@@ -330,6 +767,8 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
           isMuted: () => _c.muted,
           onToggleMute: _toggleMuted,
           onDelete: _deleteChat,
+          voiceFeed: _voiceFeed(s),
+          mediaFeed: _mediaFeed(),
           statusOf: () => !widget.link.connected.value
               ? s.chatConnecting
               : _c.peerTyping
@@ -393,6 +832,16 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
               // The messages fill the whole area, down to the screen edge, and
               // scroll under the glass of the header and of the input bar.
               Positioned.fill(child: _buildMessages(s, topInset)),
+              // While a voice message plays: the player bar under the header.
+              VoiceTopBarHost(
+                top: topInset + 6,
+                authorOf: (m) => widget.isGroup || _c.isMine(m)
+                    ? _authorOf(
+                        m.sender == 0 ? (widget.api.myId ?? 0) : m.sender,
+                        s,
+                      )
+                    : widget.peer.shortName,
+              ),
               Positioned(
                 left: 0,
                 right: 0,
@@ -417,8 +866,14 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
                             : _replying == null
                             ? null
                             : s.chatReplyTo(_authorOf(_replying!.sender, s)),
-                        editText: (_editing ?? _replying)?.text,
+                        editText: _editing != null
+                            ? _editing!.text
+                            : _replying == null
+                            ? null
+                            : chatPreviewText(_replying!, s),
                         onCancelEdit: _cancelEdit,
+                        onVoice: _sendVoice,
+                        onAttach: _attach,
                       ),
                     ),
                   ),
@@ -490,7 +945,7 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
         if (e.message!.isSystem) {
           return _DayChip(label: _systemText(e.message!, s));
         }
-        return _Bubble(
+        final bubble = _Bubble(
           message: e.message!,
           mine: _c.isMine(e.message!),
           senderLabel: widget.isGroup && !_c.isMine(e.message!) && e.firstInRun
@@ -498,15 +953,43 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
               : null,
           tail: e.lastInRun,
           gapAbove: e.firstInRun,
-          onRetry: () => _c.retry(e.message!),
+          onRetry: () {
+            for (final x in e.album) {
+              _c.retry(x);
+            }
+          },
           notSentHint: s.chatNotSent,
           editedLabel: s.chatEdited,
           menu: _menuFor(e.message!, _c.isMine(e.message!), s),
-          onMenu: (a) => _onMenu(e.message!, a),
+          onMenu: (a) => _onMenu(e.message!, a, album: e.album),
           quoteAuthor: e.message!.reply == null
               ? null
               : _authorOf(e.message!.reply!.sender, s),
           onReply: () => _startReply(e.message!),
+          onOpenMedia: () => _openMedia(e.message!),
+          album: e.album,
+          spy: _spy,
+          albumKey: _albumKeys.putIfAbsent(
+            '${e.message!.albumId}:${e.message!.id}',
+            GlobalKey.new,
+          ),
+          onOpenAlbum: () => _openAlbumAt(e.album),
+        );
+        if (!e.album.any((x) => x.id == _jumpId)) return bubble;
+        // The message "Go to message" leads to: found by its key, and it
+        // flashes when the list has arrived.
+        return KeyedSubtree(
+          key: _jumpKey,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 350),
+            decoration: BoxDecoration(
+              color: _flash
+                  ? AppColors.brandOrange.withValues(alpha: 0.18)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: bubble,
+          ),
         );
       },
     );
@@ -530,6 +1013,18 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
           next != null &&
           _sameDay(m.createdAt, next.createdAt) &&
           _sameSender(next, m);
+      // Photos / videos sent together: one bubble.
+      if (m.albumId.isNotEmpty &&
+          m.isMedia &&
+          !m.isFile &&
+          out.isNotEmpty &&
+          out.last.message != null &&
+          out.last.message!.albumId == m.albumId &&
+          sameRunAsPrev) {
+        out.last.album.add(m);
+        out.last.lastInRun = !sameRunAsNext;
+        continue;
+      }
       out.add(
         _Entry.message(
           m,
@@ -568,17 +1063,35 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
 }
 
 class _Entry {
-  _Entry.day(this.day) : message = null, firstInRun = false, lastInRun = false;
+  _Entry.day(this.day)
+    : message = null,
+      album = const [],
+      firstInRun = false,
+      lastInRun = false;
   _Entry.message(
     ChatMessage this.message, {
     required this.firstInRun,
     required this.lastInRun,
-  }) : day = null;
+  }) : day = null,
+       album = [message];
 
   final DateTime? day;
   final ChatMessage? message;
+
+  /// The messages drawn in this bubble: one, or the photos / videos sent
+  /// together (an album).
+  final List<ChatMessage> album;
   final bool firstInRun;
-  final bool lastInRun;
+  bool lastInRun;
+
+  bool get isAlbum => album.length > 1;
+}
+
+/// The last place a finger touched the screen: the menu button around a bubble
+/// takes the touches, so which tile of an album was tapped is worked out from
+/// this point.
+class _TouchSpy {
+  Offset? last;
 }
 
 class _DayChip extends StatelessWidget {
@@ -611,7 +1124,7 @@ class _DayChip extends StatelessWidget {
   }
 }
 
-enum _MsgAction { reply, copy, edit, deleteForMe, deleteForAll }
+enum _MsgAction { reply, copy, edit, deleteForMe, deleteForAll, discard }
 
 class _Bubble extends StatelessWidget {
   const _Bubble({
@@ -626,8 +1139,23 @@ class _Bubble extends StatelessWidget {
     required this.onMenu,
     required this.quoteAuthor,
     required this.onReply,
+    required this.onOpenMedia,
+    required this.album,
+    required this.onOpenAlbum,
+    required this.spy,
+    required this.albumKey,
     this.senderLabel,
   });
+
+  /// The photos / videos drawn in this bubble when they were sent together
+  /// ([message] is the first); one message otherwise.
+  final List<ChatMessage> album;
+  final VoidCallback onOpenAlbum;
+  final _TouchSpy spy;
+  final GlobalKey albumKey;
+
+  /// A tap on a photo / video / document.
+  final VoidCallback onOpenMedia;
 
   /// In a group: who wrote it (the first bubble of a person's run).
   final String? senderLabel;
@@ -646,7 +1174,8 @@ class _Bubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = message;
-    final failed = m.state == ChatSendState.failed;
+    final isAlbum = album.length > 1;
+    final failed = album.any((x) => x.state == ChatSendState.failed);
     // Telegram's palette: my messages light green, the peer's white.
     const fg = kChatInk;
     final meta = mine ? const Color(0xFF5DAA55) : kChatMuted;
@@ -665,7 +1194,9 @@ class _Bubble extends StatelessWidget {
       constraints: BoxConstraints(
         maxWidth: MediaQuery.of(context).size.width * 0.84,
       ),
-      padding: const EdgeInsets.fromLTRB(14, 9, 12, 8),
+      padding: m.isMedia
+          ? const EdgeInsets.all(4)
+          : const EdgeInsets.fromLTRB(14, 9, 12, 8),
       decoration: BoxDecoration(
         color: mine ? const Color(0xFFE1FFC7) : Colors.white,
         borderRadius: radius,
@@ -676,7 +1207,11 @@ class _Bubble extends StatelessWidget {
         children: [
           if (senderLabel != null)
             Padding(
-              padding: const EdgeInsets.only(bottom: 2),
+              padding: EdgeInsets.only(
+                bottom: 2,
+                left: m.isMedia ? 8 : 0,
+                top: m.isMedia ? 4 : 0,
+              ),
               child: Text(
                 senderLabel!,
                 maxLines: 1,
@@ -689,35 +1224,109 @@ class _Bubble extends StatelessWidget {
               ),
             ),
           if (m.reply != null && quoteAuthor != null)
-            _Quote(
-              author: quoteAuthor!,
-              text: m.reply!.text,
-              color: mine ? const Color(0xFF5DAA55) : AppColors.brandOrange,
-            ),
-          Wrap(
-            alignment: WrapAlignment.end,
-            crossAxisAlignment: WrapCrossAlignment.end,
-            spacing: 8,
-            children: [
-              Text(
-                m.text,
-                style: const TextStyle(fontSize: 17, height: 1.28, color: fg),
+            Padding(
+              padding: m.isMedia
+                  ? const EdgeInsets.fromLTRB(4, 4, 4, 0)
+                  : EdgeInsets.zero,
+              child: _Quote(
+                author: quoteAuthor!,
+                text: chatReplyText(m.reply!, S.of(context)),
+                color: mine ? const Color(0xFF5DAA55) : AppColors.brandOrange,
               ),
-              Row(
+            ),
+          // The player itself lies over the bubble (see below): the menu
+          // button covers its whole child with a native view that takes every
+          // touch, so a control inside would never get a tap.
+          if (m.isVoice)
+            const SizedBox(width: kVoiceBodyWidth, height: kVoiceBodyHeight)
+          else if (isAlbum) ...[
+            AlbumBody(
+              key: albumKey,
+              messages: album,
+              width: math.min(
+                MediaQuery.of(context).size.width * 0.84 - 8,
+                290,
+              ),
+              meta: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    m.edited ? '$editedLabel $time' : time,
-                    style: TextStyle(fontSize: 12, color: meta),
+                    time,
+                    style: const TextStyle(fontSize: 12, color: Colors.white),
                   ),
                   if (mine) ...[
                     const SizedBox(width: 3),
-                    _Status(message: m, color: meta),
+                    _Status(
+                      message: album.firstWhere(
+                        (x) => x.state == ChatSendState.failed,
+                        orElse: () => album.firstWhere(
+                          (x) => x.state == ChatSendState.sending,
+                          orElse: () => album.last,
+                        ),
+                      ),
+                      color: Colors.white,
+                    ),
                   ],
                 ],
               ),
-            ],
-          ),
+            ),
+            if (album.any((x) => x.text.trim().isNotEmpty))
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
+                child: Text(
+                  album.firstWhere((x) => x.text.trim().isNotEmpty).text,
+                  style: const TextStyle(fontSize: 17, height: 1.28, color: fg),
+                ),
+              ),
+          ] else if (m.isMedia) ...[
+            MediaBubbleBody(
+              message: m,
+              accent: mine ? const Color(0xFF5DAA55) : AppColors.brandOrange,
+              maxWidth: MediaQuery.of(context).size.width * 0.84 - 8,
+              metaOf: (color) => Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(time, style: TextStyle(fontSize: 12, color: color)),
+                  if (mine) ...[
+                    const SizedBox(width: 3),
+                    _Status(message: m, color: color),
+                  ],
+                ],
+              ),
+            ),
+            if (m.text.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
+                child: Text(
+                  m.text,
+                  style: const TextStyle(fontSize: 17, height: 1.28, color: fg),
+                ),
+              ),
+          ] else
+            Wrap(
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.end,
+              spacing: 8,
+              children: [
+                Text(
+                  m.text,
+                  style: const TextStyle(fontSize: 17, height: 1.28, color: fg),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      m.edited ? '$editedLabel $time' : time,
+                      style: TextStyle(fontSize: 12, color: meta),
+                    ),
+                    if (mine) ...[
+                      const SizedBox(width: 3),
+                      _Status(message: m, color: meta),
+                    ],
+                  ],
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -732,14 +1341,52 @@ class _Bubble extends StatelessWidget {
           Align(
             alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
             child: _SwipeToReply(
-              enabled: !m.isLocal && !failed,
+              enabled: !album.any((x) => x.isLocal) && !failed,
               onReply: onReply,
-              child: AdaptivePopupMenuButton.widget<_MsgAction>(
-                items: menu,
-                triggerOnLongPress: true,
-                onTap: failed ? onRetry : null,
-                onSelected: (_, entry) => onMenu(entry.value),
-                child: bubble,
+              child: Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: (e) => spy.last = e.position,
+                child: Stack(
+                  children: [
+                    AdaptivePopupMenuButton.widget<_MsgAction>(
+                      items: menu,
+                      triggerOnLongPress: true,
+                      onTap: failed
+                          ? onRetry
+                          : (isAlbum
+                                ? onOpenAlbum
+                                : (m.isMedia ? onOpenMedia : null)),
+                      onSelected: (_, entry) => onMenu(entry.value),
+                      child: bubble,
+                    ),
+                    if (m.isVoice)
+                      Positioned(
+                        left: 14,
+                        bottom: 8,
+                        width: kVoiceBodyWidth,
+                        height: kVoiceBodyHeight,
+                        child: VoiceBubbleBody(
+                          message: m,
+                          accent: mine
+                              ? const Color(0xFF5DAA55)
+                              : AppColors.brandOrange,
+                          meta: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                time,
+                                style: TextStyle(fontSize: 12, color: meta),
+                              ),
+                              if (mine) ...[
+                                const SizedBox(width: 3),
+                                _Status(message: m, color: meta),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

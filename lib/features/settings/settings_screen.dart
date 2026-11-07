@@ -12,6 +12,8 @@ import '../../core/localization/locale_notifier.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/fade_route.dart';
+import '../../core/widgets/routeless_alert.dart';
+import '../chat/chat_media.dart';
 import '../../core/widgets/ui_blocks.dart';
 import 'face_id_tile.dart';
 import 'settings_rows.dart';
@@ -43,6 +45,9 @@ class _SettingsScreenState extends State<SettingsScreen>
   // timesheet"); empty until loaded or when the user has no employee.
   String? _photoUrl;
   String _apiToken = '';
+  // What the chat's photos, videos and files take on this phone (null: not
+  // counted yet).
+  int? _chatBytes;
   bool _canCheckBiometrics = false;
   bool _useBiometrics = false;
   // Which biometric icon/label to show — detected per device instead of
@@ -51,7 +56,6 @@ class _SettingsScreenState extends State<SettingsScreen>
   BiometricType? _biometricType;
 
   static const Color _gradientStart = AppColors.brandOrange;
-  static const Color _gradientEnd = AppColors.brandRed;
 
   final List<Map<String, String>> _languages = [
     {'code': 'ru', 'name': 'Русский', 'desc': 'Русский язык'},
@@ -73,6 +77,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     _animationController.forward();
     _loadUserData().then((_) => _loadPhoto());
     _loadVersion();
+    _countChatStorage();
     _checkBiometrics();
     _loadBiometricPreference();
     localeNotifier.addListener(_onLocaleChanged);
@@ -255,6 +260,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         SettingsGroup(
           children: [
             if (_canCheckBiometrics) _buildBiometricRow(s),
+            _buildStorageRow(s),
             _buildPrivacyRow(s),
             _buildVersionRow(s),
           ],
@@ -378,23 +384,8 @@ class _SettingsScreenState extends State<SettingsScreen>
         .map((lang) => lang['code']!.toUpperCase())
         .toList();
 
-    // AdaptiveSegmentedControl renders a Material 3 SegmentedButton on
-    // Android, but the app theme has useMaterial3 disabled, so Android gets a
-    // plain pill track matching the iOS control's look.
-    if (Platform.isIOS) {
-      return AdaptiveSegmentedControl(
-        labels: labels,
-        selectedIndex: selectedIndex,
-        color: _gradientStart,
-        // The colours of the text are given, not worked out from the
-        // surroundings: otherwise the native control restyles itself every time
-        // the surroundings change (another page pushed over this one), and the
-        // three labels blinked. (As in the davrtruck app, which does not.)
-        textColor: const Color(0xFF1C1C1E),
-        selectedTextColor: Colors.white,
-        onValueChanged: _selectLanguage,
-      );
-    }
+    // A plain Flutter switch on every platform: the native one blinked while
+    // a page slid over this screen.
     return _LanguageSegments(
       labels: labels,
       selectedIndex: selectedIndex,
@@ -424,6 +415,56 @@ class _SettingsScreenState extends State<SettingsScreen>
         onChanged: _toggleBiometricPreference,
         activeColor: _gradientStart,
       ),
+    );
+  }
+
+  Future<void> _countChatStorage() async {
+    await ChatMediaStore.init();
+    final bytes = await ChatMediaStore.usedBytes();
+    if (mounted) setState(() => _chatBytes = bytes);
+  }
+
+  /// "Chat storage": how much the chat's files take, and a way to clear them.
+  Widget _buildStorageRow(S s) {
+    final bytes = _chatBytes;
+    return SettingsRow(
+      icon: Icons.cleaning_services_rounded,
+      color: SettingsColors.orange,
+      title: s.chatStorageTitle,
+      subtitle: s.chatStorageSubtitle(
+        bytes == null ? '…' : formatFileSize(bytes),
+      ),
+      onTap: () {
+        showNativeAlert(
+          context: context,
+          title: s.chatStorageClearTitle,
+          message: s.chatStorageClearMessage,
+          actions: [
+            AlertAction(
+              title: s.chatStorageClear,
+              style: AlertActionStyle.destructive,
+              onPressed: () async {
+                await ChatMediaStore.clear();
+                if (!mounted) return;
+                setState(() => _chatBytes = 0);
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    SnackBar(
+                      content: Text(s.chatStorageCleared),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+              },
+            ),
+            AlertAction(
+              title: s.chatCancel,
+              style: AlertActionStyle.cancel,
+              onPressed: () {},
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -489,7 +530,9 @@ class _LanguageSegments extends StatelessWidget {
                 curve: Curves.easeOut,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: selected ? Colors.white : Colors.transparent,
+                  color: selected
+                      ? _SettingsScreenState._gradientStart
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(9),
                   boxShadow: selected
                       ? [
@@ -506,9 +549,7 @@ class _LanguageSegments extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: selected
-                        ? AppColors.brandRed
-                        : const Color(0xFF8A8A8E),
+                    color: selected ? Colors.white : const Color(0xFF1C1C1E),
                   ),
                 ),
               ),

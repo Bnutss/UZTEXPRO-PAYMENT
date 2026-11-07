@@ -40,6 +40,12 @@
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Камера нужна, чтобы снять фото или видео и отправить в чат</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Доступ к галерее нужен, чтобы выбрать фото и видео для чата</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Микрофон нужен для записи голосовых сообщений в чате</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Используйте Face ID для быстрого входа в приложение.</string>
 	<key>UIApplicationSceneManifest</key>

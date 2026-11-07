@@ -36,6 +36,13 @@ dependencies:
   path_provider: ^2.1.6
   path_drawing: ^1.0.1
   audioplayers: ^6.8.1
+  record: ^7.1.2
+  image_picker: ^1.2.4
+  file_picker: ^11.0.3
+  video_player: ^2.14.1
+  video_compress: ^3.1.4
+  flutter_image_compress: ^2.5.1
+  path: ^1.9.1
 
 dev_dependencies:
   flutter_test:

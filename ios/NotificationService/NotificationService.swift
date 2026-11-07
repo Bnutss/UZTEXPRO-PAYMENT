@@ -57,10 +57,13 @@ final class NotificationService: UNNotificationServiceExtension {
     info: [AnyHashable: Any],
     data: Data
   ) -> UNNotificationContent {
-    let senderName = (info["sender_name"] as? String) ?? content.title
+    let isGroup = (info["group"] as? Bool) == true || (info["group"] as? String) == "true"
+    // In a group the system's title is the person of the intent: make it the
+    // group (as Telegram does); the author stays in front of the text, which
+    // the server already put there ("Surname Name: text").
+    let senderName = isGroup ? content.title : ((info["sender_name"] as? String) ?? content.title)
     let senderId = "\(info["sender"] ?? "0")"
     let conversationId = "\(info["conversation"] ?? "0")"
-    let isGroup = (info["group"] as? Bool) == true || (info["group"] as? String) == "true"
 
     if #available(iOS 15.0, *) {
       let person = INPerson(
@@ -74,7 +77,7 @@ final class NotificationService: UNNotificationServiceExtension {
       let intent = INSendMessageIntent(
         recipients: nil,
         content: content.body,
-        speakableGroupName: isGroup ? INSpeakableString(spokenPhrase: content.title) : nil,
+        speakableGroupName: nil,
         conversationIdentifier: conversationId,
         serviceName: nil,
         sender: person

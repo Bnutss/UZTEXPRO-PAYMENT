@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,8 +13,12 @@ import '../../core/widgets/ui_blocks.dart';
 import 'chat_api.dart';
 import 'chat_group_picker.dart';
 import 'chat_models.dart';
+import 'chat_profile_page.dart';
+import 'chat_media_grid.dart';
+import 'chat_voice_list.dart';
 import 'chat_socket.dart';
 import 'chat_thread_controller.dart';
+import 'chat_thread_page.dart' show chatInstantRoute;
 import 'chat_widgets.dart';
 
 /// The group's card, as the person's one: the photo, the title, how many
@@ -25,7 +31,19 @@ class ChatGroupPage extends StatefulWidget {
     required this.link,
     required this.statusOf,
     this.onChanged,
+    this.onWrite,
+    this.voiceFeed,
+    this.mediaFeed,
   });
+
+  /// The group's photos and videos, in a grid under the members.
+  final MediaFeed? mediaFeed;
+
+  /// The group's voice messages, listed under the members.
+  final VoiceFeed? voiceFeed;
+
+  /// Opens a personal chat with a member ("Write" in the member's card).
+  final void Function(ChatUser user)? onWrite;
 
   final ChatThreadController controller;
   final ChatRest api;
@@ -80,6 +98,27 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
   Future<void> _rename() async {
     final s = S.of(context);
     HapticFeedback.selectionClick();
+    if (Platform.isIOS) {
+      // The same card as when the group was made: the photo and the name.
+      final edit = await editGroupNative(
+        context,
+        name: _c.group?.peer.name ?? _c.peer.name,
+        photo: _c.group?.peer.photo ?? _c.peer.photo,
+        members: _c.group?.members ?? const [],
+      );
+      if (edit == null || !mounted) return;
+      final title = edit.name.trim();
+      if (title.isNotEmpty && title != (_c.group?.peer.name ?? '')) {
+        await _run(() => _c.renameGroup(title));
+        if (!mounted) return;
+      }
+      if (edit.photo != null) {
+        await _run(() => _c.changeGroupPhoto(edit.photo!));
+      } else if (edit.removePhoto) {
+        await _run(_c.removeGroupPhoto);
+      }
+      return;
+    }
     final name = await AdaptiveAlertDialog.inputShow(
       context: context,
       title: s.chatRename,
@@ -90,13 +129,13 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
       ),
       actions: [
         AlertAction(
-          title: s.cancel,
-          style: AlertActionStyle.cancel,
+          title: s.save,
+          style: AlertActionStyle.primary,
           onPressed: () {},
         ),
         AlertAction(
-          title: s.save,
-          style: AlertActionStyle.primary,
+          title: s.chatCancel,
+          style: AlertActionStyle.cancel,
           onPressed: () {},
         ),
       ],
@@ -114,11 +153,6 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
       context: context,
       title: s.chatChangePhoto,
       actions: [
-        AlertAction(
-          title: s.cancel,
-          style: AlertActionStyle.cancel,
-          onPressed: () {},
-        ),
         if (hasPhoto)
           AlertAction(
             title: s.chatRemovePhoto,
@@ -134,6 +168,11 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
               await _run(() => _c.changeGroupPhoto(bytes));
             }
           },
+        ),
+        AlertAction(
+          title: s.chatCancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
         ),
       ],
     );
@@ -168,14 +207,14 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
       title: s.chatLeaveTitle,
       actions: [
         AlertAction(
-          title: s.cancel,
-          style: AlertActionStyle.cancel,
-          onPressed: () {},
-        ),
-        AlertAction(
           title: s.chatLeaveConfirm,
           style: AlertActionStyle.destructive,
           onPressed: () => _run(_c.leaveGroup),
+        ),
+        AlertAction(
+          title: s.chatCancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
         ),
       ],
     );
@@ -189,20 +228,41 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
       title: s.chatDeleteGroupTitle,
       actions: [
         AlertAction(
-          title: s.cancel,
-          style: AlertActionStyle.cancel,
-          onPressed: () {},
-        ),
-        AlertAction(
           title: s.chatDeleteGroup,
           style: AlertActionStyle.destructive,
           onPressed: () => _run(_c.deleteGroup),
+        ),
+        AlertAction(
+          title: s.chatCancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
         ),
       ],
     );
   }
 
-  /// A tap on a member (admins): make / unmake an admin, remove.
+  /// A tap on a member: the member's card.
+  void _openMember(ChatUser m) {
+    HapticFeedback.selectionClick();
+    final me = widget.api.myId;
+    final write = widget.onWrite;
+    Navigator.of(context).push(
+      chatInstantRoute(
+        (_) => ChatProfilePage(
+          user: m,
+          listenable: Listenable.merge([_c, widget.link.connected]),
+          statusOf: () => m.online
+              ? S.of(context).chatOnline
+              : S.of(context).chatLastSeen(m.lastSeen),
+          showManage: false,
+          showWrite: write != null && m.id != me,
+          onWrite: write == null ? null : () => write(m),
+        ),
+      ),
+    );
+  }
+
+  /// A long press on a member (admins): make / unmake an admin, remove.
   void _memberMenu(ChatUser m) {
     final s = S.of(context);
     final me = widget.api.myId;
@@ -213,13 +273,8 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
     HapticFeedback.selectionClick();
     showNativeAlert(
       context: context,
-      title: m.name,
+      title: m.surnameName,
       actions: [
-        AlertAction(
-          title: s.cancel,
-          style: AlertActionStyle.cancel,
-          onPressed: () {},
-        ),
         if (iAmOwner)
           AlertAction(
             title: m.isAdmin ? s.chatRemoveAdmin : s.chatMakeAdmin,
@@ -231,6 +286,11 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
           title: s.chatRemoveFromGroup,
           style: AlertActionStyle.destructive,
           onPressed: () => _run(() => _c.removeMember(m.id)),
+        ),
+        AlertAction(
+          title: s.chatCancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
         ),
       ],
     );
@@ -368,11 +428,40 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
                                   ? s.chatOnline
                                   : s.chatLastSeen(members[i].lastSeen),
                               youLabel: s.chatYou,
-                              onTap: () => _memberMenu(members[i]),
+                              onTap: () => _openMember(members[i]),
+                              onLongPress: () => _memberMenu(members[i]),
                             ),
                           ],
                         ],
                       ),
+                    ),
+                  ],
+                  if (widget.mediaFeed != null) ...[
+                    const SizedBox(height: 18),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16, bottom: 6),
+                      child: Text(
+                        s.chatMedia.toUpperCase(),
+                        style: const TextStyle(fontSize: 13, color: kChatMuted),
+                      ),
+                    ),
+                    ProfileMediaGrid(
+                      key: const ValueKey('media'),
+                      feed: widget.mediaFeed!,
+                    ),
+                  ],
+                  if (widget.voiceFeed != null) ...[
+                    const SizedBox(height: 18),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16, bottom: 6),
+                      child: Text(
+                        s.chatVoiceMessage.toUpperCase(),
+                        style: const TextStyle(fontSize: 13, color: kChatMuted),
+                      ),
+                    ),
+                    ProfileVoiceList(
+                      key: const ValueKey('voices'),
+                      feed: widget.voiceFeed!,
                     ),
                   ],
                   if (_c.group?.myRole == 'owner') ...[
@@ -459,8 +548,10 @@ class _MemberRow extends StatelessWidget {
     required this.status,
     required this.youLabel,
     required this.onTap,
+    required this.onLongPress,
   });
 
+  final VoidCallback onLongPress;
   final ChatUser user;
   final bool isMe;
   final String? roleLabel;
@@ -472,6 +563,7 @@ class _MemberRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
         child: Row(
@@ -491,7 +583,7 @@ class _MemberRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isMe ? '${user.name} ($youLabel)' : user.name,
+                    isMe ? '${user.surnameName} ($youLabel)' : user.surnameName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 16, color: kChatInk),
