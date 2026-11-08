@@ -4,6 +4,8 @@ import 'dart:io' show Platform;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/widgets/app_image_cache.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -262,9 +264,10 @@ class _AttendancePageState extends State<AttendancePage> {
           // Opens to the full height at once, not half the screen.
           'tall': true,
           'name': entry.name,
-          'subtitle': [entry.position, entry.department]
-              .where((t) => t.isNotEmpty)
-              .join(' · '),
+          'subtitle': [
+            entry.position,
+            entry.department,
+          ].where((t) => t.isNotEmpty).join(' · '),
           'isIn': entry.isIn,
           'status': entry.isIn ? s.dashboardInTerritory : s.attendanceStatusOut,
           'phone': entry.phone,
@@ -757,11 +760,14 @@ class _PhotoViewer extends StatelessWidget {
                   tag: 'attendance_photo_${entry.id}_big',
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
-                    child: Image.network(
-                      entry.photoUrl!,
-                      headers: headers,
+                    child: CachedNetworkImage(
+                      imageUrl: entry.photoUrl!,
+                      cacheKey: entry.photoUrl!,
+                      cacheManager: appImageCache,
+                      httpHeaders: headers,
                       fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      fadeInDuration: Duration.zero,
+                      errorWidget: (_, _, _) => const SizedBox.shrink(),
                     ),
                   ),
                 ),

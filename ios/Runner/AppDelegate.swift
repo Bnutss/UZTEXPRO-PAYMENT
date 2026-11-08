@@ -1164,8 +1164,9 @@ final class PhotoPickerHolder: NSObject, PHPickerViewControllerDelegate {
 //
 // As in Telegram: the page goes dark and blurred, a card shows the chat's
 // header and its last messages (and it SCROLLS), and under it a menu of
-// actions. A tap on the card opens the chat. It answers {"open": true},
-// {"index": n} (the action) or nil (closed).
+// actions. It is a silent look: nothing on the card opens the chat, and the
+// messages are only fetched, never marked read. It answers {"index": n} (the
+// action) or nil (closed).
 
 struct ChatPreviewConfig {
   let title: String
@@ -1236,7 +1237,6 @@ enum ChatPreviewPresenter {
       config: config,
       actions: actions,
       onPick: { index in close(["index": index]) },
-      onOpen: { close(["open": true]) },
       onClose: { close(nil) }
     )
     let controller = UIHostingController(rootView: view)
@@ -1256,6 +1256,16 @@ struct PreviewMessage: Identifiable {
   let text: String
   let time: String
   let isSystem: Bool
+  /// text / voice / image / video / file / system
+  let kind: String
+  /// Photos and videos: the small picture on the server and its shape.
+  let thumb: String
+  let aspect: CGFloat
+  /// Voice messages: length in ms and the loudness bars (0..31).
+  let durationMs: Int
+  let waveform: [Int]
+  /// Files: the file name.
+  let fileName: String
 }
 
 final class ChatPreviewModel: ObservableObject {
@@ -1294,23 +1304,24 @@ final class ChatPreviewModel: ObservableObject {
     return rows.compactMap { r in
       guard let id = (r["id"] as? NSNumber)?.intValue else { return nil }
       let created = (r["created_at"] as? String).flatMap { iso.date(from: $0) ?? plain.date(from: $0) }
-      // Voice messages and media have no text of their own: a line with an icon.
-      var text = r["text"] as? String ?? ""
+      let kind = r["kind"] as? String ?? "text"
       let media = r["media"] as? [String: Any]
-      switch r["kind"] as? String {
-      case "voice": text = "🎤 " + text
-      case "image": text = "📷 " + (text.isEmpty ? "Фото" : text)
-      case "video": text = "🎥 " + (text.isEmpty ? "Видео" : text)
-      case "file": text = "📎 " + (text.isEmpty ? (media?["name"] as? String ?? "Файл") : text)
-      default: break
-      }
+      let width = (media?["width"] as? NSNumber)?.doubleValue ?? 0
+      let height = (media?["height"] as? NSNumber)?.doubleValue ?? 0
+      let aspect = width > 0 && height > 0 ? CGFloat(width / height) : 1
       return PreviewMessage(
         id: id,
         sender: (r["sender"] as? NSNumber)?.intValue ?? 0,
         senderName: r["sender_name"] as? String ?? "",
-        text: text,
+        text: r["text"] as? String ?? "",
         time: created.map { clock.string(from: $0) } ?? "",
-        isSystem: (r["kind"] as? String) == "system"
+        isSystem: kind == "system",
+        kind: kind,
+        thumb: media?["thumb"] as? String ?? "",
+        aspect: min(max(aspect, 0.62), 1.7),
+        durationMs: (r["duration_ms"] as? NSNumber)?.intValue ?? 0,
+        waveform: (r["waveform"] as? [NSNumber])?.map { $0.intValue } ?? [],
+        fileName: media?["name"] as? String ?? ""
       )
     }
   }
@@ -1336,7 +1347,6 @@ struct ChatPreviewScreen: View {
   @StateObject private var model: ChatPreviewModel
   let actions: [PreviewAction]
   let onPick: (Int) -> Void
-  let onOpen: () -> Void
   let onClose: () -> Void
 
   @State private var appeared = false
@@ -1345,11 +1355,10 @@ struct ChatPreviewScreen: View {
   private let accent = Color(red: 1.0, green: 0.416, blue: 0.0)
 
   init(config: ChatPreviewConfig, actions: [PreviewAction],
-       onPick: @escaping (Int) -> Void, onOpen: @escaping () -> Void, onClose: @escaping () -> Void) {
+       onPick: @escaping (Int) -> Void, onClose: @escaping () -> Void) {
     _model = StateObject(wrappedValue: ChatPreviewModel(config))
     self.actions = actions
     self.onPick = onPick
-    self.onOpen = onOpen
     self.onClose = onClose
   }
 
@@ -1373,6 +1382,10 @@ struct ChatPreviewScreen: View {
       }
       .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
     }
+    // The whole screen: the row's position comes in screen coordinates, so
+    // the card must be measured from the screen's top, not from under the
+    // status bar (it sat lower by the safe area and was cut off).
+    .ignoresSafeArea()
     .onAppear {
       model.load()
       withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) { appeared = true }
@@ -1390,7 +1403,7 @@ struct ChatPreviewScreen: View {
     let fixed = menuHeight + gap
     let below = safeBottom - (rowBottom + 8) - fixed
     let above = (rowTop - 8) - safeTop - fixed
-    let wanted: CGFloat = min(geo.size.height * 0.55, 500)
+    let wanted: CGFloat = min(geo.size.height * 0.62, 560)
     if rowBottom > 0 {
       if below >= 260 {
         let h = min(wanted, below)
@@ -1424,7 +1437,9 @@ struct ChatPreviewScreen: View {
     }
     .clipped()
     .contentShape(Rectangle())
-    .onTapGesture { onOpen() }
+    // A silent look: nothing on the card opens the chat (and a tap on it does
+    // not close the preview either); a tap outside the card closes it.
+    .onTapGesture {}
   }
 
   private var header: some View {
@@ -1450,20 +1465,30 @@ struct ChatPreviewScreen: View {
       Text(model.config.emptyText).foregroundColor(.secondary)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     } else {
-      ScrollViewReader { proxy in
-        ScrollView(.vertical, showsIndicators: false) {
-          VStack(spacing: 3) {
-            ForEach(Array(model.messages.enumerated()), id: \.element.id) { index, m in
-              bubble(m, previous: index > 0 ? model.messages[index - 1] : nil).id(m.id)
+      GeometryReader { box in
+        ScrollViewReader { proxy in
+          ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 3) {
+              // A short chat sits at the bottom, like in the chat itself.
+              Spacer(minLength: 0)
+              ForEach(Array(model.messages.enumerated()), id: \.element.id) { index, m in
+                bubble(m, previous: index > 0 ? model.messages[index - 1] : nil).id(m.id)
+              }
+              Color.clear.frame(height: 1).id("bottom")
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 66)
+            .padding(.bottom, 10)
+            .frame(minHeight: box.size.height)
+          }
+          // Opens at the newest messages (scroll up for older ones). The
+          // images size themselves a moment later, so it scrolls again.
+          .onAppear {
+            proxy.scrollTo("bottom", anchor: .bottom)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+              proxy.scrollTo("bottom", anchor: .bottom)
             }
           }
-          .padding(.horizontal, 10)
-          .padding(.top, 66)
-          .padding(.bottom, 10)
-        }
-        // It opens at the newest messages, and scrolls up to older ones.
-        .onAppear {
-          if let last = model.messages.last { proxy.scrollTo(last.id, anchor: .bottom) }
         }
       }
     }
@@ -1494,18 +1519,86 @@ struct ChatPreviewScreen: View {
             Text(m.senderName.split(separator: " ").first.map(String.init) ?? "")
               .font(.system(size: 13, weight: .semibold)).foregroundColor(accent)
           }
-          HStack(alignment: .lastTextBaseline, spacing: 8) {
-            Text(m.text).font(.system(size: 15)).foregroundColor(.black)
-            Text(m.time).font(.system(size: 11))
-              .foregroundColor(mine ? Color(red: 0.36, green: 0.67, blue: 0.33) : .secondary)
-          }
+          content(of: m, mine: mine)
         }
-        .padding(.horizontal, 12).padding(.vertical, 6)
+        .padding(.horizontal, m.kind == "image" || m.kind == "video" ? 4 : 12)
+        .padding(.vertical, m.kind == "image" || m.kind == "video" ? 4 : 6)
         .background(mine ? mineGreen : Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         if !mine { Spacer(minLength: 40) }
       }
     }
+  }
+
+  private func timeText(_ m: PreviewMessage, mine: Bool) -> some View {
+    Text(m.time).font(.system(size: 11))
+      .foregroundColor(mine ? Color(red: 0.36, green: 0.67, blue: 0.33) : .secondary)
+  }
+
+  /// What is inside a bubble: text, a voice message with its bars, a photo /
+  /// video picture (with a caption), or a file.
+  @ViewBuilder
+  private func content(of m: PreviewMessage, mine: Bool) -> some View {
+    switch m.kind {
+    case "voice":
+      HStack(spacing: 10) {
+        ZStack {
+          Circle().fill(mine ? Color(red: 0.36, green: 0.67, blue: 0.33) : accent)
+          Image(systemName: "play.fill").font(.system(size: 14, weight: .bold)).foregroundColor(.white)
+        }
+        .frame(width: 36, height: 36)
+        VStack(alignment: .leading, spacing: 3) {
+          PreviewWaveform(bars: m.waveform, tint: mine ? Color(red: 0.36, green: 0.67, blue: 0.33) : accent)
+            .frame(width: 130, height: 22)
+          HStack {
+            Text(Self.clock(m.durationMs)).font(.system(size: 11))
+              .foregroundColor(mine ? Color(red: 0.36, green: 0.67, blue: 0.33) : accent)
+            Spacer(minLength: 8)
+            timeText(m, mine: mine)
+          }
+          .frame(width: 130)
+        }
+      }
+    case "image", "video":
+      VStack(alignment: .leading, spacing: 4) {
+        ZStack(alignment: .bottomTrailing) {
+          PreviewThumb(url: m.thumb, video: m.kind == "video")
+            .frame(width: 210, height: min(max(210 / m.aspect, 110), 300))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+          if m.text.isEmpty {
+            timeText(m, mine: false)
+              .foregroundColor(.white)
+              .padding(.horizontal, 7).padding(.vertical, 2)
+              .background(Color.black.opacity(0.45))
+              .clipShape(Capsule())
+              .padding(6)
+          }
+        }
+        if !m.text.isEmpty {
+          HStack(alignment: .lastTextBaseline, spacing: 8) {
+            Text(m.text).font(.system(size: 15)).foregroundColor(.black)
+            timeText(m, mine: mine)
+          }
+          .padding(.horizontal, 8).padding(.bottom, 2)
+        }
+      }
+    case "file":
+      HStack(alignment: .lastTextBaseline, spacing: 8) {
+        Image(systemName: "paperclip").font(.system(size: 14)).foregroundColor(accent)
+        Text(m.text.isEmpty ? m.fileName : m.text).font(.system(size: 15)).foregroundColor(.black).lineLimit(2)
+        timeText(m, mine: mine)
+      }
+    default:
+      HStack(alignment: .lastTextBaseline, spacing: 8) {
+        Text(m.text).font(.system(size: 15)).foregroundColor(.black)
+        timeText(m, mine: mine)
+      }
+    }
+  }
+
+  private static func clock(_ ms: Int) -> String {
+    let total = max(0, ms / 1000)
+    return String(format: "%d:%02d", total / 60, total % 60)
   }
 
   // The menu under the card: rounded, label left, icon right, red when it deletes.
@@ -1528,6 +1621,53 @@ struct ChatPreviewScreen: View {
     }
     .frame(width: 260)
     .modifier(MenuGlass())
+  }
+}
+
+/// A photo's / video's small picture from the server (a grey tile until it
+/// arrives, a play mark on a video).
+struct PreviewThumb: View {
+  let url: String
+  let video: Bool
+
+  var body: some View {
+    ZStack {
+      Color.black.opacity(0.08)
+      if let u = URL(string: url), !url.isEmpty {
+        AsyncImage(url: u) { phase in
+          if let image = phase.image { image.resizable().scaledToFill() }
+        }
+      } else {
+        Image(systemName: video ? "video" : "photo").font(.system(size: 26)).foregroundColor(.secondary)
+      }
+      if video {
+        Image(systemName: "play.circle.fill")
+          .font(.system(size: 40)).foregroundColor(.white.opacity(0.9))
+          .shadow(radius: 3)
+      }
+    }
+    .clipped()
+  }
+}
+
+/// The loudness bars of a voice message.
+struct PreviewWaveform: View {
+  let bars: [Int]
+  let tint: Color
+
+  var body: some View {
+    GeometryReader { geo in
+      let count = max(1, Int(geo.size.width / 4))
+      HStack(alignment: .center, spacing: 2) {
+        ForEach(0..<count, id: \.self) { i in
+          let v = bars.isEmpty ? 8 : bars[min(bars.count - 1, i * bars.count / count)]
+          RoundedRectangle(cornerRadius: 1)
+            .fill(tint.opacity(0.85))
+            .frame(width: 2, height: max(3, geo.size.height * CGFloat(v) / 31))
+        }
+      }
+      .frame(maxHeight: .infinity)
+    }
   }
 }
 
@@ -1570,7 +1710,7 @@ struct MenuGlass: ViewModifier {
 enum PhotoViewerPresenter {
   static func present(_ args: [String: Any]) {
     guard let urlString = args["url"] as? String, let url = URL(string: urlString) else { return }
-    let vc = PhotoViewerController(url: url, title: args["title"] as? String)
+    let vc = PhotoViewerController(url: url, title: args["title"] as? String, subtitle: args["subtitle"] as? String)
     let nav = UINavigationController(rootViewController: vc)
     nav.modalPresentationStyle = .overFullScreen
     nav.modalTransitionStyle = .crossDissolve
@@ -1585,16 +1725,88 @@ enum PhotoViewerPresenter {
   }
 }
 
+/// The viewer's header: the sender's name and, under it, the date and time, on
+/// a Liquid Glass capsule (a blur material before iOS 26), like the name
+/// capsule of the chat header.
+final class ViewerTitleCapsule: UIView {
+  private let glass: UIVisualEffectView
+  private let stack = UIStackView()
+  private let inset = UIEdgeInsets(top: 6, left: 18, bottom: 6, right: 18)
+
+  init(title: String, subtitle: String?) {
+    if #available(iOS 26.0, *) {
+      let effect = UIGlassEffect()
+      effect.isInteractive = false
+      glass = UIVisualEffectView(effect: effect)
+      glass.cornerConfiguration = .capsule()
+    } else {
+      glass = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
+      glass.clipsToBounds = true
+    }
+    super.init(frame: .zero)
+
+    let name = UILabel()
+    name.text = title
+    name.font = .systemFont(ofSize: 16, weight: .semibold)
+    name.textColor = .white
+    name.textAlignment = .center
+    name.lineBreakMode = .byTruncatingTail
+    stack.addArrangedSubview(name)
+    if let subtitle = subtitle, !subtitle.isEmpty {
+      let when = UILabel()
+      when.text = subtitle
+      when.font = .systemFont(ofSize: 12, weight: .regular)
+      when.textColor = UIColor.white.withAlphaComponent(0.7)
+      when.textAlignment = .center
+      stack.addArrangedSubview(when)
+    }
+    stack.axis = .vertical
+    stack.alignment = .center
+    stack.spacing = 0
+
+    addSubview(glass)
+    glass.contentView.addSubview(stack)
+    translatesAutoresizingMaskIntoConstraints = false
+  }
+
+  required init?(coder: NSCoder) { fatalError() }
+
+  private func fitted(maxWidth: CGFloat) -> CGSize {
+    let content = stack.systemLayoutSizeFitting(
+      CGSize(width: max(0, maxWidth - inset.left - inset.right), height: UIView.layoutFittingCompressedSize.height),
+      withHorizontalFittingPriority: .fittingSizeLevel,
+      verticalFittingPriority: .fittingSizeLevel)
+    return CGSize(
+      width: min(maxWidth, content.width + inset.left + inset.right),
+      height: content.height + inset.top + inset.bottom)
+  }
+
+  override var intrinsicContentSize: CGSize { fitted(maxWidth: 240) }
+
+  override func sizeThatFits(_ size: CGSize) -> CGSize { fitted(maxWidth: 240) }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    glass.frame = bounds
+    if #unavailable(iOS 26.0) { glass.layer.cornerRadius = bounds.height / 2 }
+    stack.frame = bounds.inset(by: inset)
+  }
+}
+
 final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
   private let url: URL
   private let scrollView = UIScrollView()
   private let imageView = UIImageView()
   private let spinner = UIActivityIndicatorView(style: .large)
 
-  init(url: URL, title: String?) {
+  /// [title] is the sender's name, [subtitle] the date and time (under it).
+  init(url: URL, title: String?, subtitle: String?) {
     self.url = url
     super.init(nibName: nil, bundle: nil)
     self.title = title
+    if let title = title, !title.isEmpty {
+      navigationItem.titleView = ViewerTitleCapsule(title: title, subtitle: subtitle)
+    }
   }
   required init?(coder: NSCoder) { fatalError() }
 

@@ -211,6 +211,7 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
   /// (a group), or connecting / typing / online / last seen (a person).
   String _statusLine(S s) {
     if (!widget.link.connected.value) return s.chatConnecting;
+    if (_c.syncing) return s.chatUpdating;
     if (widget.isGroup) {
       if (_c.peerTyping) {
         return s.chatTypingNames([
@@ -531,6 +532,27 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     return result;
   }
 
+  /// Who sent a photo / video, for the viewer's header: "You" for mine, else
+  /// the person's "Surname Name" (in a group: the member's).
+  String _senderLabel(ChatMessage m, S s) {
+    if (_c.isMine(m)) return s.chatYou;
+    if (widget.isGroup) {
+      final full =
+          _c.names[m.sender] ??
+          (m.senderName.isNotEmpty ? m.senderName : s.chatMemberFallback);
+      // "Surname Name" without the patronymic, as in the lists.
+      return full.trim().split(RegExp(r'\s+')).take(2).join(' ');
+    }
+    return widget.peer.surnameName;
+  }
+
+  /// "08.11.2026 11:00": when it was sent, under the name in the viewer.
+  String _sentAtLabel(ChatMessage m) {
+    String two(int v) => v.toString().padLeft(2, '0');
+    final t = m.createdAt;
+    return '${two(t.day)}.${two(t.month)}.${t.year} ${two(t.hour)}:${two(t.minute)}';
+  }
+
   /// A tap on a photo / video / document: opens it (fetching it first when it
   /// is not on this phone yet).
   Future<void> _openMedia(ChatMessage m) async {
@@ -564,22 +586,35 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     if (m.isImage) {
       if (Platform.isIOS) {
         try {
-          await const MethodChannel('uztexpro/native_sheet').invokeMethod(
-            'photoViewer',
-            {'url': Uri.file(file.path).toString(), 'title': m.media?.name},
-          );
+          await const MethodChannel(
+            'uztexpro/native_sheet',
+          ).invokeMethod('photoViewer', {
+            'url': Uri.file(file.path).toString(),
+            'title': _senderLabel(m, s),
+            'subtitle': _sentAtLabel(m),
+          });
           return;
         } catch (_) {}
       }
       if (!mounted) return;
       Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => PhotoViewerPage(file: file)),
+        MaterialPageRoute<void>(
+          builder: (_) => PhotoViewerPage(
+            file: file,
+            title: _senderLabel(m, s),
+            subtitle: _sentAtLabel(m),
+          ),
+        ),
       );
     } else if (m.isVideo) {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
           fullscreenDialog: true,
-          builder: (_) => VideoViewerPage(file: file),
+          builder: (_) => VideoViewerPage(
+            file: file,
+            title: _senderLabel(m, s),
+            subtitle: _sentAtLabel(m),
+          ),
         ),
       );
     } else {
@@ -771,6 +806,8 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
           mediaFeed: _mediaFeed(),
           statusOf: () => !widget.link.connected.value
               ? s.chatConnecting
+              : _c.syncing
+              ? s.chatUpdating
               : _c.peerTyping
               ? s.chatTyping
               : _c.peerOnline

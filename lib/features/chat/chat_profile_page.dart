@@ -272,6 +272,7 @@ class _ChatProfilePageState extends State<ChatProfilePage> {
                   onChanged: (i) => setState(() => _tab = i),
                 ),
               ),
+              const SizedBox(height: 14),
               if (_tab == 0 && widget.mediaFeed != null)
                 ProfileMediaGrid(
                   key: const ValueKey('media'),

@@ -28,8 +28,8 @@ String chatTimeLabel(DateTime t, S s, {DateTime? now}) {
   return '${two(t.day)}.${two(t.month)}.${two(t.year % 100)}';
 }
 
-/// A flat list of rows with hairlines that start at the text, like the
-/// Telegram chat list. By default on a rounded white card; [plain] drops the
+/// A flat list of rows with hairlines that start at the text and stop short of
+/// the right edge (16 pt), like the Telegram chat list. By default on a rounded white card; [plain] drops the
 /// card: the rows sit straight on the page and only the lines remain (the
 /// contacts list).
 class ChatListCard extends StatelessWidget {
@@ -48,6 +48,7 @@ class ChatListCard extends StatelessWidget {
               height: 0.5,
               thickness: 0.5,
               indent: kChatTextIndent,
+              endIndent: 16,
               color: Color(0x1F000000),
             ),
           children[i],

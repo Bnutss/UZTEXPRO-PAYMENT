@@ -8,9 +8,18 @@ import 'chat_voice.dart';
 /// A full-screen photo (zoom with two fingers) for platforms without the
 /// native iOS viewer.
 class PhotoViewerPage extends StatelessWidget {
-  const PhotoViewerPage({super.key, required this.file});
+  const PhotoViewerPage({
+    super.key,
+    required this.file,
+    this.title,
+    this.subtitle,
+  });
 
   final File file;
+
+  /// The sender's name and, under it, when it was sent.
+  final String? title;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -19,6 +28,10 @@ class PhotoViewerPage extends StatelessWidget {
       backgroundColor: Colors.black,
       foregroundColor: Colors.white,
       elevation: 0,
+      centerTitle: true,
+      title: title == null
+          ? null
+          : _ViewerTitle(title: title!, subtitle: subtitle),
     ),
     body: Center(
       child: InteractiveViewer(
@@ -29,11 +42,49 @@ class PhotoViewerPage extends StatelessWidget {
   );
 }
 
+/// Two lines for a viewer's header: the sender's name and the date + time.
+class _ViewerTitle extends StatelessWidget {
+  const _ViewerTitle({required this.title, this.subtitle});
+
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      if (subtitle != null && subtitle!.isNotEmpty)
+        Text(
+          subtitle!,
+          maxLines: 1,
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+    ],
+  );
+}
+
 /// A full-screen video, played from the file on this phone.
 class VideoViewerPage extends StatefulWidget {
-  const VideoViewerPage({super.key, required this.file});
+  const VideoViewerPage({
+    super.key,
+    required this.file,
+    this.title,
+    this.subtitle,
+  });
 
   final File file;
+  final String? title;
+  final String? subtitle;
 
   @override
   State<VideoViewerPage> createState() => _VideoViewerPageState();
@@ -153,6 +204,16 @@ class _VideoViewerPageState extends State<VideoViewerPage> {
                 child: IconButton(
                   icon: const Icon(Icons.close_rounded, color: Colors.white),
                   onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+            if (_controls && widget.title != null)
+              Positioned(
+                top: MediaQuery.paddingOf(context).top + 8,
+                left: 64,
+                right: 64,
+                child: _ViewerTitle(
+                  title: widget.title!,
+                  subtitle: widget.subtitle,
                 ),
               ),
           ],

@@ -254,13 +254,12 @@ class _SwipeButton extends StatelessWidget {
 // ── Long press: the native preview of a chat ────────────────────────────
 
 /// Shows the native preview (iOS): the chat's last messages in a card that
-/// scrolls, and the menu of [actions] under it. A tap on the card calls
-/// [onOpen]; a tap on an action runs it. Returns false where there is no
+/// scrolls, and the menu of [actions] under it. It is a silent look: nothing on
+/// the card opens the chat (and nothing is marked read); a tap on an action runs it. Returns false where there is no
 /// native preview (the caller shows a menu instead).
 Future<bool> showNativeChatPreview({
   required Map<String, dynamic> preview,
   required List<ChatListAction> actions,
-  required VoidCallback onOpen,
 }) async {
   if (!Platform.isIOS) return false;
   try {
@@ -277,12 +276,8 @@ Future<bool> showNativeChatPreview({
           ],
         });
     if (res == null) return true; // closed
-    if (res['open'] == true) {
-      onOpen();
-    } else {
-      final i = (res['index'] as num?)?.toInt();
-      if (i != null && i >= 0 && i < actions.length) actions[i].onTap();
-    }
+    final i = (res['index'] as num?)?.toInt();
+    if (i != null && i >= 0 && i < actions.length) actions[i].onTap();
     return true;
   } on MissingPluginException {
     return false;

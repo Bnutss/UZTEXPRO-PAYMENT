@@ -842,11 +842,8 @@ class S {
   String get amountColon =>
       _t({'ru': 'Сумма:', 'en': 'Amount:', 'uz': 'Summa:'});
 
-  String get updating => _t({
-    'ru': 'Обновление...',
-    'en': 'Updating...',
-    'uz': 'Yangilanmoqda...',
-  });
+  String get updating =>
+      _t({'ru': 'Обновление…', 'en': 'Updating…', 'uz': 'Yangilanmoqda…'});
 
   String get noPermission => _t({
     'ru': 'У вас нет прав на изменение статуса',
@@ -1355,6 +1352,12 @@ class S {
   // AI Assistant
   String get chatTitle => _t({'ru': 'Чаты', 'en': 'Chats', 'uz': 'Chatlar'});
 
+  String get chatUpdating => _t({
+    'ru': 'Обновление...',
+    'en': 'Updating...',
+    'uz': 'Yangilanmoqda...',
+  });
+
   String get contactsTitle =>
       _t({'ru': 'Контакты', 'en': 'Contacts', 'uz': 'Kontaktlar'});
 
@@ -1500,7 +1503,7 @@ class S {
   });
   String get chatEditGroup =>
       _t({'ru': 'изменить', 'en': 'edit', 'uz': 'tahrirlash'});
-  String get chatLeave => _t({'ru': 'выйти', 'en': 'leave', 'uz': 'chiqish'});
+  String get chatMoreShort => _t({'ru': 'ещё', 'en': 'more', 'uz': 'yana'});
   String get chatAddShort =>
       _t({'ru': 'добавить', 'en': 'add', 'uz': 'qo‘shish'});
   String get chatMembers =>
@@ -1815,7 +1818,7 @@ class S {
   }
 
   String get chatConnecting =>
-      _t({'ru': 'Подключение…', 'en': 'Connecting…', 'uz': 'Ulanmoqda…'});
+      _t({'ru': 'Соединение…', 'en': 'Connecting…', 'uz': 'Ulanmoqda…'});
 
   String get chatToday => _t({'ru': 'Сегодня', 'en': 'Today', 'uz': 'Bugun'});
 

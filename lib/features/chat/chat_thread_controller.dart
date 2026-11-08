@@ -94,6 +94,10 @@ class ChatThreadController extends ChangeNotifier {
   /// Notifications of this chat are off (for me).
   bool muted = false;
 
+  /// The latest messages are being fetched (first open, or catching up after
+  /// the socket came back): the header says "Updating…".
+  bool syncing = false;
+
   /// The chat was deleted (by me or by the peer): the screen should close.
   bool deleted = false;
 
@@ -311,6 +315,8 @@ class ChatThreadController extends ChangeNotifier {
       });
 
   Future<void> _loadLatest({bool initial = false}) async {
+    syncing = true;
+    _changed();
     try {
       await _ensureConversation();
       final page = await rest.messages(_convId!, limit: pageSize);
@@ -330,6 +336,7 @@ class ChatThreadController extends ChangeNotifier {
       if (initial) historyFailed = true;
     } finally {
       loading = false;
+      syncing = false;
       _changed();
       _markReadIfNeeded();
     }

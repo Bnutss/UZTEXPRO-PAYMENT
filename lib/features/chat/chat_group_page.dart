@@ -9,6 +9,7 @@ import '../../core/widgets/routeless_alert.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/adaptive_back_button.dart';
 import '../../core/widgets/fading_header_scaffold.dart';
+import '../../core/widgets/native_segments.dart';
 import '../../core/widgets/ui_blocks.dart';
 import 'chat_api.dart';
 import 'chat_group_picker.dart';
@@ -58,9 +59,11 @@ class ChatGroupPage extends StatefulWidget {
 }
 
 class _ChatGroupPageState extends State<ChatGroupPage> {
+  /// 0 = media, 1 = voice messages (the segmented switch under the members).
+  int _tab = 0;
+
   static const _bg = Color(0xFFF2F2F7);
   static const _blue = Color(0xFF3478F6);
-  static const _red = Color(0xFFFF3B30);
 
   ChatThreadController get _c => widget.controller;
 
@@ -197,6 +200,35 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
     final draft = await pickGroupMembers(context, candidates, add: true);
     if (draft == null || draft.ids.isEmpty || !mounted) return;
     await _run(() => _c.addMembers(draft.ids));
+  }
+
+  /// "More": a native menu (tap) with leave and, for the owner, delete group.
+  Widget _moreMenu(S s) {
+    final ios26 = PlatformInfo.isIOS26OrHigher();
+    return AdaptivePopupMenuButton.widget<String>(
+      items: [
+        AdaptivePopupMenuItem<String>(
+          label: s.chatLeaveConfirm,
+          icon: ios26
+              ? 'rectangle.portrait.and.arrow.right'
+              : Icons.logout_rounded,
+          isDestructive: true,
+          value: 'leave',
+        ),
+        if (_c.group?.myRole == 'owner')
+          AdaptivePopupMenuItem<String>(
+            label: s.chatDeleteGroup,
+            icon: ios26 ? 'trash' : Icons.delete_outline_rounded,
+            isDestructive: true,
+            value: 'delete',
+          ),
+      ],
+      onSelected: (_, entry) {
+        if (entry.value == 'leave') _leave();
+        if (entry.value == 'delete') _deleteGroup();
+      },
+      child: _Tile(icon: Icons.more_horiz_rounded, label: s.chatMoreShort),
+    );
   }
 
   void _leave() {
@@ -383,14 +415,7 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
                         ),
                       ],
                       const SizedBox(width: 8),
-                      Expanded(
-                        child: _Tile(
-                          icon: Icons.logout_rounded,
-                          label: s.chatLeave,
-                          color: _red,
-                          onTap: _leave,
-                        ),
-                      ),
+                      Expanded(child: _moreMenu(s)),
                     ],
                   ),
                   if (members.isNotEmpty) ...[
@@ -436,51 +461,39 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
                       ),
                     ),
                   ],
-                  if (widget.mediaFeed != null) ...[
-                    const SizedBox(height: 18),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16, bottom: 6),
-                      child: Text(
-                        s.chatMedia.toUpperCase(),
-                        style: const TextStyle(fontSize: 13, color: kChatMuted),
+                  if (widget.mediaFeed != null || widget.voiceFeed != null) ...[
+                    const SizedBox(height: 20),
+                    Center(
+                      child: NativeSegments(
+                        labels: [s.chatMedia, s.chatVoice],
+                        selectedIndex: _tab,
+                        minSegmentWidth: 110,
+                        onChanged: (i) => setState(() => _tab = i),
                       ),
                     ),
-                    ProfileMediaGrid(
-                      key: const ValueKey('media'),
-                      feed: widget.mediaFeed!,
-                    ),
-                  ],
-                  if (widget.voiceFeed != null) ...[
-                    const SizedBox(height: 18),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16, bottom: 6),
-                      child: Text(
-                        s.chatVoiceMessage.toUpperCase(),
-                        style: const TextStyle(fontSize: 13, color: kChatMuted),
-                      ),
-                    ),
-                    ProfileVoiceList(
-                      key: const ValueKey('voices'),
-                      feed: widget.voiceFeed!,
-                    ),
-                  ],
-                  if (_c.group?.myRole == 'owner') ...[
-                    const SizedBox(height: 18),
-                    GestureDetector(
-                      onTap: _deleteGroup,
-                      child: Container(
-                        height: 52,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                        ),
+                    const SizedBox(height: 14),
+                    if (_tab == 0 && widget.mediaFeed != null)
+                      ProfileMediaGrid(
+                        key: const ValueKey('media'),
+                        feed: widget.mediaFeed!,
+                      )
+                    else if (_tab == 1 && widget.voiceFeed != null)
+                      ProfileVoiceList(
+                        key: const ValueKey('voices'),
+                        feed: widget.voiceFeed!,
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 40),
                         child: Text(
-                          s.chatDeleteGroup,
-                          style: const TextStyle(fontSize: 17, color: _red),
+                          s.chatNothingYet,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: kChatMuted,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ],
               ),
@@ -500,17 +513,11 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
 }
 
 class _Tile extends StatelessWidget {
-  const _Tile({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.color = _ChatGroupPageState._blue,
-  });
+  const _Tile({required this.icon, required this.label, this.onTap});
 
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
-  final Color color;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -525,13 +532,16 @@ class _Tile extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 22),
+            Icon(icon, color: _ChatGroupPageState._blue, size: 22),
             const SizedBox(height: 3),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 11, color: color),
+              style: const TextStyle(
+                fontSize: 11,
+                color: _ChatGroupPageState._blue,
+              ),
             ),
           ],
         ),

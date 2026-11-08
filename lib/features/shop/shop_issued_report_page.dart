@@ -1,4 +1,6 @@
 import 'dart:io' show Platform;
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/widgets/app_image_cache.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -248,7 +250,12 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage>
       'sections': [
         {
           'rows': [
-            pvzRow('person.fill', kSheetBlue, s.shopPickupBuyer, order.buyerName),
+            pvzRow(
+              'person.fill',
+              kSheetBlue,
+              s.shopPickupBuyer,
+              order.buyerName,
+            ),
             pvzRow(
               'person.badge.key.fill',
               kSheetIndigo,
@@ -300,7 +307,8 @@ class _ShopIssuedReportPageState extends State<ShopIssuedReportPage>
       'name': group.name,
       'subtitle':
           '${group.orders.length} · ${_numberFormat.format(group.totalValue)} сум',
-      if (group.pendingCount > 0) 'status': '${s.shopIssuedStatusPending}: ${group.pendingCount}',
+      if (group.pendingCount > 0)
+        'status': '${s.shopIssuedStatusPending}: ${group.pendingCount}',
       'statusColor': kSheetOrange,
       if (photo != null) 'photoUrl': photo.url,
       if (photo?.headers != null) 'headers': photo!.headers,
@@ -1229,7 +1237,12 @@ class _PhotoPreview extends StatelessWidget {
                 borderRadius: BorderRadius.circular(13),
                 child: Hero(
                   tag: heroTag,
-                  child: Image.network(photoUrl, fit: BoxFit.cover),
+                  child: CachedNetworkImage(
+                    imageUrl: photoUrl,
+                    cacheManager: appImageCache,
+                    fit: BoxFit.cover,
+                    fadeInDuration: Duration.zero,
+                  ),
                 ),
               ),
               Positioned(
@@ -1275,7 +1288,14 @@ class _FullScreenPhotoView extends StatelessWidget {
         child: InteractiveViewer(
           minScale: 0.8,
           maxScale: 4,
-          child: Hero(tag: heroTag, child: Image.network(photoUrl)),
+          child: Hero(
+            tag: heroTag,
+            child: CachedNetworkImage(
+              imageUrl: photoUrl,
+              cacheManager: appImageCache,
+              fadeInDuration: Duration.zero,
+            ),
+          ),
         ),
       ),
     );

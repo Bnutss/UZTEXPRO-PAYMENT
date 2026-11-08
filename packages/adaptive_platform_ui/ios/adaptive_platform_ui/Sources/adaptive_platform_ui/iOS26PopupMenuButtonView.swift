@@ -1,11 +1,47 @@
 import Flutter
 import UIKit
 
+/// The button under a custom child (a chat bubble, a tile). Its long-press
+/// menu lifts a preview of the button; on iOS 26 the system draws that preview
+/// as a glass circle/capsule. The child is drawn by Flutter and the button
+/// itself is invisible, so the lift is an empty, background-less rectangle.
+final class iOS26PopupMenuTriggerButton: UIButton {
+    var clearPreview = false
+
+    override func contextMenuInteraction(
+        _ interaction: UIContextMenuInteraction,
+        previewForHighlightingMenuWithConfiguration configuration: UIContextMenuConfiguration
+    ) -> UITargetedPreview? {
+        guard clearPreview else {
+            return super.contextMenuInteraction(interaction, previewForHighlightingMenuWithConfiguration: configuration)
+        }
+        return clearTargetedPreview()
+    }
+
+    override func contextMenuInteraction(
+        _ interaction: UIContextMenuInteraction,
+        previewForDismissingMenuWithConfiguration configuration: UIContextMenuConfiguration
+    ) -> UITargetedPreview? {
+        guard clearPreview else {
+            return super.contextMenuInteraction(interaction, previewForDismissingMenuWithConfiguration: configuration)
+        }
+        return clearTargetedPreview()
+    }
+
+    private func clearTargetedPreview() -> UITargetedPreview {
+        let parameters = UIPreviewParameters()
+        parameters.backgroundColor = .clear
+        parameters.shadowPath = UIBezierPath()
+        parameters.visiblePath = UIBezierPath(rect: bounds)
+        return UITargetedPreview(view: self, parameters: parameters)
+    }
+}
+
 /// Platform view for iOS 26 popup menu button
-class iOS26PopupMenuButtonView: NSObject, FlutterPlatformView {
+class iOS26PopupMenuButtonView: NSObject, FlutterPlatformView, UIContextMenuInteractionDelegate {
     private let channel: FlutterMethodChannel
     private let container: UIView
-    private let button: UIButton
+    private let button: iOS26PopupMenuTriggerButton
     private var currentButtonStyle: String = "plain"
     private var isRoundButton: Bool = false
     private var labels: [String] = []
@@ -18,6 +54,13 @@ class iOS26PopupMenuButtonView: NSObject, FlutterPlatformView {
     private var isSelected: [Bool] = []
     private var parents: [Int] = []
     private var longPressMode = false
+    /// A long-press menu under a custom child is driven by our own context-menu
+    /// interaction instead of the button's: the button's lifts a glass
+    /// circle/capsule on iOS 26 (see [anchor]).
+    private var menuInteraction: UIContextMenuInteraction?
+    /// A 2pt invisible view at the touch point: the menu's "preview". Lifting
+    /// that instead of the whole (invisible) button leaves no glass shape.
+    private var anchor: UIView?
     /// Items with children that were opened: their children are shown right
     /// in the same menu (it is updated in place, not replaced).
     private var expanded: Set<Int> = []
@@ -25,7 +68,7 @@ class iOS26PopupMenuButtonView: NSObject, FlutterPlatformView {
     init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
         self.channel = FlutterMethodChannel(name: "adaptive_platform_ui/ios26_popup_menu_button_\(viewId)", binaryMessenger: messenger)
         self.container = UIView(frame: frame)
-        self.button = UIButton(type: .system)
+        self.button = iOS26PopupMenuTriggerButton(type: .system)
 
         var title: String? = nil
         var iconName: String? = nil
@@ -77,6 +120,14 @@ class iOS26PopupMenuButtonView: NSObject, FlutterPlatformView {
         else if #available(iOS 13.0, *) { button.tintColor = .label }
         if #available(iOS 16.0, *) {
             button.preferredMenuElementOrder = .fixed
+        }
+
+        button.clearPreview = isCustomWidget
+        if isCustomWidget && triggerOnLongPress, #available(iOS 16.0, *) {
+            let interaction = UIContextMenuInteraction(delegate: self)
+            menuInteraction = interaction
+            button.isContextMenuInteractionEnabled = false
+            button.addInteraction(interaction)
         }
 
         // Add button and pin to container
@@ -212,6 +263,7 @@ class iOS26PopupMenuButtonView: NSObject, FlutterPlatformView {
     /// to start every opening collapsed.
     private func rebuildMenu() {
         guard #available(iOS 14.0, *) else { return }
+        if menuInteraction != nil { return }
         if longPressMode, #available(iOS 15.0, *) {
             button.menu = UIMenu(title: "", children: [
                 UIDeferredMenuElement.uncached { [weak self] completion in
@@ -330,12 +382,74 @@ class iOS26PopupMenuButtonView: NSObject, FlutterPlatformView {
         return []
     }
 
+    // MARK: UIContextMenuInteractionDelegate (long-press menu, custom child)
+
+    func contextMenuInteraction(
+        _ interaction: UIContextMenuInteraction,
+        configurationForMenuAtLocation location: CGPoint
+    ) -> UIContextMenuConfiguration? {
+        anchor?.removeFromSuperview()
+        let dot = UIView(frame: CGRect(x: location.x - 1, y: location.y - 1, width: 2, height: 2))
+        dot.backgroundColor = .clear
+        dot.isUserInteractionEnabled = false
+        button.addSubview(dot)
+        anchor = dot
+
+        expanded.removeAll()
+        hapticGenerator.impactOccurred()
+        hapticGenerator.prepare()
+        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ in
+            guard let self = self else { return nil }
+            return UIMenu(title: "", children: self.menuChildren())
+        }
+    }
+
+    private func anchorPreview() -> UITargetedPreview? {
+        guard let dot = anchor else { return nil }
+        let parameters = UIPreviewParameters()
+        parameters.backgroundColor = .clear
+        parameters.shadowPath = UIBezierPath()
+        parameters.visiblePath = UIBezierPath(rect: dot.bounds)
+        return UITargetedPreview(view: dot, parameters: parameters)
+    }
+
+    func contextMenuInteraction(
+        _ interaction: UIContextMenuInteraction,
+        previewForHighlightingMenuWithConfiguration configuration: UIContextMenuConfiguration
+    ) -> UITargetedPreview? {
+        anchorPreview()
+    }
+
+    func contextMenuInteraction(
+        _ interaction: UIContextMenuInteraction,
+        previewForDismissingMenuWithConfiguration configuration: UIContextMenuConfiguration
+    ) -> UITargetedPreview? {
+        anchorPreview()
+    }
+
+    func contextMenuInteraction(
+        _ interaction: UIContextMenuInteraction,
+        willEndFor configuration: UIContextMenuConfiguration,
+        animator: UIContextMenuInteractionAnimating?
+    ) {
+        let dot = anchor
+        let cleanup = { [weak self] in
+            dot?.removeFromSuperview()
+            if self?.anchor === dot { self?.anchor = nil }
+        }
+        if let animator = animator {
+            animator.addCompletion(cleanup)
+        } else {
+            cleanup()
+        }
+    }
+
     /// Opens an item's children inside the menu that is already on screen.
     @available(iOS 16.0, *)
     private func expandInPlace(_ i: Int) {
         expanded.insert(i)
         let updated = UIMenu(title: "", children: menuChildren())
-        button.contextMenuInteraction?.updateVisibleMenu { _ in updated }
+        (menuInteraction ?? button.contextMenuInteraction)?.updateVisibleMenu { _ in updated }
     }
 
     @objc private func onButtonPressedLegacy(_ sender: UIButton) {

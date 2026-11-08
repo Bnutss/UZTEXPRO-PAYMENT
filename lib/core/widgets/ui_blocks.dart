@@ -1,5 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import 'app_image_cache.dart';
 
 /// Shared building blocks for the compact "dashboard" screens (issued
 /// orders, analytics): one rounded white block per logical group, hairline
@@ -262,19 +264,31 @@ class _FallbackNetworkImageState extends State<FallbackNetworkImage> {
   Widget build(BuildContext context) {
     if (_index >= widget.sources.length) return widget.placeholder();
     final source = widget.sources[_index];
-    return Image.network(
-      source.url,
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    // The picture is kept on the phone (see [appImageCache]) and decoded at
+    // the size it is shown, so long lists of faces stay light. The key is the
+    // address alone: a new login token must not make it download again.
+    return CachedNetworkImage(
       key: ValueKey('$_index:${source.url}'),
-      headers: source.headers,
+      imageUrl: source.url,
+      cacheKey: source.url,
+      cacheManager: appImageCache,
+      httpHeaders: source.headers,
       width: widget.width,
       height: widget.height,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) {
+      memCacheWidth: widget.width.isFinite
+          ? (widget.width * dpr).round()
+          : null,
+      // No fade: a picture that is already on the phone must not blink in.
+      fadeInDuration: Duration.zero,
+      fadeOutDuration: Duration.zero,
+      placeholderFadeInDuration: Duration.zero,
+      placeholder: (_, _) => widget.placeholder(),
+      errorWidget: (_, _, _) {
         _next();
         return widget.placeholder();
       },
-      loadingBuilder: (_, child, progress) =>
-          progress == null ? child : widget.placeholder(),
     );
   }
 }

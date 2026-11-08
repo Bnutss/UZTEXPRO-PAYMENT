@@ -46,6 +46,7 @@ class FadingHeaderScaffold extends StatelessWidget {
     this.bottomNavigationBar,
     this.center,
     this.fade = true,
+    this.centerTitle = false,
   });
 
   final String title;
@@ -63,6 +64,10 @@ class FadingHeaderScaffold extends StatelessWidget {
   /// The soft plate in the page colour behind the header. Off for a page with
   /// a picture behind it (the chat wallpaper), where it would show as a band.
   final bool fade;
+
+  /// Puts the [title] in the middle of the screen (not just of the free space
+  /// between the back button and the actions).
+  final bool centerTitle;
 
   /// Extra widgets in the title row, left of the search button.
   final List<Widget> trailing;
@@ -108,8 +113,7 @@ class FadingHeaderScaffold extends StatelessWidget {
     final headerHeight = statusBar + kFadingHeaderRowHeight + bottomHeight;
     final reduceMotion = MediaQuery.of(context).disableAnimations;
 
-    final titleRow = Row(
-      key: const ValueKey('title'),
+    final titleRowCore = Row(
       children: [
         const SizedBox(
           width: 58,
@@ -117,7 +121,10 @@ class FadingHeaderScaffold extends StatelessWidget {
           child: AdaptiveBackButton(),
         ),
         Expanded(
-          child: center != null
+          child: centerTitle && center == null
+              // The centered title is drawn over the row (see [titleRow]).
+              ? const SizedBox.shrink()
+              : center != null
               // A little air between the capsule and the buttons beside it.
               ? Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -180,6 +187,38 @@ class FadingHeaderScaffold extends StatelessWidget {
           ),
       ],
     );
+
+    final titleRow = !centerTitle || center != null
+        ? KeyedSubtree(key: const ValueKey('title'), child: titleRowCore)
+        : Stack(
+            key: const ValueKey('title'),
+            children: [
+              // The buttons row (its own title slot is left empty).
+              Positioned.fill(child: titleRowCore),
+              // Reserve the widest side (back button / actions) on both sides
+              // so the title sits exactly in the middle of the screen.
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 112),
+                    child: Center(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFF1C1C1E),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
 
     final searchRow = Row(
       key: const ValueKey('search'),

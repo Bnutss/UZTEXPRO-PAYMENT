@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io' show Platform;
+import 'dart:io' show File, Platform;
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
@@ -13,20 +13,23 @@ import '../../core/widgets/app_refresh.dart';
 import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/floating_notch_bar.dart';
 import '../auth/widgets/logo_stroke_loader.dart';
+import '../settings/settings_screen.dart';
 import 'chat_api.dart';
 import 'chat_group_picker.dart';
 import 'chat_hub.dart';
 import 'chat_list_actions.dart';
 import 'chat_system.dart';
 import 'chat_models.dart';
+import 'chat_my_photo.dart';
 import 'chat_media_widgets.dart' show chatPreviewText;
 import 'chat_push.dart' show ChatPushTarget;
 import 'chat_socket.dart';
 import 'chat_thread_page.dart';
 import 'chat_widgets.dart';
 
-/// Messenger window opened from the home toolbar. Two tabs at the bottom, like
-/// Telegram: Contacts and Chats (same native tab bar as the main screen).
+/// Messenger window opened from the home toolbar. Three tabs at the bottom, like
+/// Telegram: Contacts, Chats and Settings with the user's photo (same native
+/// tab bar as the main screen).
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key, required this.hub, this.openThread});
 
@@ -45,8 +48,11 @@ class _ChatPageState extends State<ChatPage> {
   ChatRest get _api => widget.hub.api;
   ChatLink get _link => widget.hub.link;
 
-  // Tabs: 0 = contacts, 1 = chats (opens on chats).
+  // Tabs: 0 = contacts, 1 = chats (opens on chats), 2 = settings.
   int _index = 1;
+
+  /// The user's own photo, the icon of the Settings tab (null: a plain one).
+  File? _myPhoto;
 
   @override
   void initState() {
@@ -54,6 +60,9 @@ class _ChatPageState extends State<ChatPage> {
     // The window shows the real numbers itself; the badge of the chat button
     // waits (and is refreshed on closing).
     widget.hub.chatOpen = true;
+    ChatMyPhoto.load().then((f) {
+      if (mounted && f != null) setState(() => _myPhoto = f);
+    });
     widget.hub.unread.addListener(_onUnread);
     final target = widget.openThread;
     if (target != null) {
@@ -129,6 +138,12 @@ class _ChatPageState extends State<ChatPage> {
           children: [
             _ContactsTab(api: _api, link: _link, hub: widget.hub),
             _ChatsTab(api: _api, link: _link, hub: widget.hub),
+            FadingHeaderScaffold(
+              title: s.settingsTitle,
+              centerTitle: true,
+              background: AppColors.groupedBackground,
+              body: (context, topInset) => SettingsScreen(topInset: topInset),
+            ),
           ],
         ),
         bottomNavigationBar: AdaptiveBottomNavigationBar(
@@ -145,6 +160,16 @@ class _ChatPageState extends State<ChatPage> {
               badgeCount: widget.hub.unread.value > 0
                   ? widget.hub.unread.value
                   : null,
+            ),
+            AdaptiveNavigationDestination(
+              // The user's round photo, like Telegram (a person until loaded).
+              icon: _myPhoto != null
+                  ? FileImage(_myPhoto!)
+                  : 'person.crop.circle',
+              selectedIcon: _myPhoto != null
+                  ? FileImage(_myPhoto!)
+                  : 'person.crop.circle.fill',
+              label: s.settingsTitle,
             ),
           ],
           selectedIndex: _index,
@@ -169,6 +194,11 @@ class _ChatPageState extends State<ChatPage> {
                       s.chatTitle,
                       badge: widget.hub.unread.value,
                     ),
+                    NotchBarItem(
+                      Icons.settings_outlined,
+                      Icons.settings_rounded,
+                      s.settingsTitle,
+                    ),
                   ],
                 ),
         ),
@@ -178,6 +208,19 @@ class _ChatPageState extends State<ChatPage> {
 }
 
 // ─── Shared list scaffolding ─────────────────────────────────────────────
+
+/// Telegram-style header: "Connecting…" while the socket is down, "Updating…"
+/// while the list is being loaded, otherwise the page's own [title].
+String _statusTitle(
+  S s, {
+  required String title,
+  required bool connected,
+  required bool updating,
+}) => !connected
+    ? s.chatConnecting
+    : updating
+    ? s.chatUpdating
+    : title;
 
 /// What to tell the user when a load failed: 403 means the chat group was
 /// taken away (the app may still hold an old login), anything else is a
@@ -369,8 +412,21 @@ class _ContactsTabState extends State<_ContactsTab> {
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
+    return ValueListenableBuilder<bool>(
+      valueListenable: widget.link.connected,
+      builder: (context, connected, _) => _buildScaffold(s, connected),
+    );
+  }
+
+  Widget _buildScaffold(S s, bool connected) {
     return FadingHeaderScaffold(
-      title: s.contactsTitle,
+      title: _statusTitle(
+        s,
+        title: s.contactsTitle,
+        connected: connected,
+        updating: _loading,
+      ),
+      centerTitle: true,
       background: AppColors.groupedBackground,
       searching: _searching,
       onToggleSearch: _toggleSearch,
@@ -498,12 +554,17 @@ class _ChatsTabState extends State<_ChatsTab> {
     });
   }
 
+  /// Background refreshes in flight (the header says "Updating…").
+  int _syncing = 0;
+
   Future<void> _load({bool silent = false}) async {
     if (!silent) {
       setState(() {
         _loading = true;
         _error = null;
       });
+    } else {
+      setState(() => _syncing++);
     }
     try {
       final chats = await widget.api.conversations();
@@ -523,6 +584,8 @@ class _ChatsTabState extends State<_ChatsTab> {
         _error = _errorText(e, S.of(context));
         _loading = false;
       });
+    } finally {
+      if (silent && mounted) setState(() => _syncing--);
     }
   }
 
@@ -882,8 +945,21 @@ class _ChatsTabState extends State<_ChatsTab> {
               )
               .toList();
 
+    return ValueListenableBuilder<bool>(
+      valueListenable: widget.link.connected,
+      builder: (context, connected, _) => _buildScaffold(s, connected, shown),
+    );
+  }
+
+  Widget _buildScaffold(S s, bool connected, List<ChatConversation> shown) {
     return FadingHeaderScaffold(
-      title: s.chatTitle,
+      title: _statusTitle(
+        s,
+        title: s.chatTitle,
+        connected: connected,
+        updating: _loading || _syncing > 0,
+      ),
+      centerTitle: true,
       background: AppColors.groupedBackground,
       searching: _searching,
       onToggleSearch: _toggleSearch,
@@ -901,7 +977,9 @@ class _ChatsTabState extends State<_ChatsTab> {
         error: _error,
         emptyIcon: Icons.forum_outlined,
         emptySvg: 'assets/icons/tg_chats.svg',
-        emptyText: q.isEmpty ? s.chatsEmpty : s.chatNothingFound,
+        emptyText: _search.text.trim().isEmpty
+            ? s.chatsEmpty
+            : s.chatNothingFound,
         plain: true,
         rows: [
           for (final c in shown)
@@ -920,7 +998,6 @@ class _ChatsTabState extends State<_ChatsTab> {
                     'rowBottom': row.bottom,
                   },
                   actions: _menuFor(c, s),
-                  onOpen: () => _open(c),
                 ),
                 fallbackActions: [
                   for (final a in _menuFor(c, s))
