@@ -130,6 +130,7 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
   void initState() {
     super.initState();
     ChatVoicePlayer.instance.nextResolver = _nextVoice;
+    ChatOpenThreads.add(_c);
     WidgetsBinding.instance.addPostFrameCallback((_) => _measureInput());
     _c.start();
     _scroll.addListener(() {
@@ -167,6 +168,7 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
       ChatVoicePlayer.instance.nextResolver = null;
     }
     ChatVoicePlayer.instance.stop(); // leaving the chat stops the voice
+    ChatOpenThreads.remove(_c);
     _c.dispose();
     _input.dispose();
     _scroll.dispose();

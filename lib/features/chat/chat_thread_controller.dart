@@ -10,6 +10,26 @@ import 'chat_media.dart';
 import 'chat_models.dart';
 import 'chat_socket.dart';
 
+/// The conversations whose window is on the screen right now (the in-app
+/// banner is not shown for a chat you are looking at).
+class ChatOpenThreads {
+  ChatOpenThreads._();
+
+  static final Set<ChatThreadController> _open = {};
+
+  static void add(ChatThreadController c) => _open.add(c);
+  static void remove(ChatThreadController c) {
+    if (_open.remove(c)) closed.value++;
+  }
+
+  /// Ticks whenever a conversation window is closed: what was read in it is no
+  /// longer unread, so the chat list must be refreshed, however the window was
+  /// opened (a list row, a contact, a banner, a notification).
+  static final ValueNotifier<int> closed = ValueNotifier(0);
+  static bool isOpen(int conversationId) =>
+      _open.any((c) => c.conversationId == conversationId);
+}
+
 /// State and logic of one conversation: history, live messages, sending with
 /// an immediate local copy, delivery fallbacks, read marks and "typing".
 ///

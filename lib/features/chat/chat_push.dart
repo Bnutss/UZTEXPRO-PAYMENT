@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:pushy_flutter/pushy_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -109,9 +110,13 @@ Future<void> chatBackgroundNotificationListener(
   Map<String, dynamic> data,
 ) async {
   // iOS: the system has already shown it from the `notification` part.
-  if (!Platform.isAndroid || data['type'] != 'chat') return;
+  if (!Platform.isAndroid) return;
+  final isChat = data['type'] == 'chat';
+  // Anything else with a text (a test push from the server or the Pushy
+  // dashboard) is shown too, so delivery can be checked without a chat.
+  if (!isChat && (data['message'] ?? '').toString().isEmpty) return;
   // The app is open: it shows the message itself (and the unread badge).
-  if (await PushForeground.appIsOpen()) return;
+  if (isChat && await PushForeground.appIsOpen()) return;
   final title = (data['title'] ?? 'UztexPro').toString();
   final text = (data['message'] ?? '').toString();
   Pushy.notify(title, text, data);
@@ -143,19 +148,35 @@ class PushyClient implements PushClient {
   void onTap(void Function(Map<String, dynamic> data) listener) =>
       Pushy.setNotificationClickListener(listener);
 
+  static const _channel = MethodChannel('uztexpro/notifications');
+
   @override
-  void clearBadge() => Pushy.clearBadge();
+  void clearBadge() {
+    Pushy.clearBadge(); // iOS: the number on the icon
+    if (Platform.isAndroid) {
+      // Android: the number is the notifications still in the shade.
+      _channel.invokeMethod<bool>('cancelAll').catchError((_) => false);
+    }
+  }
 }
 
 // ── The service the main screen owns ─────────────────────────────────────
 
 class ChatPushService with WidgetsBindingObserver {
-  ChatPushService({required this.api, required this.client, String? platform})
-    : platform = platform ?? (Platform.isIOS ? 'ios' : 'android');
+  ChatPushService({
+    required this.api,
+    required this.client,
+    String? platform,
+    this.unread,
+  }) : platform = platform ?? (Platform.isIOS ? 'ios' : 'android');
 
   final ChatRest api;
   final PushClient client;
   final String platform;
+
+  /// The current unread count; when it is 0 on returning to the app, the
+  /// notifications left in the shade (and the number on the icon) are removed.
+  final int Function()? unread;
 
   /// Set when a notification was tapped: the screen opens that conversation.
   final ValueNotifier<ChatPushTarget?> openRequest = ValueNotifier(null);
@@ -172,6 +193,11 @@ class ChatPushService with WidgetsBindingObserver {
   Future<void> start() async {
     WidgetsBinding.instance.addObserver(this);
     _startBeat();
+    // Opening the app with nothing unread: drop stale notifications. Wait a
+    // moment so the unread count has been loaded.
+    Future<void>.delayed(const Duration(seconds: 3), () {
+      if (!_disposed && unread?.call() == 0) clearBadge();
+    });
     client.onTap((data) {
       final target = parseChatPush(data);
       if (target != null && !_disposed) openRequest.value = target;
@@ -210,6 +236,7 @@ class ChatPushService with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _startBeat();
+      if (unread?.call() == 0) clearBadge();
     } else {
       _beat?.cancel();
       _beat = null;

@@ -4,8 +4,20 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import 'chat_api.dart';
+import 'chat_models.dart';
+import 'chat_push.dart' show ChatPushTarget;
 import 'chat_socket.dart';
 import 'chat_sounds.dart';
+import 'chat_thread_controller.dart' show ChatOpenThreads;
+
+/// A message from somebody else in a chat that is not on the screen: what the
+/// in-app banner shows.
+class ChatIncoming {
+  const ChatIncoming(this.conversation, this.message);
+
+  final ChatConversation conversation;
+  final ChatMessage message;
+}
 
 /// The chat for the whole app session: ONE live connection and the count of
 /// unread messages for the badge on the chat button. The chat window uses the
@@ -56,6 +68,51 @@ class ChatHub with WidgetsBindingObserver {
 
   /// Unread messages in all chats.
   final ValueNotifier<int> unread = ValueNotifier(0);
+
+  /// Messages for the in-app banner (see [ChatIncoming]).
+  final _incoming = StreamController<ChatIncoming>.broadcast();
+  Stream<ChatIncoming> get incoming => _incoming.stream;
+
+  /// A tap on a banner asks to open this conversation: the chat window (or the
+  /// home screen, when it is closed) opens it.
+  final ValueNotifier<ChatPushTarget?> openRequest = ValueNotifier(null);
+
+  void requestOpen(ChatPushTarget target) {
+    openRequest.value = null; // so that the same target notifies again
+    openRequest.value = target;
+  }
+
+  final Map<int, ChatConversation> _known = {};
+  Future<void>? _loadingKnown;
+
+  Future<ChatConversation?> _conversationOf(int id) async {
+    var c = _known[id];
+    if (c != null) return c;
+    _loadingKnown ??= () async {
+      try {
+        for (final x in await api.conversations()) {
+          _known[x.id] = x;
+        }
+      } catch (_) {}
+    }().whenComplete(() => _loadingKnown = null);
+    await _loadingKnown;
+    return _known[id];
+  }
+
+  /// Offers a message from somebody else to the banner, unless it should not
+  /// be shown: a service line, a muted chat, the chat on the screen.
+  Future<void> _announce(Map<String, dynamic> data) async {
+    try {
+      final m = ChatMessage.fromJson(data);
+      if (m.isSystem || m.sender == api.myId) return;
+      if (mutedConversations.contains(m.conversation)) return;
+      if (ChatOpenThreads.isOpen(m.conversation)) return;
+      final c = await _conversationOf(m.conversation);
+      if (c == null || c.muted || _disposed) return;
+      if (ChatOpenThreads.isOpen(m.conversation)) return;
+      _incoming.add(ChatIncoming(c, m));
+    } catch (_) {}
+  }
 
   bool _chatOpen = false;
 
@@ -108,6 +165,7 @@ class ChatHub with WidgetsBindingObserver {
     if (e.type != 'message') return;
     final sender = (e.data['sender'] as num?)?.toInt();
     final me = api.myId;
+    if (me != null && sender != me) _announce(e.data);
     if (_chatOpen) {
       // Inside the chat window: its screens show the message, a sound tells
       // that it came, and the total follows the server (the open conversation
@@ -153,5 +211,7 @@ class ChatHub with WidgetsBindingObserver {
     link.connected.removeListener(_onConnection);
     socket?.dispose();
     unread.dispose();
+    openRequest.dispose();
+    _incoming.close();
   }
 }

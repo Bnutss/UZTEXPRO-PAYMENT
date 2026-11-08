@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../platform/platform_info.dart';
+import 'android_context_menu.dart';
 import 'ios26/ios26_popup_menu_button.dart';
 
 export 'ios26/ios26_popup_menu_button.dart'
@@ -110,6 +111,8 @@ class AdaptivePopupMenuButton<T> {
         items: items,
         onSelected: onSelected,
         tint: tint,
+        triggerOnLongPress: triggerOnLongPress,
+        onTap: onTap,
         child: child,
       );
     }
@@ -462,6 +465,8 @@ class _MaterialPopupMenuButton<T> extends StatefulWidget {
   }) : icon = null,
        size = null,
        iconSize = null,
+       triggerOnLongPress = false,
+       onTap = null,
        child = null;
 
   const _MaterialPopupMenuButton.icon({
@@ -473,18 +478,27 @@ class _MaterialPopupMenuButton<T> extends StatefulWidget {
     this.iconSize,
   }) : label = null,
        height = null,
+       triggerOnLongPress = false,
+       onTap = null,
        child = null;
 
   const _MaterialPopupMenuButton.widget({
     required this.items,
     required this.onSelected,
     this.tint,
+    this.triggerOnLongPress = false,
+    this.onTap,
     required this.child,
   }) : label = null,
        icon = null,
        height = null,
        size = null,
        iconSize = null;
+
+  /// Custom-widget variant: a tap calls [onTap] and a long press opens the
+  /// menu (as on iOS), instead of a tap opening the menu.
+  final bool triggerOnLongPress;
+  final VoidCallback? onTap;
 
   final String? label;
   final dynamic icon; // IconData for Android
@@ -506,6 +520,20 @@ class _MaterialPopupMenuButton<T> extends StatefulWidget {
 
 class _MaterialPopupMenuButtonState<T>
     extends State<_MaterialPopupMenuButton<T>> {
+  final GlobalKey _boundaryKey = GlobalKey();
+
+  Future<void> _showContextMenu({bool lift = true}) async {
+    final index = await showAndroidContextMenu(
+      context: context,
+      boundaryKey: _boundaryKey,
+      items: widget.items,
+      lift: lift,
+    );
+    if (index == null || !mounted) return;
+    final entry = widget.items[index];
+    if (entry is AdaptivePopupMenuItem<T>) widget.onSelected(index, entry);
+  }
+
   @override
   Widget build(BuildContext context) {
     final menuItems = AdaptivePopupMenuButton._materialMenuItems<T>(
@@ -515,15 +543,21 @@ class _MaterialPopupMenuButtonState<T>
 
     // Custom widget case
     if (widget.isCustomWidget) {
-      return PopupMenuButton<int>(
-        child: widget.child!,
-        itemBuilder: (context) => menuItems,
-        onSelected: (index) {
-          final selectedEntry = widget.items[index];
-          if (selectedEntry is AdaptivePopupMenuItem<T>) {
-            widget.onSelected(index, selectedEntry);
-          }
-        },
+      if (widget.triggerOnLongPress) {
+        // Tap = onTap, long press = the lifted-message menu (Telegram-style).
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          onLongPress: _showContextMenu,
+          child: RepaintBoundary(key: _boundaryKey, child: widget.child!),
+        );
+      }
+
+      // A tap opens the same card, under the button (nothing is lifted).
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _showContextMenu(lift: false),
+        child: RepaintBoundary(key: _boundaryKey, child: widget.child!),
       );
     }
 

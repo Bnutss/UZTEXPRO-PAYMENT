@@ -24,6 +24,7 @@ import 'chat_my_photo.dart';
 import 'chat_media_widgets.dart' show chatPreviewText;
 import 'chat_push.dart' show ChatPushTarget;
 import 'chat_socket.dart';
+import 'chat_thread_controller.dart' show ChatOpenThreads;
 import 'chat_thread_page.dart';
 import 'chat_widgets.dart';
 
@@ -64,29 +65,43 @@ class _ChatPageState extends State<ChatPage> {
       if (mounted && f != null) setState(() => _myPhoto = f);
     });
     widget.hub.unread.addListener(_onUnread);
+    widget.hub.openRequest.addListener(_onOpenRequest);
     final target = widget.openThread;
     if (target != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        // The push carries only the id and the name: the photo, position and
-        // the rest of the profile come from the server first.
-        final peer = await _fullPeer(target);
-        if (!mounted) return;
-        Navigator.of(context).push(
-          chatInstantRoute(
-            (_) => ChatThreadPage(
-              api: _api,
-              link: _link,
-              peer: peer,
-              conversationId: target.conversationId,
-              sounds: widget.hub.sounds,
-              mutedChats: widget.hub.mutedConversations,
-              onRead: widget.hub.requestRefresh,
-              isGroup: target.isGroup,
-            ),
-          ),
-        );
-      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openThread(target));
     }
+  }
+
+  /// A tap on an in-app banner while the chat window is open.
+  void _onOpenRequest() {
+    final target = widget.hub.openRequest.value;
+    if (target == null || !mounted) return;
+    if (ChatOpenThreads.isOpen(target.conversationId)) return;
+    // From inside another conversation: back to the window, then forward.
+    final route = ModalRoute.of(context);
+    if (route != null) Navigator.of(context).popUntil((r) => r == route);
+    _openThread(target);
+  }
+
+  Future<void> _openThread(ChatPushTarget target) async {
+    // The push carries only the id and the name: the photo, position and the
+    // rest of the profile come from the server first.
+    final peer = await _fullPeer(target);
+    if (!mounted) return;
+    Navigator.of(context).push(
+      chatInstantRoute(
+        (_) => ChatThreadPage(
+          api: _api,
+          link: _link,
+          peer: peer,
+          conversationId: target.conversationId,
+          sounds: widget.hub.sounds,
+          mutedChats: widget.hub.mutedConversations,
+          onRead: widget.hub.requestRefresh,
+          isGroup: target.isGroup,
+        ),
+      ),
+    );
   }
 
   /// The whole profile of the person (or the group) a notification is about;
@@ -110,6 +125,7 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void dispose() {
     widget.hub.unread.removeListener(_onUnread);
+    widget.hub.openRequest.removeListener(_onOpenRequest);
     widget.hub.chatOpen = false;
     super.dispose();
   }
@@ -489,12 +505,22 @@ class _ChatsTabState extends State<_ChatsTab> {
     _events = widget.link.events.listen(_onEvent);
     _wasConnected = widget.link.connected.value;
     widget.link.connected.addListener(_onConnection);
+    ChatOpenThreads.closed.addListener(_onThreadClosed);
     _load();
+  }
+
+  /// A conversation window was closed: take the unread counts again. (After
+  /// the frame: the window is being disposed right now.)
+  void _onThreadClosed() {
+    Future<void>.microtask(() {
+      if (mounted) _load(silent: true);
+    });
   }
 
   @override
   void dispose() {
     _events?.cancel();
+    ChatOpenThreads.closed.removeListener(_onThreadClosed);
     widget.link.connected.removeListener(_onConnection);
     _search.dispose();
     _openRow.dispose();

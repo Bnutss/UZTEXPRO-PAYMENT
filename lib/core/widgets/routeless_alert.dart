@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 
+import 'android_alert.dart';
+
 /// The native iOS 26 (Liquid Glass) alert of adaptive_platform_ui, shown in
 /// the root [Overlay] instead of as a dialog route.
 ///
@@ -25,6 +27,15 @@ Future<void> showNativeAlert({
   String? message,
   required List<AlertAction> actions,
 }) async {
+  if (Platform.isAndroid) {
+    await showAndroidAlert(
+      context: context,
+      title: title,
+      message: message,
+      actions: actions,
+    );
+    return;
+  }
   if (showRoutelessNativeAlert(
     context,
     title: title,

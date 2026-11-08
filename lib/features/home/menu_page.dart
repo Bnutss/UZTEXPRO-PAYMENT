@@ -9,6 +9,7 @@ import '../../core/widgets/confirm_dialog.dart';
 import '../../core/widgets/fade_route.dart';
 import '../chat/chat_hub.dart';
 import '../chat/chat_page.dart';
+import '../chat/chat_banner.dart';
 import '../chat/chat_push.dart';
 import '../../core/widgets/floating_notch_bar.dart';
 import '../../core/widgets/logo_3d.dart';
@@ -73,10 +74,7 @@ class _MenuPageState extends State<MenuPage>
   /// when there is something in them (the same rules that fill them below).
   late final List<_MenuTab> _tabs = [
     _MenuTab.home,
-    if (_hasFullAccess ||
-        _canSeePayments ||
-        _canSeePasses ||
-        _canSignRequests)
+    if (_hasFullAccess || _canSeePayments || _canSeePasses || _canSignRequests)
       _MenuTab.confirmations,
     if (_hasFullAccess) _MenuTab.production,
     if (_canSeeShop) _MenuTab.shop,
@@ -121,6 +119,7 @@ class _MenuPageState extends State<MenuPage>
   /// on the chat button); only for members of `mobile_chat`.
   ChatHub? _chat;
   ChatPushService? _push;
+  ChatBanners? _banners;
   int _chatUnread = 0;
 
   void _onChatUnread() {
@@ -131,6 +130,14 @@ class _MenuPageState extends State<MenuPage>
       // Nothing unread any more: no number on the app icon either.
       if (_chatUnread == 0) _push?.clearBadge();
     }
+  }
+
+  /// An in-app banner was tapped while the chat window is closed.
+  void _onBannerOpen() {
+    final target = _chat?.openRequest.value;
+    final hub = _chat;
+    if (target == null || hub == null || !mounted || hub.isChatOpen) return;
+    _openChat(openThread: target);
   }
 
   /// A notification was tapped: open that conversation (not while the chat
@@ -148,9 +155,19 @@ class _MenuPageState extends State<MenuPage>
     if (_canUseChat) {
       _chat = ChatHub.forToken(widget.jwtToken)..start();
       _chat!.unread.addListener(_onChatUnread);
-      _push = ChatPushService(api: _chat!.api, client: PushyClient());
+      _push = ChatPushService(
+        api: _chat!.api,
+        client: PushyClient(),
+        unread: () => _chatUnread,
+      );
       _push!.openRequest.addListener(_onPushOpen);
       _push!.start();
+      // A message from another chat: a banner on any screen, as in Telegram.
+      _banners = ChatBanners(
+        hub: _chat!,
+        contextOf: () => mounted ? context : null,
+      )..start();
+      _chat!.openRequest.addListener(_onBannerOpen);
     }
     _animationController = AnimationController(
       vsync: this,
@@ -326,6 +343,8 @@ class _MenuPageState extends State<MenuPage>
   @override
   void dispose() {
     _push?.openRequest.removeListener(_onPushOpen);
+    _chat?.openRequest.removeListener(_onBannerOpen);
+    _banners?.dispose();
     _push?.dispose();
     _chat?.unread.removeListener(_onChatUnread);
     _chat?.dispose();
@@ -2233,7 +2252,6 @@ class _HeaderGlassCapsule extends StatelessWidget {
     );
   }
 }
-
 
 /// The tabs of the main window; which of them a person gets depends on their
 /// access (see `_MenuPageState._tabs`).
