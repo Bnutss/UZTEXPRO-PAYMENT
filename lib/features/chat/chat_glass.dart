@@ -1,12 +1,12 @@
 import 'dart:io' show Platform;
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
-
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/material.dart';
 
 import '../../core/localization/app_strings.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/native_glass_gate.dart';
 import '../../core/widgets/ui_blocks.dart';
 import 'chat_models.dart';
 import 'chat_spellcheck.dart';
@@ -20,6 +20,10 @@ import 'chat_widgets.dart';
 // platforms get plain white shapes.
 
 const double _slot = 46;
+
+/// The plate of the input, the paperclip and the microphone: light grey, as
+/// in Telegram (nearly opaque: there is no blur under it any more).
+const Color _plate = Color(0xF2F5F5F7);
 
 double _textWidth(BuildContext context, String text, TextStyle style) {
   final p = TextPainter(
@@ -50,15 +54,12 @@ Widget _frosted({
       decoration: BoxDecoration(borderRadius: radius),
       child: ClipRRect(
         borderRadius: radius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.94),
-              borderRadius: radius,
-            ),
-            child: child,
-          ),
+        // No BackdropFilter: a sigma 40 blur under a scrolling list cost 3-6 ms
+        // of GPU per frame (measured, profile mode) and heated the phone, while
+        // under a 94% white plate it was hardly visible.
+        child: DecoratedBox(
+          decoration: BoxDecoration(color: _plate, borderRadius: radius),
+          child: child,
         ),
       ),
     ),
@@ -82,23 +83,22 @@ Widget _glass({
   VoidCallback? onTap,
 }) {
   final radius = math.min(height / 2, _slot / 2);
-  if (!Platform.isIOS) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(radius),
-        ),
-        child: child,
+  Widget plain(Color color) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(radius),
       ),
-    );
-  }
+      child: child,
+    ),
+  );
+  if (!Platform.isIOS) return plain(Colors.white);
   // The package's child button fills all the width it is given (its child sits
   // in a Center inside a Stack), so the size is pinned from outside.
-  return SizedBox(
+  final native = SizedBox(
     width: width,
     height: height,
     child: AdaptiveButton.child(
@@ -113,6 +113,9 @@ Widget _glass({
       child: SizedBox(width: width, height: height, child: child),
     ),
   );
+  // While a Flutter overlay blurs the screen (the message menu) the native
+  // glass would stay sharp on top of it: a plain stand-in is drawn meanwhile.
+  return NativeGlassSwap(native: native, standIn: plain(_plate));
 }
 
 /// The name of the person, centered in the header. [status] (typing…,
@@ -247,7 +250,12 @@ class ChatInputBar extends StatefulWidget {
     this.onCancelEdit,
     this.onVoice,
     this.onAttach,
+    @visibleForTesting this.recorder,
   });
+
+  /// The recorder of the microphone; the widget makes its own unless a test
+  /// passes one in.
+  final ChatVoiceRecorder? recorder;
 
   /// The paperclip: pick a photo, video or file. Null: no such button.
   final VoidCallback? onAttach;
@@ -276,7 +284,7 @@ class ChatInputBar extends StatefulWidget {
 
 class _ChatInputBarState extends State<ChatInputBar> {
   final _focus = FocusNode();
-  final _rec = ChatVoiceRecorder();
+  late final _rec = widget.recorder ?? ChatVoiceRecorder();
 
   static const _style = TextStyle(fontSize: 16, color: kChatInk, height: 1.25);
   static const _maxLines = 6;
@@ -294,6 +302,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
   void initState() {
     super.initState();
     _rec.onAutoStop = (clip) => widget.onVoice?.call(clip);
+    if (widget.onVoice != null) _rec.warmUp();
   }
 
   @override
@@ -354,7 +363,13 @@ class _ChatInputBarState extends State<ChatInputBar> {
               final recording = _rec.active;
               // The microphone always stands to the right of the field; the
               // send arrow always stays inside it.
-              final mic = widget.onVoice != null && !_editing;
+              // Typing takes the microphone away (as in Telegram): the field
+              // spreads over the width, the send arrow stays inside it. While
+              // a recording is on, the microphone stays (it is being held).
+              // The button stays in the tree (so it can shrink and fade out
+              // while the field spreads); [mic] is whether it takes room.
+              final micMounted = widget.onVoice != null && !_editing;
+              final mic = micMounted && (recording || !widget.canSend);
               // The paperclip stands left of the field (a round glass button,
               // as the microphone on the right); not while recording.
               final attach = widget.onAttach != null && !_editing && !recording;
@@ -374,6 +389,12 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   clipBehavior: Clip.none,
                   children: [
                     AnimatedPositioned(
+                      // Keys: the paperclip comes and goes (it is hidden while a
+                      // voice message is recorded), and without them the children
+                      // of this Stack change places: the microphone button was
+                      // rebuilt as a NEW one in the middle of the hold, the old one
+                      // was disposed, and the recording was dropped on release.
+                      key: const ValueKey('input-capsule'),
                       duration: const Duration(milliseconds: 180),
                       curve: Curves.easeOut,
                       left: attach ? _slot + 8 : 0,
@@ -549,6 +570,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                     ),
                     if (attach)
                       Positioned(
+                        key: const ValueKey('input-attach'),
                         left: 0,
                         bottom: 0,
                         child: _frosted(
@@ -565,33 +587,48 @@ class _ChatInputBarState extends State<ChatInputBar> {
                     // The microphone is a round glass button of its own, to the
                     // right of the field (as in Telegram); typing takes it away and
                     // the field spreads over the whole width.
-                    if (mic)
+                    if (micMounted)
                       Positioned(
+                        key: const ValueKey('input-mic'),
                         right: 0,
                         bottom: 0,
-                        child: SizedBox(
-                          width: _slot,
-                          height: _slot,
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              _frosted(
+                        child: IgnorePointer(
+                          ignoring: !mic,
+                          child: AnimatedScale(
+                            scale: mic ? 1 : 0.3,
+                            duration: const Duration(milliseconds: 180),
+                            curve: Curves.easeOut,
+                            child: AnimatedOpacity(
+                              opacity: mic ? 1 : 0,
+                              duration: const Duration(milliseconds: 150),
+                              curve: Curves.easeOut,
+                              child: SizedBox(
                                 width: _slot,
                                 height: _slot,
-                                child: const SizedBox.shrink(),
-                              ),
-                              Positioned.fill(
-                                child: VoiceMicButton(
-                                  recorder: _rec,
-                                  size: _slot,
-                                  onClip: widget.onVoice!,
-                                  onDenied: () =>
-                                      _hint(S.of(context).chatMicDenied),
-                                  onTooShort: () =>
-                                      _hint(S.of(context).chatHoldToRecord),
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    _frosted(
+                                      width: _slot,
+                                      height: _slot,
+                                      child: const SizedBox.shrink(),
+                                    ),
+                                    Positioned.fill(
+                                      child: VoiceMicButton(
+                                        recorder: _rec,
+                                        size: _slot,
+                                        onClip: widget.onVoice!,
+                                        onDenied: () =>
+                                            _hint(S.of(context).chatMicDenied),
+                                        onTooShort: () => _hint(
+                                          S.of(context).chatHoldToRecord,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ),

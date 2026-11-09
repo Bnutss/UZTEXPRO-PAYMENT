@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 
+import 'native_glass_gate.dart';
+
 /// `AppBar.leadingWidth` that fits [AdaptiveBackButton] with its 12px left
 /// inset (46 + 12), mirroring the right inset of the search button.
 const double kBackButtonLeadingWidth = 58;
@@ -35,19 +37,37 @@ class AdaptiveBackButton extends StatelessWidget {
 
   Widget _build(VoidCallback handlePressed) {
     if (Platform.isIOS) {
-      return SizedBox(
-        width: 46,
-        height: 46,
-        child: AdaptiveButton.icon(
-          onPressed: handlePressed,
-          icon: Icons.arrow_back_ios_new_rounded,
-          iconColor: const Color(0xFF1C1C1E),
-          color: const Color(0xFF1C1C1E),
-          style: AdaptiveButtonStyle.glass,
-          size: AdaptiveButtonSize.medium,
-          useSmoothRectangleBorder: false,
-          padding: EdgeInsets.zero,
-          minSize: const Size(46, 46),
+      // While a Flutter overlay blurs the screen (see [nativeGlassHidden]) the
+      // native glass is replaced by a plain circle, which the blur can reach.
+      return NativeGlassSwap(
+        native: SizedBox(
+          width: 46,
+          height: 46,
+          child: AdaptiveButton.icon(
+            onPressed: handlePressed,
+            icon: Icons.arrow_back_ios_new_rounded,
+            iconColor: const Color(0xFF1C1C1E),
+            color: const Color(0xFF1C1C1E),
+            style: AdaptiveButtonStyle.glass,
+            size: AdaptiveButtonSize.medium,
+            useSmoothRectangleBorder: false,
+            padding: EdgeInsets.zero,
+            minSize: const Size(46, 46),
+          ),
+        ),
+        standIn: Container(
+          width: 46,
+          height: 46,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            color: Color(0xF2F5F5F7),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Color(0xFF1C1C1E),
+            size: 20,
+          ),
         ),
       );
     }

@@ -1,7 +1,9 @@
-import 'dart:io' show Platform;
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, ValueNotifier, defaultTargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:flutter/services.dart';
 
 import '../../core/localization/app_strings.dart';
@@ -170,8 +172,14 @@ class VoiceBubbleBody extends StatelessWidget {
                         return GestureDetector(
                           behavior: HitTestBehavior.translucent,
                           onTapUp: (d) => seek(d.localPosition.dx),
-                          onHorizontalDragUpdate: (d) =>
-                              seek(d.localPosition.dx),
+                          // Dragging along the wave rewinds, but only a message
+                          // that is already the current one. On any other the
+                          // wave must not claim the horizontal drag: it beat
+                          // the swipe-to-reply (a deeper recogniser wins) and
+                          // "rewinding" started the voice message.
+                          onHorizontalDragUpdate: current
+                              ? (d) => seek(d.localPosition.dx)
+                              : null,
                           child: VoiceWave(
                             bars: m.waveform,
                             progress: progress,
@@ -291,12 +299,16 @@ class _VoiceMicButtonState extends State<VoiceMicButton> {
       return;
     }
     if (_rec.phase != RecorderPhase.holding) return; // locked: buttons rule
+    // The callbacks are taken BEFORE the wait: whatever happens to this button
+    // meanwhile, a finished recording must be delivered (it used to be dropped
+    // with `if (!mounted) return`, and the clip was lost).
+    final onClip = widget.onClip;
+    final onTooShort = widget.onTooShort;
     final clip = await _rec.finish();
-    if (!mounted) return;
-    if (clip == null) {
-      widget.onTooShort();
-    } else {
-      widget.onClip(clip);
+    if (clip != null) {
+      onClip(clip);
+    } else if (mounted) {
+      onTooShort();
     }
   }
 
@@ -440,55 +452,47 @@ class VoiceRecordingStrip extends StatelessWidget {
       builder: (context, _) {
         final locked = recorder.locked;
         return Padding(
-          padding: EdgeInsets.only(left: locked ? 6 : 16, right: rightPad),
+          padding: EdgeInsets.only(left: 16, right: rightPad),
           child: Row(
             children: [
-              if (locked)
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    recorder.cancel();
-                  },
-                  child: SizedBox(
-                    width: 38,
-                    height: 38,
-                    child: Icon(
-                      kChatDeleteIcon,
-                      color: const Color(0xFFFF3B30),
-                      size: 24,
-                    ),
-                  ),
-                )
-              else
-                const _RecDot(),
+              const _RecDot(),
               const SizedBox(width: 8),
               SizedBox(
-                width: 44,
-                child: Text(
-                  formatVoiceTime(recorder.elapsedMs),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: kChatInk,
-                    fontFeatures: [FontFeature.tabularFigures()],
-                  ),
+                width: 72,
+                // Minutes, seconds and hundredths ("0:07,34") as in Telegram;
+                // scaled down rather than cut when a long one needs more room.
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: _RecTimer(recorder: recorder),
                 ),
               ),
               Expanded(
                 child: locked
-                    ? Padding(
-                        padding: const EdgeInsets.only(left: 6),
-                        child: SizedBox(
-                          height: 26,
-                          child: VoiceWave(
-                            bars: [
-                              for (final v in recorder.live)
-                                (v * 31).round().clamp(1, 31),
-                            ],
-                            progress: 1,
-                            active: AppColors.brandOrange,
-                            inactive: AppColors.brandOrange,
-                            height: 26,
+                    // Locked, as in Telegram: a text button "Cancel" right in
+                    // the bar, next to the time (the round button at the right
+                    // sends).
+                    ? Center(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            recorder.cancel();
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 12,
+                            ),
+                            child: Text(
+                              s.chatCancel,
+                              maxLines: 1,
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.brandOrange,
+                              ),
+                            ),
                           ),
                         ),
                       )
@@ -526,6 +530,40 @@ class VoiceRecordingStrip extends StatelessWidget {
       },
     );
   }
+}
+
+/// The recording time with hundredths. It is redrawn on every frame (a ticker),
+/// not with the recorder's 100 ms beat, or the hundredths would jump by tens.
+class _RecTimer extends StatefulWidget {
+  const _RecTimer({required this.recorder});
+
+  final ChatVoiceRecorder recorder;
+
+  @override
+  State<_RecTimer> createState() => _RecTimerState();
+}
+
+class _RecTimerState extends State<_RecTimer>
+    with SingleTickerProviderStateMixin {
+  late final Ticker _ticker = createTicker((_) => setState(() {}))..start();
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Text(
+    formatVoiceTimeFine(widget.recorder.liveMs),
+    maxLines: 1,
+    style: const TextStyle(
+      fontSize: 16,
+      color: kChatInk,
+      // Equal-width digits: the line does not tremble as the hundredths run.
+      fontFeatures: [FontFeature.tabularFigures()],
+    ),
+  );
 }
 
 class _RecDot extends StatefulWidget {
@@ -721,7 +759,7 @@ class VoiceTopBarHost extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (Platform.isIOS) {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
       return _NativeVoiceBar(top: top, authorOf: authorOf);
     }
     return Positioned(
@@ -753,9 +791,52 @@ class _NativeVoiceBarState extends State<_NativeVoiceBar> {
   /// window, so it must go away while another screen (a profile) covers it.
   bool _onTop = true;
 
+  /// The page is being dragged back (the swipe from the left edge). The native
+  /// bar is a UIKit view over the whole window: it does not follow the Flutter
+  /// transform, so it would hang in place over the chat list showing through,
+  /// while the chat slides away. It is hidden for the gesture and comes back if
+  /// the swipe is cancelled (when it completes, the chat is gone and so is it).
+  ValueNotifier<bool>? _gesture;
+  bool get _swiping => _gesture?.value ?? false;
+
+  /// The two transitions that move this chat on the screen: its own (closing
+  /// by the "back" button) and the one of a screen above it (a profile that
+  /// opens over it, or slides away from it). The native bar does not follow
+  /// either: `isCurrent` turns true at the START of the profile's closing, so
+  /// the bar jumped up over the profile that was still sliding off. It is shown
+  /// only when both transitions are at rest.
+  ModalRoute<dynamic>? _route;
+  Animation<double>? _own;
+  Animation<double>? _above;
+
+  bool get _settled =>
+      (_own?.status ?? AnimationStatus.completed) ==
+          AnimationStatus.completed &&
+      (_above?.status ?? AnimationStatus.dismissed) ==
+          AnimationStatus.dismissed;
+
+  void _onAnimation(AnimationStatus _) => _push();
+
+  void _watch(ModalRoute<dynamic>? route) {
+    if (identical(route, _route)) return;
+    _own?.removeStatusListener(_onAnimation);
+    _above?.removeStatusListener(_onAnimation);
+    _route = route;
+    _own = route?.animation;
+    _above = route?.secondaryAnimation;
+    _own?.addStatusListener(_onAnimation);
+    _above?.addStatusListener(_onAnimation);
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _watch(ModalRoute.of(context));
+    final gesture = Navigator.maybeOf(context)?.userGestureInProgressNotifier;
+    if (!identical(gesture, _gesture)) {
+      _gesture?.removeListener(_push);
+      _gesture = gesture?..addListener(_push);
+    }
     final onTop = ModalRoute.of(context)?.isCurrent ?? true;
     if (onTop != _onTop) {
       _onTop = onTop;
@@ -779,6 +860,9 @@ class _NativeVoiceBarState extends State<_NativeVoiceBar> {
 
   @override
   void dispose() {
+    _own?.removeStatusListener(_onAnimation);
+    _above?.removeStatusListener(_onAnimation);
+    _gesture?.removeListener(_push);
     _player.removeListener(_push);
     _channel.setMethodCallHandler(null);
     if (_shown) _channel.invokeMethod<void>('voiceBarHide');
@@ -803,7 +887,7 @@ class _NativeVoiceBarState extends State<_NativeVoiceBar> {
   void _push() {
     if (!mounted) return;
     final m = _player.current;
-    if (m == null || !_onTop) {
+    if (m == null || !_onTop || _swiping || !_settled) {
       if (_shown) {
         _shown = false;
         _last = null;

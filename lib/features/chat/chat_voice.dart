@@ -22,8 +22,14 @@ class VoiceClip {
   final List<int> waveform;
 }
 
-/// Shortest recording that is sent; anything shorter is a stray tap.
-const int kVoiceMinMs = 1000;
+/// Shortest HOLD of the microphone that is sent; anything shorter is a stray
+/// tap. It is the time since the finger went down, as a person feels it: the
+/// microphone itself takes 0.3-0.8 s to open, and measured from there an
+/// ordinary one-second hold came out under the limit and was thrown away.
+const int kVoiceMinMs = 800;
+
+/// And the least sound that must have been recorded in that time.
+const int kVoiceMinRecordedMs = 300;
 
 /// Longest recording (it stops and is sent by itself).
 const Duration kVoiceMax = Duration(minutes: 15);
@@ -45,6 +51,17 @@ List<int> downsampleWave(List<double> samples, {int bars = kWaveBars}) {
     out.add((peak * 31).round().clamp(1, 31));
   }
   return out;
+}
+
+/// "0:07,34" / "12:03,05": minutes, seconds and hundredths with a comma, as the
+/// recording timer of Telegram shows them.
+String formatVoiceTimeFine(int ms) {
+  final t = math.max(0, ms);
+  final total = t ~/ 1000;
+  final m = total ~/ 60;
+  final sec = total % 60;
+  final cs = (t % 1000) ~/ 10;
+  return '$m:${sec.toString().padLeft(2, '0')},${cs.toString().padLeft(2, '0')}';
 }
 
 /// "0:07" / "12:03".
@@ -76,6 +93,10 @@ class ChatVoiceRecorder extends ChangeNotifier {
   double lockProgress = 0;
 
   int elapsedMs = 0;
+
+  /// The recorded time right now, to the millisecond (`elapsedMs` is only
+  /// refreshed every 100 ms: too coarse for hundredths of a second).
+  int get liveMs => _clock.isRunning ? _clock.elapsedMilliseconds : elapsedMs;
   final List<double> _samples = [];
 
   /// The last loud/quiet values, for the live wave while locked.
@@ -86,16 +107,33 @@ class ChatVoiceRecorder extends ChangeNotifier {
   String? _path;
   Timer? _tick;
   StreamSubscription<Amplitude>? _amp;
+
+  /// Counts the recorded sound (from the moment the microphone is open).
   final Stopwatch _clock = Stopwatch();
+
+  /// Counts the hold (from the moment the finger went down).
+  final Stopwatch _held = Stopwatch();
   bool _releasedEarly = false;
 
   /// Called when the maximum length is reached: the recording was stopped and
   /// is handed over here (to be sent).
   void Function(VoiceClip clip)? onAutoStop;
 
+  /// Gets the recorder ready before the finger comes: the plugin is created and
+  /// the permission looked at (WITHOUT asking for it), so that the first press
+  /// does not also pay for that.
+  Future<void> warmUp() async {
+    try {
+      await _recorder.hasPermission(request: false);
+    } catch (_) {}
+  }
+
   /// Starts recording. False when there is no microphone permission.
   Future<bool> start() async {
     if (phase != RecorderPhase.idle) return false;
+    _held
+      ..reset()
+      ..start();
     phase = RecorderPhase.starting;
     _releasedEarly = false;
     notifyListeners();
@@ -175,12 +213,14 @@ class ChatVoiceRecorder extends ChangeNotifier {
   Future<VoiceClip?> finish() async {
     if (!active) return null;
     final ms = _clock.elapsedMilliseconds;
-    await _stopEngine(keepFile: ms >= kVoiceMinMs);
+    final held = _held.elapsedMilliseconds;
+    final keep = held >= kVoiceMinMs && ms >= kVoiceMinRecordedMs;
+    await _stopEngine(keepFile: keep);
     final path = _path;
     _path = null;
     final wave = downsampleWave(_samples);
     _reset();
-    if (path == null || ms < kVoiceMinMs) {
+    if (path == null || !keep) {
       if (path != null) _delete(path);
       return null;
     }
@@ -203,6 +243,7 @@ class ChatVoiceRecorder extends ChangeNotifier {
     await _amp?.cancel();
     _amp = null;
     _clock.stop();
+    _held.stop();
     try {
       await _recorder.stop();
     } catch (_) {}
