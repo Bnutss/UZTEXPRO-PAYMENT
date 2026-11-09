@@ -139,6 +139,9 @@ abstract class PushClient {
 class PushyClient implements PushClient {
   @override
   Future<String?> register() async {
+    // Android: deliver through Google FCM too, so the phone wakes for a push
+    // even while the system has put the app to sleep (as Telegram does).
+    Pushy.toggleFCM(true);
     Pushy.listen();
     Pushy.setNotificationListener(chatBackgroundNotificationListener);
     return Pushy.register();

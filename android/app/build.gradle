@@ -1,6 +1,7 @@
 plugins {
     id "com.android.application"
     id "dev.flutter.flutter-gradle-plugin"
+    id "com.google.gms.google-services"
 }
 
 def keystoreProperties = new Properties()
@@ -54,4 +55,10 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Pushy delivers through FCM too (Pushy.toggleFCM), which wakes the phone
+    // while the system has put the app to sleep.
+    implementation "com.google.firebase:firebase-messaging:24.1.0"
 }
