@@ -2052,6 +2052,12 @@ class S {
     'en': 'Delete for me',
     'uz': 'Menda o‘chirish',
   });
+  /// "Delete for me and for <name>": the other person's messages go too.
+  String chatMenuDeleteForBoth(String name) => _t({
+    'ru': 'Удалить у меня и у $name',
+    'en': 'Delete for me and $name',
+    'uz': 'Menda va $name da o‘chirish',
+  });
   String get chatMenuDeleteForAll => _t({
     'ru': 'Удалить у всех',
     'en': 'Delete for everyone',

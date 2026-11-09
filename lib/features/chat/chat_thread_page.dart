@@ -1,18 +1,26 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/cupertino.dart'
     show
         CupertinoActionSheet,
         CupertinoActionSheetAction,
+        CupertinoIcons,
+        CupertinoPageRoute,
         showCupertinoModalPopup;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
+import 'package:flutter/gestures.dart'
+    show LongPressGestureRecognizer, TapGestureRecognizer;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:flutter/services.dart';
 import 'package:open_filex/open_filex.dart';
 
 import '../../core/localization/app_strings.dart';
+import '../../core/widgets/native_glass_gate.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/fading_header_scaffold.dart';
 import '../auth/widgets/logo_stroke_loader.dart';
@@ -43,13 +51,24 @@ import 'chat_voice_list.dart';
 import 'chat_voice_widgets.dart';
 import 'chat_widgets.dart';
 
-/// A route without a transition: chat screens open and close at once, as in
-/// Telegram.
-Route<void> chatInstantRoute(WidgetBuilder builder) => PageRouteBuilder<void>(
-  transitionDuration: Duration.zero,
-  reverseTransitionDuration: Duration.zero,
-  pageBuilder: (context, _, _) => builder(context),
-);
+/// Chat screens open at once (no transition), and go back with the iOS slide:
+/// the page follows the finger when it is dragged from the left edge, as in
+/// Telegram (the list under it shifts with the usual parallax).
+///
+/// A plain `PageRouteBuilder` has no back-swipe at all; this is a
+/// [CupertinoPageRoute] whose forward transition is just made instant.
+Route<void> chatInstantRoute(WidgetBuilder builder) =>
+    _ChatRoute(builder: builder);
+
+class _ChatRoute extends CupertinoPageRoute<void> {
+  _ChatRoute({required super.builder});
+
+  @override
+  Duration get transitionDuration => Duration.zero;
+
+  @override
+  Duration get reverseTransitionDuration => const Duration(milliseconds: 350);
+}
 
 /// A conversation with one person: messages (live), the input, "typing…".
 ///
@@ -217,6 +236,12 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     });
   }
 
+  /// "Surname Name" without the patronymic, as the delete choice shows it.
+  String _surnameName(ChatUser u) {
+    final parts = u.name.trim().split(RegExp(r'\s+'));
+    return parts.length < 2 ? u.name.trim() : '${parts[0]} ${parts[1]}';
+  }
+
   String _authorOf(int senderId, S s) {
     if (widget.isGroup) {
       if (senderId == widget.api.myId) return s.chatYou;
@@ -311,20 +336,22 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
           icon: ios26 ? 'trash' : kChatDeleteIcon,
           isDestructive: true,
           children: [
+            // In a group "for everybody" is for the author and the admins.
+            if (!widget.isGroup || mine || _c.isAdmin)
+              AdaptivePopupMenuItem<_MsgAction>(
+                label: widget.isGroup
+                    ? s.chatMenuDeleteForAll
+                    : s.chatMenuDeleteForBoth(_surnameName(widget.peer)),
+                icon: ios26 ? 'person.2' : Icons.people_outline_rounded,
+                isDestructive: true,
+                value: _MsgAction.deleteForAll,
+              ),
             AdaptivePopupMenuItem<_MsgAction>(
               label: s.chatMenuDeleteForMe,
               icon: ios26 ? 'person' : Icons.person_outline_rounded,
               isDestructive: true,
               value: _MsgAction.deleteForMe,
             ),
-            // In a group "for everybody" is for the author and the admins.
-            if (!widget.isGroup || mine || _c.isAdmin)
-              AdaptivePopupMenuItem<_MsgAction>(
-                label: s.chatMenuDeleteForAll,
-                icon: ios26 ? 'person.2' : Icons.people_outline_rounded,
-                isDestructive: true,
-                value: _MsgAction.deleteForAll,
-              ),
           ],
         ),
     ];
@@ -1469,6 +1496,426 @@ enum _MsgAction {
   discard,
 }
 
+/// Long press on a bubble: the message menu, as in Telegram. The screen goes
+/// blurry, the pressed message lifts (sharp, slightly bigger) and a rounded
+/// panel opens right UNDER it, always: when there is no room below, the
+/// message itself moves up to make some.
+///
+/// Flutter-drawn on purpose. A native menu (the package's context menu or popup
+/// button) is a UIKit view laid over EVERY message: iOS picks its side (above,
+/// for the messages near the input), it blurs only lightly, it reacts late, it
+/// snapshotted only part of a voice message, and it made the bubbles vanish
+/// while the page was dragged back. Here nothing exists until the long press:
+/// the WHOLE bubble (with the voice bar that lies over it) is photographed, not
+/// rebuilt, so its keys are not duplicated, and the overlay is built once.
+///
+/// The native glass controls of the header are swapped for Flutter stand-ins
+/// meanwhile ([nativeGlassHidden]) so that the blur covers them too.
+///
+/// "Delete" (which has sub-items) opens a second sheet with the choice.
+class _BubbleMenu extends StatefulWidget {
+  const _BubbleMenu({
+    required this.items,
+    required this.onTap,
+    required this.onSelected,
+    required this.mine,
+    required this.child,
+  });
+
+  final List<AdaptivePopupMenuEntry> items;
+  final VoidCallback? onTap;
+  final void Function(_MsgAction? action) onSelected;
+  final bool mine;
+  final Widget child;
+
+  @override
+  State<_BubbleMenu> createState() => _BubbleMenuState();
+}
+
+/// The menu of a bubble, for the widget tests (the menu is private). The last
+/// label is "Delete": it opens [choices] (for me / for everybody) when given.
+@visibleForTesting
+Widget debugBubbleMenu({
+  required List<String> labels,
+  required void Function(String choice) onChoice,
+  required bool mine,
+  required Widget child,
+  List<String> choices = const [],
+  VoidCallback? onTap,
+}) => _BubbleMenu(
+  items: [
+    for (var i = 0; i < labels.length; i++)
+      if (i == labels.length - 1 && choices.isNotEmpty)
+        AdaptivePopupMenuItem<_MsgAction>(
+          label: labels[i],
+          isDestructive: true,
+          children: [
+            for (var c = 0; c < choices.length; c++)
+              AdaptivePopupMenuItem<_MsgAction>(
+                label: choices[c],
+                isDestructive: true,
+                value: c == 0
+                    ? _MsgAction.deleteForAll
+                    : _MsgAction.deleteForMe,
+              ),
+          ],
+        )
+      else
+        AdaptivePopupMenuItem<_MsgAction>(
+          label: labels[i],
+          value: _MsgAction.copy,
+        ),
+  ],
+  onTap: onTap,
+  onSelected: (a) => onChoice(switch (a) {
+    _MsgAction.deleteForMe => 'me',
+    _MsgAction.deleteForAll => 'all',
+    _ => 'other',
+  }),
+  mine: mine,
+  child: child,
+);
+
+IconData _menuIcon(AdaptivePopupMenuItem<_MsgAction> e) => switch (e.value) {
+  _MsgAction.reply => CupertinoIcons.arrowshape_turn_up_left,
+  _MsgAction.forward => CupertinoIcons.arrowshape_turn_up_right,
+  _MsgAction.copy => CupertinoIcons.doc_on_doc,
+  _MsgAction.edit => CupertinoIcons.pencil,
+  // "Delete" (the group with its sub-items) and "discard".
+  _ => CupertinoIcons.delete,
+};
+
+class _BubbleMenuState extends State<_BubbleMenu> {
+  final _shot = GlobalKey();
+
+  /// How long a finger must rest on a bubble (Flutter's default is 500 ms).
+  static const _hold = Duration(milliseconds: 300);
+
+  List<AdaptivePopupMenuItem<_MsgAction>> get _entries =>
+      widget.items.whereType<AdaptivePopupMenuItem<_MsgAction>>().toList();
+
+  Future<void> _open() async {
+    final entries = _entries;
+    final boundary = _shot.currentContext?.findRenderObject();
+    if (entries.isEmpty ||
+        boundary is! RenderRepaintBoundary ||
+        !boundary.hasSize) {
+      return;
+    }
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final rect = boundary.localToGlobal(Offset.zero) & boundary.size;
+    HapticFeedback.mediumImpact();
+    final image = await boundary.toImage(pixelRatio: dpr);
+    if (!mounted) {
+      image.dispose();
+      return;
+    }
+    // The header's native glass would stay sharp over the blur.
+    nativeGlassHidden.value = true;
+    final route = PageRouteBuilder<AdaptivePopupMenuItem<_MsgAction>>(
+      opaque: false,
+      transitionDuration: const Duration(milliseconds: 220),
+      reverseTransitionDuration: const Duration(milliseconds: 160),
+      pageBuilder: (ctx, animation, _) => _MessageMenuOverlay(
+        animation: animation,
+        rect: rect,
+        image: image,
+        dpr: dpr,
+        mine: widget.mine,
+        entries: entries,
+      ),
+    );
+    // The overlay keeps drawing the picture until its closing animation has
+    // ended: the picture (and the header's native glass) are released only
+    // then, not when the route is popped.
+    route.completed.whenComplete(() {
+      nativeGlassHidden.value = false;
+      image.dispose();
+    });
+    final picked = await Navigator.of(
+      context,
+      rootNavigator: true,
+    ).push<AdaptivePopupMenuItem<_MsgAction>>(route);
+    if (picked == null || !mounted) return;
+    widget.onSelected(picked.value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (defaultTargetPlatform != TargetPlatform.iOS) {
+      return AdaptivePopupMenuButton.widget<_MsgAction>(
+        items: widget.items,
+        triggerOnLongPress: true,
+        onTap: widget.onTap,
+        onSelected: (_, entry) => widget.onSelected(entry.value),
+        child: widget.child,
+      );
+    }
+    return RawGestureDetector(
+      behavior: HitTestBehavior.translucent,
+      gestures: {
+        if (widget.onTap != null)
+          TapGestureRecognizer:
+              GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+                TapGestureRecognizer.new,
+                (r) => r.onTap = widget.onTap,
+              ),
+        LongPressGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+              () => LongPressGestureRecognizer(duration: _hold),
+              (r) => r.onLongPress = _open,
+            ),
+      },
+      child: RepaintBoundary(key: _shot, child: widget.child),
+    );
+  }
+}
+
+/// The page over the chat while the menu is open: blur, the lifted message
+/// (a picture of it) and the panel under it.
+///
+/// "Delete" does not close the panel: its choices (for me and for <name>, for
+/// me) replace the lines of the same panel, as in Telegram.
+class _MessageMenuOverlay extends StatefulWidget {
+  const _MessageMenuOverlay({
+    required this.animation,
+    required this.rect,
+    required this.image,
+    required this.dpr,
+    required this.mine,
+    required this.entries,
+  });
+
+  final Animation<double> animation;
+  final Rect rect;
+  final ui.Image image;
+  final double dpr;
+  final bool mine;
+  final List<AdaptivePopupMenuItem<_MsgAction>> entries;
+
+  // Compact, like the system menu; wider for the delete choices (they carry
+  // a name).
+  static const _width = 224.0;
+  static const _widthChoices = 316.0;
+  static const _row = 42.0;
+  static const _gap = 10.0;
+
+  @override
+  State<_MessageMenuOverlay> createState() => _MessageMenuOverlayState();
+}
+
+class _MessageMenuOverlayState extends State<_MessageMenuOverlay> {
+  late List<AdaptivePopupMenuItem<_MsgAction>> _shown = widget.entries;
+
+  bool get _choices => !identical(_shown, widget.entries);
+
+  void _pick(AdaptivePopupMenuItem<_MsgAction> e) {
+    HapticFeedback.selectionClick();
+    if (e.children.isNotEmpty) {
+      setState(() => _shown = e.children);
+    } else {
+      Navigator.of(context).pop(e);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rect = widget.rect;
+    final size = MediaQuery.sizeOf(context);
+    final pad = MediaQuery.paddingOf(context);
+    final eased = widget.animation.drive(
+      CurveTween(curve: Curves.easeOutCubic),
+    );
+    // The place is worked out for the FIRST list (the longest): the panel
+    // keeps its top when the delete choices replace the lines.
+    final menuH = widget.entries.length * _MessageMenuOverlay._row;
+    final maxBottom = size.height - pad.bottom - 12;
+    final minTop = pad.top + 8;
+
+    // The menu goes UNDER the message. When it does not fit, the message
+    // moves up (as far as the top of the screen allows).
+    final overflow = rect.bottom + _MessageMenuOverlay._gap + menuH - maxBottom;
+    final lift = overflow <= 0
+        ? 0.0
+        : math.min(overflow, math.max(0.0, rect.top - minTop));
+    final target = rect.shift(Offset(0, -lift));
+    // A message so tall that even then the menu does not fit: it overlaps the
+    // bottom of the message rather than leaving the screen.
+    final top = math.min(
+      target.bottom + _MessageMenuOverlay._gap,
+      math.max(minTop, maxBottom - menuH),
+    );
+    final width = math.min(
+      _choices ? _MessageMenuOverlay._widthChoices : _MessageMenuOverlay._width,
+      size.width - 24,
+    );
+    final maxLeft = math.max(12.0, size.width - width - 12);
+    final left = math.min(
+      math.max(widget.mine ? target.right - width : target.left, 12.0),
+      maxLeft,
+    );
+    final anchor = widget.mine ? Alignment.topRight : Alignment.topLeft;
+
+    return Stack(
+      children: [
+        // The screen turns blurry.
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => Navigator.of(context).pop(),
+            child: FadeTransition(
+              opacity: eased,
+              child: ClipRect(
+                child: BackdropFilter(
+                  filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  child: const ColoredBox(color: Color(0x4DFFFFFF)),
+                ),
+              ),
+            ),
+          ),
+        ),
+        // The pressed message: lifts and, if needed, moves up.
+        Positioned.fill(
+          child: IgnorePointer(
+            child: AnimatedBuilder(
+              animation: eased,
+              builder: (context, _) => Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned.fromRect(
+                    rect: Rect.lerp(rect, target, eased.value)!,
+                    child: Transform.scale(
+                      scale: 1 + 0.03 * eased.value,
+                      child: RawImage(
+                        image: widget.image,
+                        scale: widget.dpr,
+                        fit: BoxFit.fill,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          left: left,
+          top: top,
+          width: width,
+          child: FadeTransition(
+            opacity: eased,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.82, end: 1.0).animate(eased),
+              alignment: anchor,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: BackdropFilter(
+                  filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                  child: DecoratedBox(
+                    decoration: const BoxDecoration(color: Color(0xE6E9E9EC)),
+                    // The height is set from the number of lines and animated
+                    // by itself (an `AnimatedSize` restarted at every frame
+                    // while the width was still changing and lagged behind).
+                    child: AnimatedContainer(
+                      key: const ValueKey('menu-panel'),
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOut,
+                      height: _shown.length * _MessageMenuOverlay._row,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 150),
+                        layoutBuilder: (current, previous) => Stack(
+                          alignment: Alignment.topCenter,
+                          children: [...previous, if (current != null) current],
+                        ),
+                        // OverflowBox: the old list is taller than the panel
+                        // while it shrinks, and must not overflow.
+                        child: OverflowBox(
+                          key: ValueKey(_choices),
+                          alignment: Alignment.topCenter,
+                          minHeight: 0,
+                          maxHeight: double.infinity,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final e in _shown)
+                                _MenuRow(entry: e, onTap: () => _pick(e)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// One line of the panel (no separators, as in the system menu): the icon,
+/// then the title, and a light tint of the brand colour while it is pressed.
+class _MenuRow extends StatefulWidget {
+  const _MenuRow({required this.entry, required this.onTap});
+
+  final AdaptivePopupMenuItem<_MsgAction> entry;
+  final VoidCallback onTap;
+
+  @override
+  State<_MenuRow> createState() => _MenuRowState();
+}
+
+class _MenuRowState extends State<_MenuRow> {
+  bool _down = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final e = widget.entry;
+    final color = e.isDestructive ? const Color(0xFFFF3B30) : kChatInk;
+    return Material(
+      type: MaterialType.transparency,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _down = true),
+        onTapCancel: () => setState(() => _down = false),
+        onTapUp: (_) => setState(() => _down = false),
+        onTap: widget.onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: _down
+                ? AppColors.brandOrange.withValues(alpha: 0.10)
+                : Colors.transparent,
+          ),
+          child: SizedBox(
+            height: _MessageMenuOverlay._row,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Icon(_menuIcon(e), size: 20, color: color),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      e.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 16, color: color),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// How many emoji a message is made of when it is ONLY 1-3 emoji (shown big,
 /// without a bubble, as in Telegram); null for anything else.
 int? bigEmojiCount(String text) {
@@ -1770,27 +2217,27 @@ class _Bubble extends StatelessWidget {
             ? CrossAxisAlignment.end
             : CrossAxisAlignment.start,
         children: [
-          Align(
+          _SwipeToReply(
             alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-            child: _SwipeToReply(
-              enabled: !album.any((x) => x.isLocal) && !failed,
-              onReply: onReply,
-              child: Listener(
-                behavior: HitTestBehavior.translucent,
-                onPointerDown: (e) => spy.last = e.position,
+            enabled: !album.any((x) => x.isLocal) && !failed,
+            onReply: onReply,
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: (e) => spy.last = e.position,
+              child: _BubbleMenu(
+                items: menu,
+                mine: mine,
+                onTap: failed
+                    ? onRetry
+                    : (isAlbum
+                          ? onOpenAlbum
+                          : (m.isMedia ? onOpenMedia : null)),
+                onSelected: onMenu,
+                // The whole bubble, with the voice bar that lies over it:
+                // this is what is photographed and lifted.
                 child: Stack(
                   children: [
-                    AdaptivePopupMenuButton.widget<_MsgAction>(
-                      items: menu,
-                      triggerOnLongPress: true,
-                      onTap: failed
-                          ? onRetry
-                          : (isAlbum
-                                ? onOpenAlbum
-                                : (m.isMedia ? onOpenMedia : null)),
-                      onSelected: (_, entry) => onMenu(entry.value),
-                      child: bubble,
-                    ),
+                    bubble,
                     if (m.isVoice)
                       Positioned(
                         left: 14,
@@ -1918,33 +2365,68 @@ class _Quote extends StatelessWidget {
 
 /// Drag a message to the left to answer it: the bubble follows the finger, an
 /// arrow shows up, a tick tells that letting go will answer.
+/// Swipe a message to the left to answer it (as in Telegram).
+///
+/// Spans the whole row, so the arrow sits at the screen's edge where it can be
+/// seen (it used to sit 34 px behind the bubble, which for my messages is off
+/// the screen) and the gesture also works on the free space next to a short
+/// bubble. Pulled past the trigger distance the drag meets resistance and the
+/// arrow fills with the brand colour; a quick fling answers too.
 class _SwipeToReply extends StatefulWidget {
   const _SwipeToReply({
     required this.child,
     required this.onReply,
     required this.enabled,
+    required this.alignment,
   });
 
   final Widget child;
   final VoidCallback onReply;
   final bool enabled;
 
+  /// Where the bubble stands in the row.
+  final AlignmentGeometry alignment;
+
   @override
   State<_SwipeToReply> createState() => _SwipeToReplyState();
 }
 
+/// The swipe, for the widget tests (it is private).
+@visibleForTesting
+Widget debugSwipeToReply({
+  required Widget child,
+  required VoidCallback onReply,
+  bool mine = true,
+}) => _SwipeToReply(
+  alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+  enabled: true,
+  onReply: onReply,
+  child: child,
+);
+
 class _SwipeToReplyState extends State<_SwipeToReply> {
-  static const _trigger = 56.0;
-  static const _max = 80.0;
+  /// The distance that arms the answer.
+  static const _trigger = 52.0;
+
+  /// The furthest the bubble can be pulled.
+  static const _max = 92.0;
+
+  /// A fling at least this fast (px/s, to the left) answers from this far.
+  /// (Flutter starts a drag only after ~18 px of slop, which is not counted.)
+  static const _flingSpeed = 900.0;
+  static const _flingFrom = 14.0;
 
   double _dx = 0;
   bool _dragging = false;
   bool _armed = false;
 
   void _update(DragUpdateDetails d) {
-    final next = (_dx + d.delta.dx).clamp(-_max, 0.0);
+    // Beyond the trigger the bubble follows the finger more reluctantly.
+    final resist = -_dx >= _trigger ? 0.4 : 1.0;
+    final next = (_dx + d.delta.dx * resist).clamp(-_max, 0.0);
     final armed = next <= -_trigger;
     if (armed && !_armed) HapticFeedback.mediumImpact();
+    if (next == _dx && _dragging) return;
     setState(() {
       _dx = next;
       _dragging = true;
@@ -1952,58 +2434,76 @@ class _SwipeToReplyState extends State<_SwipeToReply> {
     });
   }
 
-  void _end() {
-    final fire = _armed;
+  void _end(double velocity) {
+    final fire = _armed || (_dx <= -_flingFrom && velocity <= -_flingSpeed);
     setState(() {
       _dx = 0;
       _dragging = false;
       _armed = false;
     });
-    if (fire) widget.onReply();
+    if (fire) {
+      HapticFeedback.lightImpact();
+      widget.onReply();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.enabled) return widget.child;
+    if (!widget.enabled) {
+      return Align(alignment: widget.alignment, child: widget.child);
+    }
     final progress = (-_dx / _trigger).clamp(0.0, 1.0);
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onHorizontalDragUpdate: _update,
-      onHorizontalDragEnd: (_) => _end(),
-      onHorizontalDragCancel: _end,
+      onHorizontalDragEnd: (d) => _end(d.velocity.pixelsPerSecond.dx),
+      onHorizontalDragCancel: () => _end(0),
       child: Stack(
         clipBehavior: Clip.none,
-        alignment: Alignment.centerRight,
         children: [
-          Positioned(
-            right: -34,
-            child: Opacity(
-              opacity: progress,
-              child: Transform.scale(
-                scale: 0.6 + 0.4 * progress,
-                child: Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.18),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.reply_rounded,
-                    size: 19,
-                    color: Colors.white,
+          // The arrow, at the right edge of the row, level with the bubble.
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Opacity(
+                    opacity: progress,
+                    child: Transform.scale(
+                      scale: 0.55 + 0.45 * progress + (_armed ? 0.12 : 0),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 120),
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: _armed
+                              ? AppColors.brandOrange
+                              : Colors.black.withValues(alpha: 0.18),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.reply_rounded,
+                          size: 19,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-          AnimatedContainer(
-            duration: _dragging
-                ? Duration.zero
-                : const Duration(milliseconds: 180),
-            curve: Curves.easeOut,
-            transform: Matrix4.translationValues(_dx, 0, 0),
-            child: widget.child,
+          Align(
+            alignment: widget.alignment,
+            child: AnimatedContainer(
+              duration: _dragging
+                  ? Duration.zero
+                  : const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              transform: Matrix4.translationValues(_dx, 0, 0),
+              child: widget.child,
+            ),
           ),
         ],
       ),

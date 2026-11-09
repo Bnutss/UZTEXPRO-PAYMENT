@@ -8,6 +8,11 @@ import 'package:flutter/widgets.dart';
 
 import '../adaptive_context_menu.dart';
 
+/// How long a finger must rest before Flutter lets the native menu take over
+/// (see the patch note in the build method). Too short and a scroll that starts
+/// from a resting finger is taken for a long press; 500 ms is Flutter's default.
+const Duration kContextMenuHold = Duration(milliseconds: 180);
+
 /// Native iOS 26 context menu: a transparent platform view over [child] runs a
 /// `UIContextMenuInteraction`, lifting a snapshot of [child] as the preview.
 class IOS26ContextMenu extends StatefulWidget {
@@ -75,8 +80,12 @@ class _IOS26ContextMenuState extends State<IOS26ContextMenu> {
               creationParamsCodec: const StandardMessageCodec(),
               hitTestBehavior: PlatformViewHitTestBehavior.translucent,
               gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                // PATCHED (UztexPro): Flutter holds the touch for this long
+                // BEFORE it hands it to UIKit, whose own long-press timer then
+                // starts from zero: the two delays add up. The default here is
+                // 500 ms (kLongPressTimeout), so the menu took about a second.
                 Factory<LongPressGestureRecognizer>(
-                  () => LongPressGestureRecognizer(),
+                  () => LongPressGestureRecognizer(duration: kContextMenuHold),
                 ),
               },
               onPlatformViewCreated: _onCreated,
