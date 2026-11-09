@@ -10,9 +10,15 @@ import 'ui_blocks.dart';
 /// has one, where scrolling up lets it flow into the island: [IslandPullAvatar])
 /// or sits under the status bar, with the name, the status and the buttons
 /// under it. Pull the page down and the photo opens into a big picture over the
-/// top of the screen; the name, the status and the buttons go down with it and
-/// end up over its foot, in white. Let go past the half and it stays open; drag
-/// up and it closes.
+/// top of the screen: one short swipe is enough, the photo follows the finger
+/// for the first stretch and then opens the rest of the way by itself with a
+/// smooth ease; the name, the status and the buttons go down with it and end up
+/// over its foot, in white. Stopped short, it goes back to round (a quick flick
+/// still opens it); drag up and it closes the same way.
+///
+/// While the page is leaving (the "back" button, the swipe back, another screen
+/// coming over it) the avatar that hangs from the island is taken off at once
+/// and the page draws its own round photo, which slides away with it.
 ///
 /// There is one set of name, status and buttons, drawn by [blockBuilder] for
 /// every state: it is given how open the photo is (0 to 1) and blends its look
@@ -65,13 +71,64 @@ class _PullPhotoListState extends State<PullPhotoList>
     duration: const Duration(milliseconds: 180),
   );
 
-  /// How far a finger has to travel before the photo opens (or closes) by
-  /// itself: a short pull, and it goes the rest of the way at once.
-  static const double _trigger = 10;
-  static const _openTime = Duration(milliseconds: 180);
+  /// How far a finger travels for the photo to go from round to fully open.
+  static const double _span = 110;
 
-  /// What the finger has travelled in the current direction.
-  double _travelled = 0;
+  /// Past this much opening the photo no longer waits for the finger: it goes
+  /// the rest of the way by itself, so a short swipe is enough.
+  static const double _autoAt = 0.3;
+
+  /// A flick faster than this (px per move) opens it even from a short pull.
+  static const double _flick = 6;
+
+  /// A finger is down and the photo follows it.
+  bool _tracking = false;
+
+  /// What the following started from: 0 (round, opening) or 1 (open, closing).
+  double _from = 0;
+  int _fingers = 0;
+
+  /// The last non-zero step of the finger (+ down, - up): where it was going.
+  double _lastDy = 0;
+
+  // The route this page is on: while it is leaving the avatar hanging from the
+  // island must not stay (see the class comment).
+  ModalRoute<dynamic>? _route;
+  Animation<double>? _own;
+  Animation<double>? _above;
+  ValueNotifier<bool>? _gesture;
+  bool _leaving = false;
+
+  void _routeChanged([Object? _]) {
+    final own = _own?.status ?? AnimationStatus.completed;
+    final above = _above?.status ?? AnimationStatus.dismissed;
+    final leaving =
+        own == AnimationStatus.reverse ||
+        own == AnimationStatus.dismissed ||
+        above != AnimationStatus.dismissed ||
+        (_gesture?.value ?? false);
+    if (leaving != _leaving && mounted) setState(() => _leaving = leaving);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (!identical(route, _route)) {
+      _own?.removeStatusListener(_routeChanged);
+      _above?.removeStatusListener(_routeChanged);
+      _route = route;
+      _own = route?.animation;
+      _above = route?.secondaryAnimation;
+      _own?.addStatusListener(_routeChanged);
+      _above?.addStatusListener(_routeChanged);
+    }
+    final gesture = Navigator.maybeOf(context)?.userGestureInProgressNotifier;
+    if (!identical(gesture, _gesture)) {
+      _gesture?.removeListener(_routeChanged);
+      _gesture = gesture?..addListener(_routeChanged);
+    }
+  }
 
   double get _size => IslandPullAvatar.avatarSize;
   bool get _canOpen => widget.sources.isNotEmpty;
@@ -79,6 +136,9 @@ class _PullPhotoListState extends State<PullPhotoList>
 
   @override
   void dispose() {
+    _own?.removeStatusListener(_routeChanged);
+    _above?.removeStatusListener(_routeChanged);
+    _gesture?.removeListener(_routeChanged);
     _scroll.dispose();
     _open.dispose();
     super.dispose();
@@ -88,47 +148,87 @@ class _PullPhotoListState extends State<PullPhotoList>
   /// [IslandPullAvatar]); only letting go of the island opens the photo.
   bool _island(BuildContext context) => IslandPullAvatar.supported(context);
 
-  void _go(double to) {
-    HapticFeedback.mediumImpact();
-    _travelled = 0;
-    _open.animateTo(to, duration: _openTime, curve: Curves.easeOutCubic);
+  /// Gliding to [to]: a smooth ease-out, quick to start and soft to arrive.
+  void _glide(double to) {
+    if (to == _open.value) return;
+    final opening = to > _open.value;
+    HapticFeedback.selectionClick();
+    _open.animateTo(
+      to,
+      duration: Duration(milliseconds: opening ? 360 : 300),
+      curve: Curves.easeOutCubic,
+    );
   }
 
-  void _onMove(PointerMoveEvent e) {
-    if (!_canOpen || _open.isAnimating) return;
-    final dy = e.delta.dy;
-    final island = _island(context);
-    if (_open.value == 0) {
-      // Closed: a pull down at the top opens it (not on an island iPhone,
-      // where the avatar's neck takes the pull first).
-      if (dy > 0 && _atTop && !island) {
-        _travelled += dy;
-        if (_travelled >= _trigger) _go(1);
-      } else {
-        _travelled = 0;
-      }
-    } else if (_open.value == 1) {
-      // Open: a pull up closes it.
-      if (dy < 0) {
-        _travelled += -dy;
-        if (_travelled >= _trigger) _go(0);
-      } else {
-        _travelled = 0;
-      }
+  void _begin(double from) {
+    _tracking = true;
+    _from = from;
+  }
+
+  /// The photo follows the finger; once it is [_autoAt] of the way (opening) or
+  /// that far from open (closing) it goes on by itself.
+  void _follow(double dy) {
+    _open.value = (_open.value + dy / _span).clamp(0.0, 1.0);
+    if (_from == 0 && _open.value >= _autoAt) {
+      _tracking = false;
+      _glide(1);
+    } else if (_from == 1 && _open.value <= 1 - _autoAt) {
+      _tracking = false;
+      _glide(0);
     }
   }
 
-  void _onEnd(PointerEvent _) => _travelled = 0;
+  void _onDown(PointerDownEvent e) {
+    _fingers++;
+    _lastDy = 0;
+  }
 
+  void _onMove(PointerMoveEvent e) {
+    if (!_canOpen || _leaving) return;
+    final dy = e.delta.dy;
+    if (dy != 0) _lastDy = dy;
+    if (_tracking) {
+      _follow(dy);
+      return;
+    }
+    if (_open.isAnimating) return;
+    if (_open.value == 0) {
+      // Closed: a pull down at the top starts opening it (not on an island
+      // iPhone, where the avatar's neck takes the pull first).
+      if (dy > 0 && _atTop && !_island(context)) {
+        _begin(0);
+        _follow(dy);
+      }
+    } else if (_open.value == 1 && dy < 0) {
+      // Open: a pull up starts closing it.
+      _begin(1);
+      _follow(dy);
+    }
+  }
+
+  void _onEnd(PointerEvent _) {
+    if (_fingers > 0) _fingers--;
+    if (!_tracking) return;
+    _tracking = false;
+    // It stopped short of the point where it goes on by itself: it goes back,
+    // unless the finger was flicking the way it was heading.
+    final flick = _lastDy.abs() > _flick;
+    final toward = _from == 0 ? _lastDy > 0 : _lastDy < 0;
+    _glide(flick && toward ? 1 - _from : _from);
+  }
+
+  /// On an island iPhone: the neck of the avatar snapped. The photo opens the
+  /// moment it does, with a smooth ease (it used to jump open in 180 ms).
   void _letGo() {
-    if (!_canOpen || _open.value > 0 || _open.isAnimating) return;
-    _go(1);
+    if (!_canOpen || _open.value > 0 || _open.isAnimating || _leaving) return;
+    _glide(1);
   }
 
   @override
   Widget build(BuildContext context) {
     final island = _island(context);
     return Listener(
+      onPointerDown: _onDown,
       onPointerMove: _onMove,
       onPointerUp: _onEnd,
       onPointerCancel: _onEnd,
@@ -163,7 +263,7 @@ class _PullPhotoListState extends State<PullPhotoList>
             photoHeaders: photo?.headers ?? const {},
             active: true,
             background: const Color(0xFFF2F2F7),
-            hidden: t > 0,
+            hidden: t > 0 || _leaving,
             onLetGo: _letGo,
             child: list,
           );
@@ -188,7 +288,7 @@ class _PullPhotoListState extends State<PullPhotoList>
           // The photo: round at rest, opening to the full width at the top.
           // On an island iPhone the round one is the island's own (drawn over
           // the page), so only the open one is drawn here.
-          if (!island || t > 0)
+          if (!island || t > 0 || _leaving)
             Positioned(
               top: 0,
               left: 0,
