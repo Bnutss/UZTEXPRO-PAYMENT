@@ -9,6 +9,7 @@ import '../../core/widgets/confirm_dialog.dart';
 import '../../core/widgets/fade_route.dart';
 import '../chat/chat_data_settings.dart';
 import '../chat/chat_hub.dart';
+import '../chat/chat_session.dart';
 import '../chat/chat_page.dart';
 import '../chat/chat_banner.dart';
 import '../chat/chat_push.dart';
@@ -153,6 +154,10 @@ class _MenuPageState extends State<MenuPage>
   void initState() {
     super.initState();
     if (_canUseChat) {
+      // A new sign-in: this phone's session counts, and if it is terminated
+      // from another phone the app signs out.
+      ChatSession.reset();
+      ChatSession.onTerminated = _sessionTerminated;
       _chat = ChatHub.forToken(widget.jwtToken)..start();
       // Files older than the time chosen in "Data and storage" go.
       ChatDataSettings.instance.pruneMedia();
@@ -344,6 +349,9 @@ class _MenuPageState extends State<MenuPage>
 
   @override
   void dispose() {
+    if (ChatSession.onTerminated == _sessionTerminated) {
+      ChatSession.onTerminated = null;
+    }
     _push?.openRequest.removeListener(_onPushOpen);
     _chat?.openRequest.removeListener(_onBannerOpen);
     _banners?.dispose();
@@ -454,6 +462,21 @@ class _MenuPageState extends State<MenuPage>
     if (index == _currentIndex) return;
     HapticFeedback.selectionClick();
     setState(() => _currentIndex = index);
+  }
+
+  /// This phone's session was terminated from another one: sign out at once
+  /// (nothing is sent to the server: it has turned the phone away already).
+  Future<void> _sessionTerminated() async {
+    if (!mounted) return;
+    ChatSession.clear();
+    try {
+      await storage.delete(key: "jwt");
+    } catch (_) {}
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (route) => false,
+    );
   }
 
   Future<void> _logoutNow() async {

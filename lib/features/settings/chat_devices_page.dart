@@ -13,8 +13,10 @@ import '../chat/chat_models.dart';
 import '../chat/chat_push.dart' show ChatPushService;
 import 'settings_rows.dart';
 
-/// "Devices": my phones that get push notifications, with a way to
-/// disconnect the ones I no longer use.
+/// "Devices", as in Telegram: this phone, a button that ends every other
+/// session, and the active sessions with the model, the app and system version,
+/// the address and the last time each was seen. A session is ended by a swipe
+/// or from its details; the phone then signs out.
 class ChatDevicesPage extends StatefulWidget {
   const ChatDevicesPage({super.key, required this.api});
 
@@ -53,7 +55,7 @@ class _ChatDevicesPageState extends State<ChatDevicesPage> {
       );
       if (mounted) setState(() => _devices = list);
     } catch (_) {
-      if (mounted) setState(() => _failed = true);
+      if (mounted && _devices == null) setState(() => _failed = true);
     }
   }
 
@@ -62,24 +64,85 @@ class _ChatDevicesPageState extends State<ChatDevicesPage> {
       context: context,
       title: text,
       actions: [
-        AlertAction(title: 'OK', style: AlertActionStyle.primary, onPressed: () {}),
+        AlertAction(
+          title: 'OK',
+          style: AlertActionStyle.primary,
+          onPressed: () {},
+        ),
       ],
     );
   }
 
-  void _confirmRemove(S s, ChatDeviceInfo d) {
+  Future<void> _terminate(ChatDeviceInfo d) async {
+    final s = S.of(context);
+    try {
+      await widget.api.deleteDevice(d.id);
+      if (mounted) await _load();
+    } catch (_) {
+      if (mounted) _error(s.devicesRemoveError);
+    }
+  }
+
+  /// The sheet that opens from a row: what is known of the session, and "End
+  /// session".
+  void _details(S s, ChatDeviceInfo d) {
     HapticFeedback.selectionClick();
     showNativeAlert(
       context: context,
-      title: s.devicesRemoveTitle,
-      message: s.devicesRemoveMessage(_nameOf(s, d)),
+      title: d.title,
+      message: [
+        if (d.software.isNotEmpty) d.software,
+        if (d.ip.isNotEmpty) s.devicesIp(d.ip),
+        s.devicesActive(_date(s, d.updatedAt)),
+      ].join('\n'),
       actions: [
         AlertAction(
           title: s.devicesRemove,
           style: AlertActionStyle.destructive,
+          onPressed: () => _confirmTerminate(s, d),
+        ),
+        AlertAction(
+          title: s.chatCancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+      ],
+    );
+  }
+
+  void _confirmTerminate(S s, ChatDeviceInfo d) {
+    showNativeAlert(
+      context: context,
+      title: s.devicesRemoveTitle,
+      message: s.devicesRemoveMessage(d.title),
+      actions: [
+        AlertAction(
+          title: s.devicesRemove,
+          style: AlertActionStyle.destructive,
+          onPressed: () => _terminate(d),
+        ),
+        AlertAction(
+          title: s.chatCancel,
+          style: AlertActionStyle.cancel,
+          onPressed: () {},
+        ),
+      ],
+    );
+  }
+
+  void _confirmTerminateAll(S s) {
+    HapticFeedback.selectionClick();
+    showNativeAlert(
+      context: context,
+      title: s.devicesTerminateAllTitle,
+      message: s.devicesTerminateAllMessage,
+      actions: [
+        AlertAction(
+          title: s.devicesTerminateAll,
+          style: AlertActionStyle.destructive,
           onPressed: () async {
             try {
-              await widget.api.deleteDevice(d.id);
+              await widget.api.terminateOtherDevices();
               if (mounted) await _load();
             } catch (_) {
               if (mounted) _error(s.devicesRemoveError);
@@ -93,15 +156,6 @@ class _ChatDevicesPageState extends State<ChatDevicesPage> {
         ),
       ],
     );
-  }
-
-  static String _nameOf(S s, ChatDeviceInfo d) {
-    if (d.name.isNotEmpty) return d.name;
-    return switch (d.platform) {
-      'ios' => 'iPhone',
-      'android' => 'Android',
-      _ => s.devicesUnknown,
-    };
   }
 
   String _date(S s, DateTime t) {
@@ -121,16 +175,61 @@ class _ChatDevicesPageState extends State<ChatDevicesPage> {
     ),
   );
 
-  Widget _row(S s, ChatDeviceInfo d) {
+  Widget _icon(ChatDeviceInfo d) {
     final ios = d.platform == 'ios';
-    return SettingsRow(
+    return SettingsIconTile(
       icon: ios ? Icons.phone_iphone_rounded : Icons.phone_android_rounded,
       color: ios ? SettingsColors.blue : SettingsColors.green,
-      title: _nameOf(s, d),
-      subtitle: d.current
-          ? s.devicesActive(_date(s, d.updatedAt))
-          : '${s.devicesAdded(_date(s, d.createdAt))}\n${s.devicesActive(_date(s, d.updatedAt))}',
-      onTap: d.current ? null : () => _confirmRemove(s, d),
+    );
+  }
+
+  /// This phone: the model, the app and the system, and that it is online.
+  Widget _thisDevice(S s, ChatDeviceInfo d) {
+    return SettingsRow(
+      leading: _icon(d),
+      title: d.title,
+      subtitle: [
+        if (d.software.isNotEmpty) d.software,
+        s.devicesOnline,
+      ].join(' · '),
+    );
+  }
+
+  Widget _session(S s, ChatDeviceInfo d) {
+    final row = SettingsRow(
+      leading: _icon(d),
+      title: d.title,
+      subtitle: [
+        if (d.software.isNotEmpty) d.software,
+        [
+          if (d.ip.isNotEmpty) s.devicesIp(d.ip),
+          _date(s, d.updatedAt),
+        ].join(' · '),
+      ].join('\n'),
+      onTap: () => _details(s, d),
+    );
+    // A swipe to the left ends the session (after the same question).
+    return Dismissible(
+      key: ValueKey('device-${d.id}'),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        _confirmTerminate(s, d);
+        return false; // the row goes when the list reloads, not before
+      },
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        color: const Color(0xFFFF3B30),
+        child: Text(
+          s.devicesSwipe,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      child: Container(color: Colors.white, child: row),
     );
   }
 
@@ -173,12 +272,38 @@ class _ChatDevicesPageState extends State<ChatDevicesPage> {
           else ...[
             if (current.isNotEmpty) ...[
               _caption(s.devicesThis),
-              SettingsGroup(children: [for (final d in current) _row(s, d)]),
+              SettingsGroup(
+                children: [for (final d in current) _thisDevice(s, d)],
+              ),
+              if (others.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                SettingsGroup(
+                  children: [
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _confirmTerminateAll(s),
+                        child: Container(
+                          alignment: Alignment.center,
+                          constraints: const BoxConstraints(minHeight: 48),
+                          child: Text(
+                            s.devicesTerminateAll,
+                            style: const TextStyle(
+                              color: Color(0xFFFF3B30),
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 24),
             ],
             if (others.isNotEmpty) ...[
               _caption(s.devicesOthers),
-              SettingsGroup(children: [for (final d in others) _row(s, d)]),
+              SettingsGroup(children: [for (final d in others) _session(s, d)]),
             ],
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),

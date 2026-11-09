@@ -395,13 +395,25 @@ class ChatDeviceInfo {
     required this.createdAt,
     required this.updatedAt,
     required this.current,
+    this.model = '',
+    this.osVersion = '',
+    this.appVersion = '',
+    this.ip = '',
   });
 
   final int id;
 
   /// `ios`, `android` or empty.
   final String platform;
+
+  /// The name an older version of the app sent (before the model was known).
   final String name;
+
+  /// "iPhone 17 Pro Max", "Samsung SM-S918B".
+  final String model;
+  final String osVersion;
+  final String appVersion;
+  final String ip;
   final DateTime createdAt;
 
   /// The last time this phone told the server it is there (every sign-in).
@@ -410,10 +422,31 @@ class ChatDeviceInfo {
   /// The phone this list is shown on.
   final bool current;
 
+  /// What to call the phone: its model, else the old name, else the platform.
+  String get title {
+    if (model.isNotEmpty) return model;
+    if (name.isNotEmpty) return name;
+    return switch (platform) {
+      'ios' => 'iPhone',
+      'android' => 'Android',
+      _ => '',
+    };
+  }
+
+  /// "UztexPro 1.2.9 · iOS 26.5" (what is known of it).
+  String get software => [
+    if (appVersion.isNotEmpty) 'UztexPro $appVersion',
+    if (osVersion.isNotEmpty) osVersion,
+  ].join(' · ');
+
   factory ChatDeviceInfo.fromJson(Map<String, dynamic> j) => ChatDeviceInfo(
     id: (j['id'] as num).toInt(),
     platform: (j['platform'] as String?) ?? '',
     name: (j['name'] as String?) ?? '',
+    model: (j['model'] as String?) ?? '',
+    osVersion: (j['os_version'] as String?) ?? '',
+    appVersion: (j['app_version'] as String?) ?? '',
+    ip: (j['ip'] as String?) ?? '',
     createdAt:
         DateTime.tryParse((j['created_at'] as String?) ?? '')?.toLocal() ??
         DateTime.now(),
@@ -423,7 +456,6 @@ class ChatDeviceInfo {
     current: j['current'] == true,
   );
 }
-
 
 /// Push notification settings kept on the server (they apply with the app
 /// closed): for personal chats and for groups.

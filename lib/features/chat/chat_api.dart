@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:uztexpro_payment/main.dart' show API;
 
 import 'chat_models.dart';
+import 'chat_session.dart';
 
 /// The chat endpoints are not reachable (network, server, bad answer).
 class ChatApiException implements Exception {
@@ -127,7 +128,14 @@ abstract class ChatRest {
   Future<List<ChatUser>> contacts({String search});
 
   /// This phone wants push notifications for the signed-in user.
-  Future<void> registerDevice(String token, String platform, {String name});
+  Future<int?> registerDevice(
+    String token,
+    String platform, {
+    String name,
+    String model,
+    String osVersion,
+    String appVersion,
+  });
 
   /// Stop push notifications to this phone (on logout).
   Future<void> removeDevice(String token);
@@ -136,8 +144,12 @@ abstract class ChatRest {
   /// (it comes back marked).
   Future<List<ChatDeviceInfo>> devices({String? current});
 
-  /// Stop push notifications to one of my phones.
+  /// Terminates the session of one of my other phones (no more pushes; it
+  /// signs out).
   Future<void> deleteDevice(int id);
+
+  /// Terminates every session but this phone's. Returns how many were ended.
+  Future<int> terminateOtherDevices();
   Future<List<ChatConversation>> conversations();
   Future<ChatConversation> openConversation(int userId);
   Future<ChatPageResult> messages(
@@ -264,7 +276,12 @@ class ChatApi implements ChatRest {
     }
   }
 
-  Map<String, String> get headers => {'Authorization': 'Bearer $token'};
+  Map<String, String> get headers => {
+    'Authorization': 'Bearer $token',
+    // Which phone is asking: a phone whose session was terminated is turned away.
+    if (ChatSession.deviceToken != null)
+      'X-Chat-Device': ChatSession.deviceToken!,
+  };
 
   @override
   String get apiBase => _base;
@@ -513,6 +530,10 @@ class ChatApi implements ChatRest {
   }
 
   dynamic _decode(http.Response res) {
+    if (res.statusCode == 401 && res.body.contains('session_terminated')) {
+      // This phone's session was ended from another one: sign out.
+      ChatSession.terminated();
+    }
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw ChatApiException(res.statusCode);
     }
@@ -775,16 +796,23 @@ class ChatApi implements ChatRest {
   }
 
   @override
-  Future<void> registerDevice(
+  Future<int?> registerDevice(
     String token,
     String platform, {
     String name = '',
+    String model = '',
+    String osVersion = '',
+    String appVersion = '',
   }) async {
-    await _post('/devices/', {
+    final data = await _post('/devices/', {
       'token': token,
       'platform': platform,
       if (name.isNotEmpty) 'name': name,
+      if (model.isNotEmpty) 'model': model,
+      if (osVersion.isNotEmpty) 'os_version': osVersion,
+      if (appVersion.isNotEmpty) 'app_version': appVersion,
     });
+    return data is Map ? (data['id'] as num?)?.toInt() : null;
   }
 
   @override
@@ -801,6 +829,12 @@ class ChatApi implements ChatRest {
   @override
   Future<void> deleteDevice(int id) async {
     await _delete('/devices/$id/');
+  }
+
+  @override
+  Future<int> terminateOtherDevices() async {
+    final data = await _post('/devices/terminate-others/', {});
+    return data is Map ? (data['removed'] as num?)?.toInt() ?? 0 : 0;
   }
 
   @override

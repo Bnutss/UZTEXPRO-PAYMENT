@@ -1547,17 +1547,39 @@ class S {
     'uz': 'Shu qurilma',
   });
   String get devicesOthers => _t({
-    'ru': 'Другие устройства',
-    'en': 'Other Devices',
-    'uz': 'Boshqa qurilmalar',
+    'ru': 'Активные сеансы',
+    'en': 'Active Sessions',
+    'uz': 'Faol seanslar',
   });
+  String get devicesTerminateAll => _t({
+    'ru': 'Завершить все другие сеансы',
+    'en': 'Terminate All Other Sessions',
+    'uz': 'Barcha boshqa seanslarni tugatish',
+  });
+  String get devicesTerminateAllTitle => _t({
+    'ru': 'Завершить все другие сеансы?',
+    'en': 'Terminate all other sessions?',
+    'uz': 'Barcha boshqa seanslar tugatilsinmi?',
+  });
+  String get devicesTerminateAllMessage => _t({
+    'ru':
+        'Все остальные устройства выйдут из аккаунта и перестанут получать уведомления.',
+    'en':
+        'All other devices will be signed out and stop getting notifications.',
+    'uz':
+        'Boshqa barcha qurilmalar akkauntdan chiqadi va bildirishnomalar kelmay qoladi.',
+  });
+  String devicesIp(String ip) =>
+      _t({'ru': 'IP $ip', 'en': 'IP $ip', 'uz': 'IP $ip'});
+  String get devicesOnline =>
+      _t({'ru': 'в сети', 'en': 'online', 'uz': 'tarmoqda'});
   String get devicesHint => _t({
     'ru':
-        'Уведомления о сообщениях приходят на эти телефоны. Отключите те, которыми вы больше не пользуетесь.',
+        'Завершайте сеансы устройств, которыми вы больше не пользуетесь: они выйдут из аккаунта и перестанут получать уведомления.',
     'en':
-        'Message notifications are sent to these phones. Disconnect the ones you no longer use.',
+        'Terminate the sessions of devices you no longer use: they are signed out and stop getting notifications.',
     'uz':
-        'Xabar bildirishnomalari shu telefonlarga keladi. Endi foydalanmaydiganlarini o‘chiring.',
+        'Endi foydalanmaydigan qurilmalaringiz seanslarini tugating: ular akkauntdan chiqadi va bildirishnomalar kelmay qoladi.',
   });
   String get devicesUnknown =>
       _t({'ru': 'Устройство', 'en': 'Device', 'uz': 'Qurilma'});
@@ -1572,29 +1594,31 @@ class S {
     'uz': 'Oxirgi faollik: $date',
   });
   String get devicesRemoveTitle => _t({
-    'ru': 'Отключить устройство?',
-    'en': 'Disconnect this device?',
-    'uz': 'Qurilma o‘chirilsinmi?',
+    'ru': 'Завершить сеанс?',
+    'en': 'Terminate this session?',
+    'uz': 'Seans tugatilsinmi?',
   });
   String devicesRemoveMessage(String name) => _t({
     'ru':
-        'На «$name» перестанут приходить уведомления. Они вернутся, когда вы снова войдёте в приложение на этом устройстве.',
+        '«$name» выйдет из аккаунта и перестанет получать уведомления. Чтобы вернуться, нужно снова войти в приложение на этом устройстве.',
     'en':
-        '"$name" will stop getting notifications. They come back when you sign in to the app on that device again.',
+        '"$name" will be signed out and stop getting notifications. To come back, sign in to the app on that device again.',
     'uz':
-        '«$name» qurilmasiga bildirishnomalar kelmay qoladi. Ilovaga o‘sha qurilmada qayta kirsangiz, ular qaytadi.',
+        '«$name» akkauntdan chiqadi va bildirishnomalar kelmay qoladi. Qaytish uchun o‘sha qurilmada ilovaga qayta kiring.',
   });
   String get devicesRemove =>
-      _t({'ru': 'Отключить', 'en': 'Disconnect', 'uz': 'O‘chirish'});
+      _t({'ru': 'Завершить сеанс', 'en': 'Terminate Session', 'uz': 'Seansni tugatish'});
+  String get devicesSwipe =>
+      _t({'ru': 'Завершить', 'en': 'Terminate', 'uz': 'Tugatish'});
   String get devicesLoadError => _t({
     'ru': 'Не удалось загрузить устройства',
     'en': 'Could not load the devices',
     'uz': 'Qurilmalarni yuklab bo‘lmadi',
   });
   String get devicesRemoveError => _t({
-    'ru': 'Не удалось отключить устройство',
-    'en': 'Could not disconnect the device',
-    'uz': 'Qurilmani o‘chirib bo‘lmadi',
+    'ru': 'Не удалось завершить сеанс',
+    'en': 'Could not terminate the session',
+    'uz': 'Seansni tugatib bo‘lmadi',
   });
   String get devicesRetry =>
       _t({'ru': 'Повторить', 'en': 'Retry', 'uz': 'Qayta urinish'});

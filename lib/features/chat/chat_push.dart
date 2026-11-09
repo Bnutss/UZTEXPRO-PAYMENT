@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
-import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -9,7 +8,9 @@ import 'package:pushy_flutter/pushy_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'chat_api.dart';
+import 'chat_device_model.dart';
 import 'chat_models.dart';
+import 'chat_session.dart';
 
 /// Push notifications about chat messages (Pushy): registering this phone with
 /// the backend, showing a notification on Android, and leading a tap to the
@@ -200,23 +201,6 @@ class ChatPushService with WidgetsBindingObserver {
   /// settings, which show which of my devices is this one).
   static String? lastToken;
 
-  /// A name for this phone in the "Devices" list: "iPhone · iOS 26.5",
-  /// "samsung SM-S918B · Android 14". Empty when it cannot be found out.
-  static Future<String> deviceName() async {
-    try {
-      final info = DeviceInfoPlugin();
-      if (Platform.isIOS) {
-        final d = await info.iosInfo;
-        return '${d.model} · iOS ${d.systemVersion}';
-      }
-      if (Platform.isAndroid) {
-        final d = await info.androidInfo;
-        return '${d.manufacturer} ${d.model} · Android ${d.version.release}';
-      }
-    } catch (_) {}
-    return '';
-  }
-
   /// Call after sign-in. Failing to register (no permission, no network) is
   /// not an error: the next start tries again.
   Future<void> start() async {
@@ -234,7 +218,18 @@ class ChatPushService with WidgetsBindingObserver {
     try {
       final token = await client.register();
       if (token == null || token.isEmpty || _disposed) return;
-      await api.registerDevice(token, platform, name: await deviceName());
+      // The chat asks the server about this phone in every request from now on.
+      ChatSession.deviceToken = token;
+      final d = await detectDeviceDetails();
+      final id = await api.registerDevice(
+        token,
+        platform,
+        name: d.model,
+        model: d.model,
+        osVersion: d.os,
+        appVersion: d.appVersion,
+      );
+      ChatSession.deviceId = id;
       _token = token;
       lastToken = token;
     } catch (_) {}
@@ -246,6 +241,8 @@ class ChatPushService with WidgetsBindingObserver {
     final token = _token;
     _token = null;
     if (token == null) return;
+    // (the request below still says which phone it is; afterwards none)
+    Future<void>.delayed(const Duration(seconds: 6), ChatSession.clear);
     try {
       await api.removeDevice(token).timeout(const Duration(seconds: 5));
     } catch (_) {}

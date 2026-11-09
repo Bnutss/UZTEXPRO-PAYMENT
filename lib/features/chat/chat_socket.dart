@@ -6,6 +6,8 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:uztexpro_payment/main.dart' show API;
 
+import 'chat_session.dart';
+
 /// One event from the server: `message`, `typing`, `read`, `error`, or the
 /// local `denied` (the server refused this user: bad token / not in the group).
 class ChatEvent {
@@ -96,8 +98,15 @@ class ChatSocket implements ChatLink {
     if (_disposed || _connecting || _ws != null || _denied) return;
     _connecting = true;
     try {
+      // Which phone this is: a terminated one is turned away.
+      final device = ChatSession.deviceToken;
+      final url = device == null
+          ? _url
+          : _url.replace(
+              queryParameters: {..._url.queryParameters, 'device': device},
+            );
       final ws = await WebSocket.connect(
-        _url.toString(),
+        url.toString(),
       ).timeout(const Duration(seconds: 10));
       if (_disposed) {
         await ws.close();
@@ -136,6 +145,16 @@ class ChatSocket implements ChatLink {
       return;
     }
     final data = decoded['data'];
+    if (type == 'session_terminated' && data is Map) {
+      // Ended from another phone: is it this one?
+      final ids = (data['devices'] as List?)?.whereType<num>().map(
+        (n) => n.toInt(),
+      );
+      if (ids != null && ids.contains(ChatSession.deviceId)) {
+        ChatSession.terminated();
+        return;
+      }
+    }
     _events.add(
       ChatEvent(type, data is Map ? data.cast<String, dynamic>() : const {}),
     );
