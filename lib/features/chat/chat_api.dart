@@ -153,6 +153,16 @@ abstract class ChatRest {
     int? replyTo,
   });
 
+  /// Forwards a message into a chat on the server (text, voice, and media it
+  /// still has). Throws a [ChatApiException] with 410 for media the server has
+  /// already dropped: then send the app's own copy with `forwardOf`.
+  Future<ChatMessage> forwardMessage(
+    int conversationId,
+    int messageId,
+    String clientId, {
+    String albumId,
+  });
+
   /// Uploads a recorded voice message (a file on this phone).
   Future<ChatMessage> sendVoice(
     int conversationId,
@@ -169,6 +179,7 @@ abstract class ChatRest {
     ChatUpload upload,
     String clientId, {
     int? replyTo,
+    int? forwardOf,
     void Function(double progress)? onProgress,
     ChatCancelToken? cancel,
   });
@@ -589,6 +600,21 @@ class ChatApi implements ChatRest {
   }
 
   @override
+  Future<ChatMessage> forwardMessage(
+    int conversationId,
+    int messageId,
+    String clientId, {
+    String albumId = '',
+  }) async {
+    final data = await _post('/conversations/$conversationId/forward/', {
+      'message_id': messageId,
+      'client_id': clientId,
+      if (albumId.isNotEmpty) 'album_id': albumId,
+    });
+    return ChatMessage.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  @override
   Future<ChatMessage> sendVoice(
     int conversationId,
     String filePath,
@@ -625,6 +651,7 @@ class ChatApi implements ChatRest {
     ChatUpload u,
     String clientId, {
     int? replyTo,
+    int? forwardOf,
     void Function(double progress)? onProgress,
     ChatCancelToken? cancel,
   }) async {
@@ -644,6 +671,7 @@ class ChatApi implements ChatRest {
             if (u.caption.isNotEmpty) 'caption': u.caption,
             if (u.albumId.isNotEmpty) 'album_id': u.albumId,
             if (replyTo != null) 'reply_to': '$replyTo',
+            if (forwardOf != null) 'forward_of': '$forwardOf',
           });
     multipart.files.add(
       await http.MultipartFile.fromPath('file', u.filePath, filename: u.name),

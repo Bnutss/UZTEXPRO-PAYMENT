@@ -1349,6 +1349,41 @@ class S {
     'uz': "Narx shakllantirish ma'lumotlari kiritilmagan",
   });
 
+  // Forward
+  String get chatMenuForward =>
+      _t({'ru': 'Переслать', 'en': 'Forward', 'uz': 'Yuborish'});
+  String get forwardTitle =>
+      _t({'ru': 'Переслать', 'en': 'Forward', 'uz': 'Yuborish'});
+  String get forwardSearch =>
+      _t({'ru': 'Поиск', 'en': 'Search', 'uz': 'Qidirish'});
+  String get forwardChats =>
+      _t({'ru': 'Чаты', 'en': 'Chats', 'uz': 'Chatlar'});
+  String get forwardContacts =>
+      _t({'ru': 'Контакты', 'en': 'Contacts', 'uz': 'Kontaktlar'});
+  String forwardSendTo(int n) => _t({
+    'ru': n == 1 ? 'Переслать' : 'Переслать ($n)',
+    'en': n == 1 ? 'Forward' : 'Forward ($n)',
+    'uz': n == 1 ? 'Yuborish' : 'Yuborish ($n)',
+  });
+  String forwardedFrom(String name) => _t({
+    'ru': 'Переслано от $name',
+    'en': 'Forwarded from $name',
+    'uz': '$name dan yuborilgan',
+  });
+  String get forwardFailed => _t({
+    'ru': 'Не удалось переслать',
+    'en': 'Could not forward',
+    'uz': 'Yuborib bo‘lmadi',
+  });
+  String get forwardPartFailed => _t({
+    'ru':
+        'Часть сообщений переслать не удалось: файла уже нет ни на сервере, ни на этом телефоне.',
+    'en':
+        'Some messages could not be forwarded: the file is gone from the server and from this phone.',
+    'uz':
+        'Ba’zi xabarlarni yuborib bo‘lmadi: fayl serverda ham, bu telefonda ham yo‘q.',
+  });
+
   // Server-side push settings and timed mute
   String get notifPush => _t({
     'ru': 'Уведомления о сообщениях',
@@ -1389,14 +1424,26 @@ class S {
     'en': 'Mute Notifications',
     'uz': 'Bildirishnomalarni o‘chirish',
   });
-  String get mute1h =>
-      _t({'ru': 'На 1 час', 'en': 'For 1 hour', 'uz': '1 soatga'});
-  String get mute8h =>
-      _t({'ru': 'На 8 часов', 'en': 'For 8 hours', 'uz': '8 soatga'});
-  String get mute2d =>
-      _t({'ru': 'На 2 дня', 'en': 'For 2 days', 'uz': '2 kunga'});
-  String get muteForever =>
-      _t({'ru': 'Навсегда', 'en': 'Forever', 'uz': 'Doimiy'});
+  String get mute1h => _t({
+    'ru': 'Отключить на 1 час',
+    'en': 'Mute for 1 hour',
+    'uz': '1 soatga o‘chirish',
+  });
+  String get mute8h => _t({
+    'ru': 'Отключить на 8 часов',
+    'en': 'Mute for 8 hours',
+    'uz': '8 soatga o‘chirish',
+  });
+  String get mute2d => _t({
+    'ru': 'Отключить на 2 дня',
+    'en': 'Mute for 2 days',
+    'uz': '2 kunga o‘chirish',
+  });
+  String get muteForever => _t({
+    'ru': 'Отключить навсегда',
+    'en': 'Mute forever',
+    'uz': 'Doimiy o‘chirish',
+  });
 
   // Data and storage
   String get dataTitle =>

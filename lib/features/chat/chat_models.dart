@@ -78,6 +78,21 @@ class ChatUser {
 enum ChatSendState { sending, sent, failed }
 
 /// The quote above an answer: which message it answers.
+/// "Forwarded from X": who wrote the original of a forwarded message.
+class ChatForward {
+  const ChatForward({required this.name, this.userId});
+
+  final String name;
+
+  /// The person (null when the account is gone).
+  final int? userId;
+
+  factory ChatForward.fromJson(Map<String, dynamic> j) => ChatForward(
+    name: j['name'] as String? ?? '',
+    userId: (j['user'] as num?)?.toInt(),
+  );
+}
+
 class ChatReply {
   const ChatReply({
     required this.id,
@@ -166,7 +181,11 @@ class ChatMessage {
     this.waveform = const [],
     this.media,
     this.albumId = '',
+    this.forward,
   });
+
+  /// Set when this message is a forward of somebody's message.
+  final ChatForward? forward;
 
   /// Photos and videos sent together share one id: they are drawn as one album.
   final String albumId;
@@ -243,6 +262,7 @@ class ChatMessage {
     waveform: waveform,
     media: media,
     albumId: albumId,
+    forward: forward,
   );
 
   factory ChatMessage.fromJson(Map<String, dynamic> j) => ChatMessage(
@@ -272,6 +292,9 @@ class ChatMessage {
         ? ChatMedia.fromJson((j['media'] as Map).cast<String, dynamic>())
         : null,
     albumId: j['album_id'] as String? ?? '',
+    forward: j['forward'] is Map && ((j['forward'] as Map)['name'] ?? '') != ''
+        ? ChatForward.fromJson((j['forward'] as Map).cast<String, dynamic>())
+        : null,
   );
 }
 

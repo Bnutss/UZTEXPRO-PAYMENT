@@ -12,6 +12,7 @@ import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/native_segments.dart';
 import '../../core/widgets/ui_blocks.dart';
 import 'chat_models.dart';
+import 'chat_mute_sheet.dart';
 import 'chat_media_grid.dart';
 import 'chat_voice_list.dart';
 import 'chat_widgets.dart';
@@ -59,7 +60,9 @@ class ChatProfilePage extends StatefulWidget {
   /// The chat exists on the server, so it can be muted / deleted.
   final bool canManage;
   final bool Function()? isMuted;
-  final Future<bool> Function()? onToggleMute;
+  /// Turns the chat's notifications off ([hours]: for that long, null: for
+  /// good) or, when they are off, back on.
+  final Future<bool> Function({int? hours})? onToggleMute;
 
   /// Deletes the chat: only for me, or for both people. True when done.
   final Future<bool> Function(bool forAll)? onDelete;
@@ -90,11 +93,6 @@ class _ChatProfilePageState extends State<ChatProfilePage> {
     } else {
       go();
     }
-  }
-
-  Future<void> _toggleMute() async {
-    HapticFeedback.selectionClick();
-    await widget.onToggleMute?.call();
   }
 
   /// Native alert: delete for me and the person, or only for me.
@@ -220,19 +218,27 @@ class _ChatProfilePageState extends State<ChatProfilePage> {
                       ],
                       if (widget.showManage) ...[
                         Expanded(
-                          child: _Action(
-                            icon: muted
-                                ? Icons.notifications_off_rounded
-                                : Icons.notifications_rounded,
-                            label: muted ? s.chatSoundOff : s.chatSound,
+                          child: MuteMenu(
+                            muted: muted,
                             enabled: widget.canManage,
-                            onTap: _toggleMute,
+                            onMute: (h) => widget.onToggleMute?.call(
+                              hours: h == 0 ? null : h,
+                            ),
+                            onUnmute: () => widget.onToggleMute?.call(),
+                            child: _Action(
+                              icon: muted
+                                  ? Icons.notifications_off_rounded
+                                  : Icons.notifications_rounded,
+                              label: muted ? s.chatSoundOff : s.chatSound,
+                              enabled: widget.canManage,
+                              onTap: null,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: _Action(
-                            icon: Icons.delete_outline_rounded,
+                            icon: kChatDeleteIcon,
                             label: s.chatDelete,
                             color: const Color(0xFFFF3B30),
                             enabled: widget.canManage,
@@ -323,7 +329,7 @@ class _Action extends StatelessWidget {
   /// Our own icon (an svg asset) instead of a material one.
   final String? svgIcon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final Color color;
   final bool enabled;
 

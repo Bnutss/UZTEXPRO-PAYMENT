@@ -1,6 +1,8 @@
+import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -9,6 +11,13 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/ui_blocks.dart';
 import 'chat_appearance_settings.dart';
 import 'chat_models.dart';
+
+/// The "delete" icon, the same in every place of the chat: the system's trash
+/// on iOS (as the native menus and the photo viewer draw it), the outlined bin
+/// on Android.
+final IconData kChatDeleteIcon = Platform.isIOS
+    ? CupertinoIcons.trash
+    : Icons.delete_outline_rounded;
 
 const Color kChatInk = Color(0xFF1C1C1E);
 const Color kChatMuted = Color(0xFF8A8A8E);
@@ -126,7 +135,12 @@ class ChatRow extends StatelessWidget {
     this.subtitleIcon,
     this.subtitlePrefix = '',
     this.timeIcon,
+    this.selected,
   });
+
+  /// Not null: a round check at the right end (a list to pick from, as in
+  /// Telegram's "Forward"); true when this row is picked.
+  final bool? selected;
 
   /// Ticks before the time when the last message is mine: one when it is sent,
   /// two when it has been read (as in Telegram's chat list).
@@ -264,6 +278,27 @@ class ChatRow extends StatelessWidget {
                   ],
                 ),
               ),
+              if (selected != null) ...[
+                const SizedBox(width: 12),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: selected! ? AppColors.brandOrange : Colors.transparent,
+                    border: Border.all(
+                      color: selected!
+                          ? AppColors.brandOrange
+                          : const Color(0xFFC7C7CC),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: selected!
+                      ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+                      : null,
+                ),
+              ],
             ],
           ),
         ),

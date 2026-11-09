@@ -108,7 +108,7 @@ class _ProfileVoiceListState extends State<ProfileVoiceList> {
       ),
       AdaptivePopupMenuItem<_VoiceAction>(
         label: s.chatMenuDelete,
-        icon: ios26 ? 'trash' : Icons.delete_outline_rounded,
+        icon: ios26 ? 'trash' : kChatDeleteIcon,
         isDestructive: true,
         children: [
           AdaptivePopupMenuItem<_VoiceAction>(

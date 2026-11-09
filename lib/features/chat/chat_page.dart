@@ -839,7 +839,7 @@ class _ChatsTabState extends State<_ChatsTab> {
       return [
         mute,
         ChatListAction(
-          icon: Icons.delete_rounded,
+          icon: kChatDeleteIcon,
           sfSymbol: 'trash',
           label: s.chatDeleteChatAction,
           shortLabel: s.chatDeleteShort,
@@ -853,7 +853,7 @@ class _ChatsTabState extends State<_ChatsTab> {
     return [
       mute,
       ChatListAction(
-        icon: owner ? Icons.delete_rounded : Icons.logout_rounded,
+        icon: owner ? kChatDeleteIcon : Icons.logout_rounded,
         sfSymbol: owner ? 'trash' : 'rectangle.portrait.and.arrow.right',
         label: s.chatLeaveGroupAction,
         shortLabel: owner ? s.chatDeleteShort : s.chatLeaveShort,
@@ -880,7 +880,7 @@ class _ChatsTabState extends State<_ChatsTab> {
           onTap: () => _confirmLeave(c),
         ),
         ChatListAction(
-          icon: Icons.delete_rounded,
+          icon: kChatDeleteIcon,
           sfSymbol: 'trash',
           label: s.chatDeleteGroup,
           shortLabel: s.chatDeleteShort,

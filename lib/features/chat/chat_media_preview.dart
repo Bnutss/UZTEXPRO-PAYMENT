@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/theme/app_colors.dart';
 import 'chat_api.dart';
+import 'chat_widgets.dart' show kChatDeleteIcon;
 
 /// The preview before sending where there is no native sheet (Android): the
 /// picked photos / videos full screen with a caption for each, as in Telegram.
@@ -74,7 +75,7 @@ class _MediaPreviewPageState extends State<MediaPreviewPage> {
             : null,
         actions: [
           IconButton(
-            icon: const Icon(Icons.delete_outline_rounded),
+            icon: Icon(kChatDeleteIcon),
             onPressed: _removeCurrent,
           ),
         ],

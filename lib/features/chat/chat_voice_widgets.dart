@@ -450,12 +450,12 @@ class VoiceRecordingStrip extends StatelessWidget {
                     HapticFeedback.selectionClick();
                     recorder.cancel();
                   },
-                  child: const SizedBox(
+                  child: SizedBox(
                     width: 38,
                     height: 38,
                     child: Icon(
-                      Icons.delete_outline_rounded,
-                      color: Color(0xFFFF3B30),
+                      kChatDeleteIcon,
+                      color: const Color(0xFFFF3B30),
                       size: 24,
                     ),
                   ),

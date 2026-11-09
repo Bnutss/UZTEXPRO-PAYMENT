@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import 'chat_voice.dart';
+import 'chat_widgets.dart' show kChatDeleteIcon;
 
 /// A full-screen photo (zoom with two fingers) for platforms without the
 /// native iOS viewer.
@@ -13,6 +14,7 @@ class PhotoViewerPage extends StatelessWidget {
     required this.file,
     this.title,
     this.subtitle,
+    this.onDelete,
   });
 
   final File file;
@@ -20,6 +22,10 @@ class PhotoViewerPage extends StatelessWidget {
   /// The sender's name and, under it, when it was sent.
   final String? title;
   final String? subtitle;
+
+  /// A trash button in the bar when the photo can be deleted; it asks what to
+  /// do (for me / for everybody) and closes the viewer after the answer.
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -32,6 +38,14 @@ class PhotoViewerPage extends StatelessWidget {
       title: title == null
           ? null
           : _ViewerTitle(title: title!, subtitle: subtitle),
+      actions: [
+        if (onDelete != null)
+          IconButton(
+            tooltip: MaterialLocalizations.of(context).deleteButtonTooltip,
+            icon: Icon(kChatDeleteIcon),
+            onPressed: onDelete,
+          ),
+      ],
     ),
     body: Center(
       child: InteractiveViewer(

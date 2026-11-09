@@ -116,7 +116,7 @@ class _ProfileMediaGridState extends State<ProfileMediaGrid> {
       ),
       AdaptivePopupMenuItem<_MediaAction>(
         label: s.chatMenuDelete,
-        icon: ios26 ? 'trash' : Icons.delete_outline_rounded,
+        icon: ios26 ? 'trash' : kChatDeleteIcon,
         isDestructive: true,
         children: [
           AdaptivePopupMenuItem<_MediaAction>(

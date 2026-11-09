@@ -207,6 +207,7 @@ class _HangingRest extends FakeRest {
     ChatUpload upload,
     String clientId, {
     int? replyTo,
+    int? forwardOf,
     void Function(double progress)? onProgress,
     ChatCancelToken? cancel,
   }) {
@@ -224,6 +225,7 @@ class _FailingRest extends FakeRest {
     ChatUpload upload,
     String clientId, {
     int? replyTo,
+    int? forwardOf,
     void Function(double progress)? onProgress,
     ChatCancelToken? cancel,
   }) async => throw const ChatApiException(null);

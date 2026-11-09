@@ -51,8 +51,9 @@ import UniformTypeIdentifiers
       case "pickPhoto":
         PhotoPickerPresenter.present(result: result)
       case "photoViewer":
-        PhotoViewerPresenter.present(args)
-        result(nil)
+        // Answers when the viewer is closed: nil, or "me" / "all" when the
+        // person deleted the photo from it.
+        PhotoViewerPresenter.present(args, result: result)
       case "chatPreview":
         ChatPreviewPresenter.present(args, result: result)
       default:
@@ -1958,9 +1959,26 @@ struct MenuGlass: ViewModifier {
 // MARK: - Photo viewer
 
 enum PhotoViewerPresenter {
-  static func present(_ args: [String: Any]) {
-    guard let urlString = args["url"] as? String, let url = URL(string: urlString) else { return }
+  static func present(_ args: [String: Any], result: @escaping FlutterResult) {
+    guard let urlString = args["url"] as? String, let url = URL(string: urlString) else {
+      result(nil)
+      return
+    }
     let vc = PhotoViewerController(url: url, title: args["title"] as? String, subtitle: args["subtitle"] as? String)
+    // A trash button, when the photo can be deleted (the texts come from Flutter).
+    if let forMe = args["deleteForMe"] as? String {
+      vc.deleteOptions = (
+        forMe: forMe,
+        forAll: args["deleteForAll"] as? String,
+        cancel: args["cancel"] as? String ?? "Cancel"
+      )
+    }
+    var answered = false
+    vc.onFinish = { choice in
+      if answered { return }
+      answered = true
+      result(choice)
+    }
     let nav = UINavigationController(rootViewController: vc)
     nav.modalPresentationStyle = .overFullScreen
     nav.modalTransitionStyle = .crossDissolve
@@ -2044,6 +2062,11 @@ final class ViewerTitleCapsule: UIView {
 }
 
 final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
+  /// Set when the photo can be deleted: the texts of the two choices and of Cancel.
+  var deleteOptions: (forMe: String, forAll: String?, cancel: String)?
+  /// Called once when the viewer is gone: "me" / "all" if the photo was deleted.
+  var onFinish: ((String?) -> Void)?
+  private var deleteChoice: String?
   private let url: URL
   private let scrollView = UIScrollView()
   private let imageView = UIImageView()
@@ -2067,6 +2090,13 @@ final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
       systemItem: .close,
       primaryAction: UIAction { [weak self] _ in self?.dismiss(animated: true) }
     )
+    if deleteOptions != nil {
+      let trash = UIBarButtonItem(
+        systemItem: .trash,
+        primaryAction: UIAction { [weak self] _ in self?.confirmDelete() }
+      )
+      navigationItem.leftBarButtonItem = trash
+    }
 
     scrollView.frame = view.bounds
     scrollView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -2107,6 +2137,34 @@ final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
     super.viewDidLayoutSubviews()
     if scrollView.zoomScale == 1 {
       imageView.frame = scrollView.bounds
+    }
+  }
+
+  /// The system's sheet: delete for me, delete for everybody (when allowed),
+  /// Cancel. The answer goes back to Flutter when the viewer closes.
+  private func confirmDelete() {
+    guard let options = deleteOptions else { return }
+    let sheet = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+    sheet.addAction(UIAlertAction(title: options.forMe, style: .destructive) { [weak self] _ in
+      self?.deleteChoice = "me"
+      self?.dismiss(animated: true)
+    })
+    if let forAll = options.forAll {
+      sheet.addAction(UIAlertAction(title: forAll, style: .destructive) { [weak self] _ in
+        self?.deleteChoice = "all"
+        self?.dismiss(animated: true)
+      })
+    }
+    sheet.addAction(UIAlertAction(title: options.cancel, style: .cancel))
+    sheet.popoverPresentationController?.barButtonItem = navigationItem.leftBarButtonItem
+    present(sheet, animated: true)
+  }
+
+  override func viewDidDisappear(_ animated: Bool) {
+    super.viewDidDisappear(animated)
+    // Gone for good (dismissed), not just covered by the sheet.
+    if isBeingDismissed || navigationController?.isBeingDismissed == true {
+      onFinish?(deleteChoice)
     }
   }
 

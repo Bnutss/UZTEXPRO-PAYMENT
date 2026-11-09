@@ -83,12 +83,39 @@ class FakeRest implements ChatRest {
 
   final mediaCalls = <String>[];
 
+  /// `conversation:message:client id` of every forward on the server; a media
+  /// message in [goneForwards] answers 410, as a file the server dropped.
+  final forwardCalls = <String>[];
+  final goneForwards = <int>{};
+
+  @override
+  Future<ChatMessage> forwardMessage(
+    int conversationId,
+    int messageId,
+    String clientId, {
+    String albumId = '',
+  }) async {
+    forwardCalls.add('$conversationId:$messageId:$clientId');
+    if (goneForwards.contains(messageId)) throw const ChatApiException(410);
+    return ChatMessage(
+      id: 777,
+      conversation: conversationId,
+      sender: 1,
+      text: 'fwd',
+      clientId: clientId,
+      createdAt: DateTime(2026),
+      read: false,
+      forward: const ChatForward(name: 'Anna', userId: 2),
+    );
+  }
+
   @override
   Future<ChatMessage> sendMedia(
     int conversationId,
     ChatUpload upload,
     String clientId, {
     int? replyTo,
+    int? forwardOf,
     void Function(double progress)? onProgress,
     ChatCancelToken? cancel,
   }) async {

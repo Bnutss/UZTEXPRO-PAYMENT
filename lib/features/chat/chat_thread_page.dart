@@ -27,8 +27,11 @@ import 'chat_thread_controller.dart';
 import 'chat_appearance_settings.dart';
 import 'chat_attach.dart';
 import 'chat_attach_android.dart';
+import '../../core/widgets/routeless_alert.dart';
+import 'chat_delete_sheet.dart';
+import 'chat_forward.dart';
+import 'chat_forward_page.dart';
 import 'chat_media.dart';
-import 'chat_mute_sheet.dart';
 import 'chat_media_grid.dart';
 import 'chat_media_preview.dart';
 import 'chat_media_viewers.dart';
@@ -269,7 +272,7 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
       return [
         AdaptivePopupMenuItem<_MsgAction>(
           label: s.chatMenuDelete,
-          icon: ios26 ? 'trash' : Icons.delete_outline_rounded,
+          icon: ios26 ? 'trash' : kChatDeleteIcon,
           isDestructive: true,
           value: _MsgAction.discard,
         ),
@@ -281,6 +284,12 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
           label: s.chatMenuReply,
           icon: ios26 ? 'arrowshape.turn.up.left' : Icons.reply_rounded,
           value: _MsgAction.reply,
+        ),
+      if (stored && !m.isSystem)
+        AdaptivePopupMenuItem<_MsgAction>(
+          label: s.chatMenuForward,
+          icon: ios26 ? 'arrowshape.turn.up.right' : Icons.shortcut_rounded,
+          value: _MsgAction.forward,
         ),
       if (!m.isVoice)
         AdaptivePopupMenuItem<_MsgAction>(
@@ -297,7 +306,7 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
       if (stored)
         AdaptivePopupMenuItem<_MsgAction>(
           label: s.chatMenuDelete,
-          icon: ios26 ? 'trash' : Icons.delete_outline_rounded,
+          icon: ios26 ? 'trash' : kChatDeleteIcon,
           isDestructive: true,
           children: [
             AdaptivePopupMenuItem<_MsgAction>(
@@ -343,6 +352,8 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     switch (action) {
       case _MsgAction.reply:
         _startReply(m);
+      case _MsgAction.forward:
+        _forward(all);
       case _MsgAction.copy:
         Clipboard.setData(
           ClipboardData(
@@ -368,6 +379,71 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
         }
       case null:
         break;
+    }
+  }
+
+  /// "Forward": pick the chats, send the copies (the server copies what it can,
+  /// the rest goes from this phone), and, when it was one chat, land in it.
+  Future<void> _forward(List<ChatMessage> all) async {
+    final s = S.of(context);
+    final targets = await Navigator.of(context).push<List<ForwardTarget>>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => ChatForwardPage(api: widget.api),
+      ),
+    );
+    if (targets == null || targets.isEmpty || !mounted) return;
+
+    // A spinner while it goes (a copy from this phone can take a moment).
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black38,
+      useRootNavigator: true,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+    );
+    final result = await ChatForwarder(widget.api).forward(all, targets);
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop();
+    HapticFeedback.mediumImpact();
+    widget.onRead?.call(); // the chat list and the badge follow the server
+
+    if (result.failed > 0) {
+      showNativeAlert(
+        context: context,
+        title: result.sent == 0 ? s.forwardFailed : s.forwardPartFailed,
+        actions: [
+          AlertAction(
+            title: s.close,
+            style: AlertActionStyle.cancel,
+            onPressed: () {},
+          ),
+        ],
+      );
+      return;
+    }
+    // One chat picked: show it, as Telegram does (back goes to the list).
+    if (targets.length == 1 && result.chatIds.length == 1) {
+      final t = targets.first;
+      final id = result.chatIds.first;
+      if (id == _c.conversationId) return; // forwarded into this very chat
+      Navigator.of(context).pushReplacement(
+        chatInstantRoute(
+          (_) => ChatThreadPage(
+            api: widget.api,
+            link: widget.link,
+            peer: t.peer,
+            conversationId: id,
+            sounds: widget.sounds,
+            mutedChats: widget.mutedChats,
+            onRead: widget.onRead,
+            isGroup: t.isGroup,
+          ),
+        ),
+      );
     }
   }
 
@@ -621,25 +697,50 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     if (!mounted) return;
     HapticFeedback.selectionClick();
     if (m.isImage) {
+      // A photo that is on the server can be deleted from the viewer: for me,
+      // and (as in the message menu) for everybody when that is allowed.
+      final canDelete = !m.isLocal;
+      final allowForAll = !widget.isGroup || _c.isMine(m) || _c.isAdmin;
+      Future<void> apply(String? choice) async {
+        if (choice == null || !mounted) return;
+        _c.deleteMessage(m, forAll: choice == 'all');
+      }
+
       if (Platform.isIOS) {
         try {
-          await const MethodChannel(
-            'uztexpro/native_sheet',
-          ).invokeMethod('photoViewer', {
-            'url': Uri.file(file.path).toString(),
-            'title': _senderLabel(m, s),
-            'subtitle': _sentAtLabel(m),
-          });
+          final choice = await const MethodChannel('uztexpro/native_sheet')
+              .invokeMethod<String>('photoViewer', {
+                'url': Uri.file(file.path).toString(),
+                'title': _senderLabel(m, s),
+                'subtitle': _sentAtLabel(m),
+                if (canDelete) ...{
+                  'deleteForMe': s.chatMenuDeleteForMe,
+                  if (allowForAll) 'deleteForAll': s.chatMenuDeleteForAll,
+                  'cancel': s.chatCancel,
+                },
+              });
+          await apply(choice);
           return;
         } catch (_) {}
       }
       if (!mounted) return;
-      Navigator.of(context).push(
+      await Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => PhotoViewerPage(
+          builder: (viewerContext) => PhotoViewerPage(
             file: file,
             title: _senderLabel(m, s),
             subtitle: _sentAtLabel(m),
+            onDelete: !canDelete
+                ? null
+                : () async {
+                    final choice = await askDeleteMessage(
+                      viewerContext,
+                      allowForAll: allowForAll,
+                    );
+                    if (choice == null) return;
+                    if (viewerContext.mounted) Navigator.of(viewerContext).pop();
+                    await apply(choice);
+                  },
           ),
         ),
       );
@@ -694,14 +795,7 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     }
   }
 
-  Future<bool> _toggleMuted() async {
-    // Turning notifications off asks for how long; turning them on does not.
-    int? hours;
-    if (!_c.muted) {
-      final picked = await askMuteDuration(context);
-      if (picked == null || !mounted) return false;
-      hours = picked == 0 ? null : picked;
-    }
+  Future<bool> _toggleMuted({int? hours}) async {
     final ok = await _c.toggleMuted(hours: hours);
     final id = _c.conversationId;
     if (ok && id != null) {
@@ -1208,7 +1302,15 @@ class _DayChip extends StatelessWidget {
   }
 }
 
-enum _MsgAction { reply, copy, edit, deleteForMe, deleteForAll, discard }
+enum _MsgAction {
+  reply,
+  forward,
+  copy,
+  edit,
+  deleteForMe,
+  deleteForAll,
+  discard,
+}
 
 /// How many emoji a message is made of when it is ONLY 1-3 emoji (shown big,
 /// without a bubble, as in Telegram); null for anything else.
@@ -1331,6 +1433,24 @@ class _Bubble extends StatelessWidget {
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: _senderColor(m.sender),
+                ),
+              ),
+            ),
+          if (m.forward != null)
+            Padding(
+              padding: EdgeInsets.only(
+                bottom: 2,
+                left: m.isMedia ? 8 : 0,
+                top: (m.isMedia && senderLabel == null) ? 4 : 0,
+              ),
+              child: Text(
+                S.of(context).forwardedFrom(m.forward!.name),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: mine ? const Color(0xFF5DAA55) : AppColors.brandOrange,
                 ),
               ),
             ),

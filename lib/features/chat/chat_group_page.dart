@@ -93,15 +93,8 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
 
   // ── actions ──────────────────────────────────────────────────────────
 
-  Future<void> _toggleMute() async {
+  Future<void> _setMute({int? hours}) async {
     HapticFeedback.selectionClick();
-    // Turning notifications off asks for how long; turning them on does not.
-    int? hours;
-    if (!_c.muted) {
-      final picked = await askMuteDuration(context);
-      if (picked == null || !mounted) return;
-      hours = picked == 0 ? null : picked;
-    }
     await _c.toggleMuted(hours: hours);
     widget.onChanged?.call();
   }
@@ -226,7 +219,7 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
         if (_c.group?.myRole == 'owner')
           AdaptivePopupMenuItem<String>(
             label: s.chatDeleteGroup,
-            icon: ios26 ? 'trash' : Icons.delete_outline_rounded,
+            icon: ios26 ? 'trash' : kChatDeleteIcon,
             isDestructive: true,
             value: 'delete',
           ),
@@ -396,12 +389,16 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
                   Row(
                     children: [
                       Expanded(
-                        child: _Tile(
-                          icon: _c.muted
-                              ? Icons.notifications_off_rounded
-                              : Icons.notifications_rounded,
-                          label: _c.muted ? s.chatSoundOff : s.chatSound,
-                          onTap: _toggleMute,
+                        child: MuteMenu(
+                          muted: _c.muted,
+                          onMute: (h) => _setMute(hours: h == 0 ? null : h),
+                          onUnmute: _setMute,
+                          child: _Tile(
+                            icon: _c.muted
+                                ? Icons.notifications_off_rounded
+                                : Icons.notifications_rounded,
+                            label: _c.muted ? s.chatSoundOff : s.chatSound,
+                          ),
                         ),
                       ),
                       if (admin) ...[
