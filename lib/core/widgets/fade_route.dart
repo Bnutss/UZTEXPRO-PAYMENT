@@ -15,3 +15,18 @@ class FadeRoute<T> extends PageRouteBuilder<T> {
         ),
       );
 }
+
+/// A page route with no transition at all: the page is simply there.
+///
+/// For a page full of native iOS controls (switches, a slider). A native view
+/// is a platform view: it ignores the opacity of a fade, so with [FadeRoute] it
+/// shows at full strength while the rest of the page is still fading in, and
+/// the screen flickers. With no transition everything appears together.
+class InstantRoute<T> extends PageRouteBuilder<T> {
+  InstantRoute({required WidgetBuilder builder})
+    : super(
+        pageBuilder: (context, _, _) => builder(context),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+      );
+}

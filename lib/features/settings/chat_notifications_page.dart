@@ -115,18 +115,21 @@ class _ChatNotificationsPageState extends State<ChatNotificationsPage> {
       required ValueChanged<bool> onChanged,
       bool dim = false,
     }) {
-      final r = SettingsRow(
+      // Off (nothing known yet, or notifications are off): the native switch
+      // shows itself as disabled. No Opacity around it: a native view ignores
+      // it, and the switch would flash at full strength.
+      final off = dim || locked;
+      return SettingsRow(
         icon: icon,
         color: color,
         title: title,
-        onTap: dim ? null : () => onChanged(!value),
+        onTap: off ? null : () => onChanged(!value),
         trailing: AdaptiveSwitch(
           value: value,
-          onChanged: dim ? null : onChanged,
+          onChanged: off ? null : onChanged,
           activeColor: AppColors.brandOrange,
         ),
       );
-      return dim ? Opacity(opacity: 0.4, child: IgnorePointer(child: r)) : r;
     }
 
     // Nothing known yet: the same two groups, dimmed, so that the page does not
@@ -161,9 +164,7 @@ class _ChatNotificationsPageState extends State<ChatNotificationsPage> {
           ),
       ],
     );
-    return locked
-        ? Opacity(opacity: 0.4, child: IgnorePointer(child: group_))
-        : group_;
+    return group_;
   }
 
   Widget _serverSection(S s) {

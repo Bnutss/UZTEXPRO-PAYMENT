@@ -143,33 +143,39 @@ class _AlertCard extends StatelessWidget {
                   ] else
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          for (final a in [...cancel, ...others])
-                            TextButton(
-                              onPressed: a.enabled
-                                  ? () => _run(context, a)
-                                  : null,
-                              style: TextButton.styleFrom(
-                                minimumSize: const Size(64, 48),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
+                      // A Wrap, not a Row: two long titles ("Terminate all other
+                      // sessions" and "Cancel") do not fit side by side, and the
+                      // second button goes to the next line instead of overflowing.
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: Wrap(
+                          alignment: WrapAlignment.end,
+                          children: [
+                            for (final a in [...cancel, ...others])
+                              TextButton(
+                                onPressed: a.enabled
+                                    ? () => _run(context, a)
+                                    : null,
+                                style: TextButton.styleFrom(
+                                  minimumSize: const Size(64, 48),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                child: Text(
+                                  a.title,
+                                  style: TextStyle(
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: _color(a),
+                                  ),
                                 ),
                               ),
-                              child: Text(
-                                a.title,
-                                style: TextStyle(
-                                  fontSize: 15.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: _color(a),
-                                ),
-                              ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                 ],

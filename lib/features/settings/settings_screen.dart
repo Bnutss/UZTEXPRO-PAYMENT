@@ -549,7 +549,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       title: s.notifTitle,
       onTap: () => Navigator.push(
         context,
-        FadeRoute(builder: (_) => ChatNotificationsPage(api: widget.chatApi)),
+        InstantRoute(builder: (_) => ChatNotificationsPage(api: widget.chatApi)),
       ),
     );
   }
@@ -562,7 +562,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       title: s.appearanceTitle,
       onTap: () => Navigator.push(
         context,
-        FadeRoute(builder: (_) => const ChatAppearancePage()),
+        InstantRoute(builder: (_) => const ChatAppearancePage()),
       ),
     );
   }
@@ -592,7 +592,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       onTap: () async {
         await Navigator.push(
           context,
-          FadeRoute(builder: (_) => const ChatDataPage()),
+          InstantRoute(builder: (_) => const ChatDataPage()),
         );
         if (mounted) _countChatStorage();
       },
