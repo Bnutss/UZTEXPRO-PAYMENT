@@ -69,6 +69,9 @@ PODS:
     - Flutter
   - package_info_plus (0.4.5):
     - Flutter
+  - photo_manager (3.12.0):
+    - Flutter
+    - FlutterMacOS
   - Pushy (1.0.66)
   - pushy_flutter (2.0.49):
     - Flutter
@@ -108,6 +111,7 @@ DEPENDENCIES:
   - local_auth_darwin (from `.symlinks/plugins/local_auth_darwin/darwin`)
   - open_filex (from `.symlinks/plugins/open_filex/ios`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
+  - photo_manager (from `.symlinks/plugins/photo_manager/darwin`)
   - pushy_flutter (from `.symlinks/plugins/pushy_flutter/ios`)
   - record_ios (from `.symlinks/plugins/record_ios/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
@@ -149,6 +153,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/open_filex/ios"
   package_info_plus:
     :path: ".symlinks/plugins/package_info_plus/ios"
+  photo_manager:
+    :path: ".symlinks/plugins/photo_manager/darwin"
   pushy_flutter:
     :path: ".symlinks/plugins/pushy_flutter/ios"
   record_ios:
@@ -179,6 +185,7 @@ SPEC CHECKSUMS:
   local_auth_darwin: 63c73d6d28cc3e239be2b6aa460ea6e317cd5100
   open_filex: 6e26e659846ec990262224a12ef1c528bb4edbe4
   package_info_plus: c0502532a26c7662a62a356cebe2692ec5fe4ec4
+  photo_manager: 3d7c9d321e7bfeb8630ddcbf02cd3f0ff82deaaf
   Pushy: a156caefd7827fa57679cf5d6374cf6a73f91b0a
   pushy_flutter: db4cd37a2d64f890e27b3d1dcc9662c988875500
   record_ios: 41f9412c3311401689babe6d7ba69362f10b8325
