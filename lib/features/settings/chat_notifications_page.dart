@@ -11,6 +11,8 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/fade_route.dart';
 import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/routeless_alert.dart';
+import '../chat/chat_api.dart';
+import '../chat/chat_models.dart' show ChatServerNotify;
 import '../chat/chat_notify_settings.dart';
 import '../chat/chat_sounds.dart';
 import 'settings_rows.dart';
@@ -26,7 +28,11 @@ String chatSoundLabel(S s, ChatSoundChoice c) => switch (c) {
 /// "Notifications and sounds", as in Telegram: what the messenger does by
 /// itself while the app is open, and which sounds it makes.
 class ChatNotificationsPage extends StatefulWidget {
-  const ChatNotificationsPage({super.key});
+  const ChatNotificationsPage({super.key, this.api});
+
+  /// The chat's connection to the server: with it the page also shows the push
+  /// settings (they live on the server).
+  final ChatRest? api;
 
   @override
   State<ChatNotificationsPage> createState() => _ChatNotificationsPageState();
@@ -39,12 +45,147 @@ class _ChatNotificationsPageState extends State<ChatNotificationsPage> {
     settings: _settings,
   );
 
+  ChatServerNotify? _server;
+  bool _serverFailed = false;
+
   @override
   void initState() {
     super.initState();
     _settings.load();
     _settings.addListener(_changed);
     localeNotifier.addListener(_changed);
+    _loadServer();
+  }
+
+  Future<void> _loadServer() async {
+    final api = widget.api;
+    if (api == null) return;
+    setState(() => _serverFailed = false);
+    try {
+      final got = await api.notifySettings();
+      if (mounted) setState(() => _server = got);
+    } catch (_) {
+      if (mounted) setState(() => _serverFailed = true);
+    }
+  }
+
+  /// Applies a change at once and saves it; goes back if the server says no.
+  Future<void> _saveServer(ChatServerNotify next) async {
+    final api = widget.api;
+    final before = _server;
+    if (api == null || before == null) return;
+    setState(() => _server = next);
+    try {
+      final saved = await api.saveNotifySettings(next);
+      if (mounted) setState(() => _server = saved);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _server = before);
+      final s = S.of(context);
+      showNativeAlert(
+        context: context,
+        title: s.notifPushError,
+        actions: [
+          AlertAction(
+            title: 'OK',
+            style: AlertActionStyle.primary,
+            onPressed: () {},
+          ),
+        ],
+      );
+    }
+  }
+
+  /// One kind of chat (personal / group): notifications, text, sound.
+  Widget _serverGroup(S s, {required bool group}) {
+    final v = _server!;
+    final enabled = group ? v.groupEnabled : v.privateEnabled;
+    final preview = group ? v.groupPreview : v.privatePreview;
+    final sound = group ? v.groupSound : v.privateSound;
+
+    Widget row({
+      required IconData icon,
+      required Color color,
+      required String title,
+      required bool value,
+      required ValueChanged<bool> onChanged,
+      bool dim = false,
+    }) {
+      final r = SettingsRow(
+        icon: icon,
+        color: color,
+        title: title,
+        onTap: dim ? null : () => onChanged(!value),
+        trailing: AdaptiveSwitch(
+          value: value,
+          onChanged: dim ? null : onChanged,
+          activeColor: AppColors.brandOrange,
+        ),
+      );
+      return dim ? Opacity(opacity: 0.4, child: IgnorePointer(child: r)) : r;
+    }
+
+    return SettingsGroup(
+      children: [
+        row(
+          icon: Icons.notifications_rounded,
+          color: const Color(0xFFFF3B30),
+          title: s.notifAlert,
+          value: enabled,
+          onChanged: (x) => _saveServer(v.with_(group: group, enabled: x)),
+        ),
+        row(
+          icon: Icons.visibility_rounded,
+          color: SettingsColors.blue,
+          title: s.notifShowText,
+          value: preview,
+          dim: !enabled,
+          onChanged: (x) => _saveServer(v.with_(group: group, preview: x)),
+        ),
+        // A silent notification on Android needs the app's own notifications
+        // (not there yet): the switch is only offered where it works.
+        if (Platform.isIOS)
+          row(
+            icon: Icons.volume_up_rounded,
+            color: SettingsColors.green,
+            title: s.notifPushSound,
+            value: sound,
+            dim: !enabled,
+            onChanged: (x) => _saveServer(v.with_(group: group, sound: x)),
+          ),
+      ],
+    );
+  }
+
+  Widget _serverSection(S s) {
+    if (widget.api == null) return const SizedBox.shrink();
+    if (_server == null) {
+      if (!_serverFailed) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 24),
+        child: Column(
+          children: [
+            Text(
+              s.notifPushLoadError,
+              style: const TextStyle(color: Color(0xFF8A8A8E), fontSize: 14),
+            ),
+            TextButton(onPressed: _loadServer, child: Text(s.devicesRetry)),
+          ],
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _caption(s.notifPrivateChats),
+        _serverGroup(s, group: false),
+        const SizedBox(height: 24),
+        _caption(s.notifGroups),
+        _serverGroup(s, group: true),
+        _footer(s.notifPushHint),
+        const SizedBox(height: 24),
+      ],
+    );
   }
 
   void _changed() {
@@ -146,6 +287,7 @@ class _ChatNotificationsPageState extends State<ChatNotificationsPage> {
       body: (context, topInset) => ListView(
         padding: EdgeInsets.fromLTRB(16, topInset + 8, 16, 40),
         children: [
+          _serverSection(s),
           _caption(s.notifInApp),
           SettingsGroup(
             children: [

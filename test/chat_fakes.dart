@@ -227,8 +227,17 @@ class FakeRest implements ChatRest {
       deletedChats.add('$id:${forAll ? 'all' : 'me'}');
 
   @override
-  Future<void> setMuted(int id, bool muted) async =>
+  Future<void> setMuted(int id, bool muted, {int? hours}) async =>
       mutedChats.add('$id:$muted');
+
+  ChatServerNotify serverNotify = const ChatServerNotify();
+
+  @override
+  Future<ChatServerNotify> notifySettings() async => serverNotify;
+
+  @override
+  Future<ChatServerNotify> saveNotifySettings(ChatServerNotify s) async =>
+      serverNotify = s;
 
   int unreadOnServer = 0;
   int unreadCalls = 0;

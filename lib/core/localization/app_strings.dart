@@ -1349,6 +1349,55 @@ class S {
     'uz': "Narx shakllantirish ma'lumotlari kiritilmagan",
   });
 
+  // Server-side push settings and timed mute
+  String get notifPush => _t({
+    'ru': 'Уведомления о сообщениях',
+    'en': 'Message Notifications',
+    'uz': 'Xabar bildirishnomalari',
+  });
+  String get notifPrivateChats =>
+      _t({'ru': 'Личные чаты', 'en': 'Private Chats', 'uz': 'Shaxsiy chatlar'});
+  String get notifGroups =>
+      _t({'ru': 'Группы', 'en': 'Groups', 'uz': 'Guruhlar'});
+  String get notifAlert =>
+      _t({'ru': 'Уведомления', 'en': 'Show Notifications', 'uz': 'Bildirishnomalar'});
+  String get notifShowText => _t({
+    'ru': 'Показывать текст',
+    'en': 'Message Preview',
+    'uz': 'Matnni ko‘rsatish',
+  });
+  String get notifPushSound =>
+      _t({'ru': 'Звук', 'en': 'Sound', 'uz': 'Ovoz'});
+  String get notifPushHint => _t({
+    'ru':
+        'Эти настройки работают и когда приложение закрыто, на всех ваших устройствах.',
+    'en': 'These settings work when the app is closed, on all your devices.',
+    'uz': 'Bu sozlamalar ilova yopiq bo‘lganda ham, barcha qurilmalaringizda amal qiladi.',
+  });
+  String get notifPushError => _t({
+    'ru': 'Не удалось сохранить настройки',
+    'en': 'Could not save the settings',
+    'uz': 'Sozlamalarni saqlab bo‘lmadi',
+  });
+  String get notifPushLoadError => _t({
+    'ru': 'Не удалось загрузить настройки уведомлений',
+    'en': 'Could not load the notification settings',
+    'uz': 'Bildirishnoma sozlamalarini yuklab bo‘lmadi',
+  });
+  String get muteTitle => _t({
+    'ru': 'Отключить уведомления',
+    'en': 'Mute Notifications',
+    'uz': 'Bildirishnomalarni o‘chirish',
+  });
+  String get mute1h =>
+      _t({'ru': 'На 1 час', 'en': 'For 1 hour', 'uz': '1 soatga'});
+  String get mute8h =>
+      _t({'ru': 'На 8 часов', 'en': 'For 8 hours', 'uz': '8 soatga'});
+  String get mute2d =>
+      _t({'ru': 'На 2 дня', 'en': 'For 2 days', 'uz': '2 kunga'});
+  String get muteForever =>
+      _t({'ru': 'Навсегда', 'en': 'Forever', 'uz': 'Doimiy'});
+
   // Data and storage
   String get dataTitle =>
       _t({'ru': 'Данные и память', 'en': 'Data and Storage', 'uz': 'Ma’lumot va xotira'});

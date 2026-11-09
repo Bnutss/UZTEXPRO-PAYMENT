@@ -197,7 +197,15 @@ abstract class ChatRest {
   Future<void> deleteMessage(int messageId, {bool forAll = false});
 
   /// Switches the notifications of a chat off / on (for me).
-  Future<void> setMuted(int conversationId, bool muted);
+  /// Notifications of one chat off or on; [hours] turns them off for that long
+  /// (null: for good).
+  Future<void> setMuted(int conversationId, bool muted, {int? hours});
+
+  /// Push settings kept on the server.
+  Future<ChatServerNotify> notifySettings();
+
+  /// Saves the settings and returns what the server has now.
+  Future<ChatServerNotify> saveNotifySettings(ChatServerNotify settings);
 
   // ── groups ──
   Future<ChatConversation> createGroup(
@@ -446,8 +454,35 @@ class ChatApi implements ChatRest {
   }
 
   @override
-  Future<void> setMuted(int conversationId, bool muted) async {
-    await _post('/conversations/$conversationId/mute/', {'muted': muted});
+  Future<void> setMuted(int conversationId, bool muted, {int? hours}) async {
+    await _post('/conversations/$conversationId/mute/', {
+      'muted': muted,
+      if (muted && hours != null && hours > 0) 'hours': hours,
+    });
+  }
+
+  @override
+  Future<ChatServerNotify> notifySettings() async {
+    final data = await _get('/notify-settings/');
+    return ChatServerNotify.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  @override
+  Future<ChatServerNotify> saveNotifySettings(ChatServerNotify settings) async {
+    final http.Response res;
+    try {
+      res = await http
+          .put(
+            Uri.parse('$_base/notify-settings/'),
+            headers: {...headers, 'Content-Type': 'application/json'},
+            body: jsonEncode(settings.toJson()),
+          )
+          .timeout(_timeout);
+    } catch (_) {
+      throw const ChatApiException(null);
+    }
+    final data = _decode(res);
+    return ChatServerNotify.fromJson((data as Map).cast<String, dynamic>());
   }
 
   Future<dynamic> _post(String path, Map<String, dynamic> body) async {

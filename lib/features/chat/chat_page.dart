@@ -20,6 +20,7 @@ import 'chat_hub.dart';
 import 'chat_list_actions.dart';
 import 'chat_system.dart';
 import 'chat_models.dart';
+import 'chat_mute_sheet.dart';
 import 'chat_my_photo.dart';
 import 'chat_media_widgets.dart' show chatPreviewText;
 import 'chat_push.dart' show ChatPushTarget;
@@ -672,8 +673,15 @@ class _ChatsTabState extends State<_ChatsTab> {
   Future<void> _toggleMute(ChatConversation c) async {
     HapticFeedback.selectionClick();
     final next = !c.muted;
+    // Turning notifications off asks for how long; turning them on does not.
+    int? hours;
+    if (next) {
+      final picked = await askMuteDuration(context);
+      if (picked == null || !mounted) return;
+      hours = picked == 0 ? null : picked;
+    }
     try {
-      await widget.api.setMuted(c.id, next);
+      await widget.api.setMuted(c.id, next, hours: hours);
     } catch (_) {
       return _fail();
     }

@@ -549,7 +549,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       title: s.notifTitle,
       onTap: () => Navigator.push(
         context,
-        FadeRoute(builder: (_) => const ChatNotificationsPage()),
+        FadeRoute(builder: (_) => ChatNotificationsPage(api: widget.chatApi)),
       ),
     );
   }

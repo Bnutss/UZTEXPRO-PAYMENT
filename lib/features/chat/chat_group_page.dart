@@ -14,6 +14,7 @@ import '../../core/widgets/ui_blocks.dart';
 import 'chat_api.dart';
 import 'chat_group_picker.dart';
 import 'chat_models.dart';
+import 'chat_mute_sheet.dart';
 import 'chat_profile_page.dart';
 import 'chat_media_grid.dart';
 import 'chat_voice_list.dart';
@@ -94,7 +95,14 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
 
   Future<void> _toggleMute() async {
     HapticFeedback.selectionClick();
-    await _c.toggleMuted();
+    // Turning notifications off asks for how long; turning them on does not.
+    int? hours;
+    if (!_c.muted) {
+      final picked = await askMuteDuration(context);
+      if (picked == null || !mounted) return;
+      hours = picked == 0 ? null : picked;
+    }
+    await _c.toggleMuted(hours: hours);
     widget.onChanged?.call();
   }
 

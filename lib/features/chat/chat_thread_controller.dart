@@ -200,12 +200,14 @@ class ChatThreadController extends ChangeNotifier {
 
   // ── chat actions ──────────────────────────────────────────────────────
 
-  Future<bool> toggleMuted() async {
+  /// Turns the chat's notifications off ([hours]: for that long, null: for
+  /// good) or back on.
+  Future<bool> toggleMuted({int? hours}) async {
     final id = _convId;
     if (id == null) return false;
     final next = !muted;
     try {
-      await rest.setMuted(id, next);
+      await rest.setMuted(id, next, hours: hours);
     } catch (_) {
       return false;
     }

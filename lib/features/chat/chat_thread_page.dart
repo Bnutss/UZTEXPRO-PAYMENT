@@ -28,6 +28,7 @@ import 'chat_appearance_settings.dart';
 import 'chat_attach.dart';
 import 'chat_attach_android.dart';
 import 'chat_media.dart';
+import 'chat_mute_sheet.dart';
 import 'chat_media_grid.dart';
 import 'chat_media_preview.dart';
 import 'chat_media_viewers.dart';
@@ -694,7 +695,14 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
   }
 
   Future<bool> _toggleMuted() async {
-    final ok = await _c.toggleMuted();
+    // Turning notifications off asks for how long; turning them on does not.
+    int? hours;
+    if (!_c.muted) {
+      final picked = await askMuteDuration(context);
+      if (picked == null || !mounted) return false;
+      hours = picked == 0 ? null : picked;
+    }
+    final ok = await _c.toggleMuted(hours: hours);
     final id = _c.conversationId;
     if (ok && id != null) {
       final set = widget.mutedChats;

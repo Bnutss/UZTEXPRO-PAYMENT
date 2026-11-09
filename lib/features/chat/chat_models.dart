@@ -400,3 +400,57 @@ class ChatDeviceInfo {
     current: j['current'] == true,
   );
 }
+
+
+/// Push notification settings kept on the server (they apply with the app
+/// closed): for personal chats and for groups.
+class ChatServerNotify {
+  const ChatServerNotify({
+    this.privateEnabled = true,
+    this.privatePreview = true,
+    this.privateSound = true,
+    this.groupEnabled = true,
+    this.groupPreview = true,
+    this.groupSound = true,
+  });
+
+  final bool privateEnabled;
+  final bool privatePreview;
+  final bool privateSound;
+  final bool groupEnabled;
+  final bool groupPreview;
+  final bool groupSound;
+
+  factory ChatServerNotify.fromJson(Map<String, dynamic> j) => ChatServerNotify(
+    privateEnabled: j['private_enabled'] != false,
+    privatePreview: j['private_preview'] != false,
+    privateSound: j['private_sound'] != false,
+    groupEnabled: j['group_enabled'] != false,
+    groupPreview: j['group_preview'] != false,
+    groupSound: j['group_sound'] != false,
+  );
+
+  Map<String, bool> toJson() => {
+    'private_enabled': privateEnabled,
+    'private_preview': privatePreview,
+    'private_sound': privateSound,
+    'group_enabled': groupEnabled,
+    'group_preview': groupPreview,
+    'group_sound': groupSound,
+  };
+
+  /// A copy with the change; [group] picks which kind of chat it is for.
+  ChatServerNotify with_({
+    required bool group,
+    bool? enabled,
+    bool? preview,
+    bool? sound,
+  }) => ChatServerNotify(
+    privateEnabled: group ? privateEnabled : (enabled ?? privateEnabled),
+    privatePreview: group ? privatePreview : (preview ?? privatePreview),
+    privateSound: group ? privateSound : (sound ?? privateSound),
+    groupEnabled: group ? (enabled ?? groupEnabled) : groupEnabled,
+    groupPreview: group ? (preview ?? groupPreview) : groupPreview,
+    groupSound: group ? (sound ?? groupSound) : groupSound,
+  );
+}
