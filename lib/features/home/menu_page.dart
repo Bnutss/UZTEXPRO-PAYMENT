@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/widgets/confirm_dialog.dart';
 import '../../core/widgets/fade_route.dart';
+import '../chat/chat_data_settings.dart';
 import '../chat/chat_hub.dart';
 import '../chat/chat_page.dart';
 import '../chat/chat_banner.dart';
@@ -153,6 +154,8 @@ class _MenuPageState extends State<MenuPage>
     super.initState();
     if (_canUseChat) {
       _chat = ChatHub.forToken(widget.jwtToken)..start();
+      // Files older than the time chosen in "Data and storage" go.
+      ChatDataSettings.instance.pruneMedia();
       _chat!.unread.addListener(_onChatUnread);
       _push = ChatPushService(
         api: _chat!.api,

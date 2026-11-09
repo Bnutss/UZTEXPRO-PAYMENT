@@ -7,6 +7,7 @@ import 'chat_api.dart';
 import 'chat_models.dart';
 import 'chat_push.dart' show ChatPushTarget;
 import 'chat_socket.dart';
+import 'chat_notify_settings.dart';
 import 'chat_sounds.dart';
 import 'chat_thread_controller.dart' show ChatOpenThreads;
 
@@ -44,7 +45,10 @@ class ChatHub with WidgetsBindingObserver {
       api: api,
       link: socket,
       socket: socket,
-      sounds: ChatSounds(AudioChatSoundPlayer()),
+      sounds: ChatSounds(
+        AudioChatSoundPlayer(),
+        settings: ChatNotifySettings.instance..load(),
+      ),
     );
   }
 

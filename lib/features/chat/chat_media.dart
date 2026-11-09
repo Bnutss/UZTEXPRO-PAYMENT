@@ -101,6 +101,27 @@ class ChatMediaStore {
     return total;
   }
 
+  /// Deletes the saved files that were last changed longer than [age] ago
+  /// (the messages stay; an original the server already dropped cannot be
+  /// fetched again). Returns how many files went.
+  static Future<int> deleteOlderThan(Duration age, {DateTime? now}) async {
+    final dir = _dir;
+    if (dir == null || !await dir.exists()) return 0;
+    final cutoff = (now ?? DateTime.now()).subtract(age);
+    var removed = 0;
+    await for (final e in dir.list()) {
+      if (e is! File) continue;
+      try {
+        if ((await e.lastModified()).isBefore(cutoff)) {
+          await e.delete();
+          removed++;
+        }
+      } catch (_) {}
+    }
+    if (removed > 0) ChatMediaManager.instance.notifyCleared();
+    return removed;
+  }
+
   /// Deletes every saved chat file (the messages stay; originals the server
   /// already dropped cannot be fetched again) and the chat's temp leftovers.
   static Future<void> clear() async {

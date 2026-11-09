@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/widgets/ui_blocks.dart';
 import 'chat_hub.dart';
+import 'chat_notify_settings.dart';
 import 'chat_media_widgets.dart' show chatPreviewText;
 import 'chat_push.dart' show ChatPushTarget;
 
@@ -63,8 +64,10 @@ class ChatBanners {
     final target = ChatPushTarget(c.id, c.peer, isGroup: c.isGroup);
 
     // Inside the chat window the hub already plays the sound.
+    // The sound and the vibration follow the settings (see ChatSounds).
     if (!hub.isChatOpen) hub.sounds?.incoming();
-    HapticFeedback.lightImpact();
+    // "In-App Preview" off: no banner, only the sound.
+    if (!ChatNotifySettings.instance.inAppPreview) return;
     final entry = OverlayEntry(
       builder: (_) => _BannerView(
         title: title,

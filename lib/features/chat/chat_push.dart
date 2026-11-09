@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -194,6 +195,27 @@ class ChatPushService with WidgetsBindingObserver {
   /// This phone's token once it is registered.
   String? get token => _token;
 
+  /// The token of this phone as the last registration left it (for the
+  /// settings, which show which of my devices is this one).
+  static String? lastToken;
+
+  /// A name for this phone in the "Devices" list: "iPhone · iOS 26.5",
+  /// "samsung SM-S918B · Android 14". Empty when it cannot be found out.
+  static Future<String> deviceName() async {
+    try {
+      final info = DeviceInfoPlugin();
+      if (Platform.isIOS) {
+        final d = await info.iosInfo;
+        return '${d.model} · iOS ${d.systemVersion}';
+      }
+      if (Platform.isAndroid) {
+        final d = await info.androidInfo;
+        return '${d.manufacturer} ${d.model} · Android ${d.version.release}';
+      }
+    } catch (_) {}
+    return '';
+  }
+
   /// Call after sign-in. Failing to register (no permission, no network) is
   /// not an error: the next start tries again.
   Future<void> start() async {
@@ -211,8 +233,9 @@ class ChatPushService with WidgetsBindingObserver {
     try {
       final token = await client.register();
       if (token == null || token.isEmpty || _disposed) return;
-      await api.registerDevice(token, platform);
+      await api.registerDevice(token, platform, name: await deviceName());
       _token = token;
+      lastToken = token;
     } catch (_) {}
   }
 

@@ -7,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/ui_blocks.dart';
+import 'chat_appearance_settings.dart';
 import 'chat_models.dart';
 
 const Color kChatInk = Color(0xFF1C1C1E);
@@ -275,6 +276,18 @@ class ChatWallpaper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settings = ChatAppearanceSettings.instance;
+    return ListenableBuilder(
+      listenable: settings,
+      builder: (context, _) {
+        final plain = settings.wallpaper.color;
+        if (plain != null) return ColoredBox(color: plain);
+        return _picture(context);
+      },
+    );
+  }
+
+  Widget _picture(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final dpr = MediaQuery.devicePixelRatioOf(context);
     return RepaintBoundary(

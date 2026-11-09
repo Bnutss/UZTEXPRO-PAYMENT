@@ -24,6 +24,7 @@ import 'chat_profile_page.dart';
 import 'chat_socket.dart';
 import 'chat_sounds.dart';
 import 'chat_thread_controller.dart';
+import 'chat_appearance_settings.dart';
 import 'chat_attach.dart';
 import 'chat_attach_android.dart';
 import 'chat_media.dart';
@@ -131,6 +132,9 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
   void initState() {
     super.initState();
     ChatVoicePlayer.instance.nextResolver = _nextVoice;
+    ChatAppearanceSettings.instance
+      ..load()
+      ..addListener(_appearanceChanged);
     ChatOpenThreads.add(_c);
     WidgetsBinding.instance.addPostFrameCallback((_) => _measureInput());
     _c.start();
@@ -163,8 +167,13 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     return null;
   }
 
+  void _appearanceChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    ChatAppearanceSettings.instance.removeListener(_appearanceChanged);
     if (ChatVoicePlayer.instance.nextResolver == _nextVoice) {
       ChatVoicePlayer.instance.nextResolver = null;
     }
@@ -887,7 +896,7 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
               ),
             ),
           ],
-          background: kChatWallpaperBase,
+          background: ChatAppearanceSettings.instance.wallpaperBase,
           // The wallpaper shows behind the glass controls: no plate.
           fade: false,
           body: (context, topInset) => Stack(
@@ -1366,7 +1375,11 @@ class _Bubble extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
                 child: Text(
                   album.firstWhere((x) => x.text.trim().isNotEmpty).text,
-                  style: const TextStyle(fontSize: 17, height: 1.28, color: fg),
+                  style: TextStyle(
+                    fontSize: ChatAppearanceSettings.instance.textSize,
+                    height: 1.28,
+                    color: fg,
+                  ),
                 ),
               ),
           ] else if (m.isMedia) ...[
@@ -1390,7 +1403,11 @@ class _Bubble extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
                 child: Text(
                   m.text,
-                  style: const TextStyle(fontSize: 17, height: 1.28, color: fg),
+                  style: TextStyle(
+                    fontSize: ChatAppearanceSettings.instance.textSize,
+                    height: 1.28,
+                    color: fg,
+                  ),
                 ),
               ),
           ] else if (bigCount != null)
@@ -1432,7 +1449,11 @@ class _Bubble extends StatelessWidget {
               children: [
                 Text(
                   m.text,
-                  style: const TextStyle(fontSize: 17, height: 1.28, color: fg),
+                  style: TextStyle(
+                    fontSize: ChatAppearanceSettings.instance.textSize,
+                    height: 1.28,
+                    color: fg,
+                  ),
                 ),
                 Row(
                   mainAxisSize: MainAxisSize.min,

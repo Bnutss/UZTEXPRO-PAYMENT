@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
@@ -12,15 +13,38 @@ import '../../core/localization/locale_notifier.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/fade_route.dart';
-import '../../core/widgets/routeless_alert.dart';
 import '../chat/chat_media.dart';
 import '../../core/widgets/ui_blocks.dart';
 import 'face_id_tile.dart';
+import '../chat/chat_api.dart' show ChatRest;
+import 'chat_appearance_page.dart';
+import 'chat_data_page.dart';
+import 'chat_devices_page.dart';
+import 'chat_notifications_page.dart';
+import 'island_pull_avatar.dart';
 import 'settings_rows.dart';
 import 'privacy_policy_page.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({Key? key, this.topInset = 0}) : super(key: key);
+  const SettingsScreen({
+    Key? key,
+    this.topInset = 0,
+    this.chatOnly = false,
+    this.islandActive = true,
+    this.chatApi,
+  }) : super(key: key);
+
+  /// In the messenger: the chat's connection to the server (for the list of
+  /// devices).
+  final ChatRest? chatApi;
+
+  /// In the messenger: whether this tab is the one on screen. The avatar that
+  /// hangs from the Dynamic Island must not show over the other tabs.
+  final bool islandActive;
+
+  /// The settings tab inside the messenger: the profile and what belongs to
+  /// the chat (its storage). The app settings live on the main screen.
+  final bool chatOnly;
 
   /// Space the floating header takes above the first row (content still
   /// scrolls beneath it).
@@ -76,10 +100,13 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
     _animationController.forward();
     _loadUserData().then((_) => _loadPhoto());
-    _loadVersion();
-    _countChatStorage();
-    _checkBiometrics();
-    _loadBiometricPreference();
+    if (!widget.chatOnly) {
+      _loadVersion();
+      _checkBiometrics();
+      _loadBiometricPreference();
+    } else {
+      _countChatStorage();
+    }
     localeNotifier.addListener(_onLocaleChanged);
   }
 
@@ -222,8 +249,15 @@ class _SettingsScreenState extends State<SettingsScreen>
   Widget build(BuildContext context) {
     final s = S.of(context);
 
-    final page = CustomScrollView(
+    // iPhones with a Dynamic Island, in the messenger: the avatar hangs from
+    // the island (see IslandPullAvatar) and the page only leaves room for it.
+    final island = widget.chatOnly && IslandPullAvatar.supported(context);
+
+    Widget page = CustomScrollView(
       clipBehavior: Clip.none,
+      physics: island
+          ? const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics())
+          : null,
       slivers: [
         SliverPadding(
           padding: EdgeInsets.fromLTRB(16, 16 + widget.topInset, 16, 0),
@@ -235,8 +269,30 @@ class _SettingsScreenState extends State<SettingsScreen>
         SliverToBoxAdapter(
           child: SizedBox(height: MediaQuery.paddingOf(context).bottom + 114),
         ),
+        // The avatar merges into the island as the page scrolls up, so there
+        // must be that much to scroll even when the page is short.
+        if (island) ...[
+          const SliverFillRemaining(
+            hasScrollBody: false,
+            child: SizedBox.shrink(),
+          ),
+          const SliverToBoxAdapter(
+            child: SizedBox(height: IslandPullAvatar.snapRange),
+          ),
+        ],
       ],
     );
+
+    if (island) {
+      page = IslandPullAvatar(
+        name: _displayName,
+        photoUrl: _photoUrl,
+        photoHeaders: {'Authorization': 'Bearer $_apiToken'},
+        active: widget.islandActive,
+        background: AppColors.groupedBackground,
+        child: page,
+      );
+    }
 
     // Scrolls under the (transparent) header: no clip edge, no block.
     return FadeTransition(opacity: _animation, child: page);
@@ -250,6 +306,23 @@ class _SettingsScreenState extends State<SettingsScreen>
   /// Telegram-style: the profile on the page itself, then groups of rows with
   /// colored icon tiles.
   Widget _buildSettingsCard(S s) {
+    if (widget.chatOnly) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildProfileSection(s),
+          const SizedBox(height: 20),
+          SettingsGroup(
+            children: [
+              _buildNotificationsRow(s),
+              _buildAppearanceRow(s),
+              if (widget.chatApi != null) _buildDevicesRow(s),
+              _buildStorageRow(s),
+            ],
+          ),
+        ],
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -260,7 +333,6 @@ class _SettingsScreenState extends State<SettingsScreen>
         SettingsGroup(
           children: [
             if (_canCheckBiometrics) _buildBiometricRow(s),
-            _buildStorageRow(s),
             _buildPrivacyRow(s),
             _buildVersionRow(s),
           ],
@@ -278,6 +350,9 @@ class _SettingsScreenState extends State<SettingsScreen>
               .join()
               .toUpperCase()
         : 'U';
+
+    final island = widget.chatOnly && IslandPullAvatar.supported(context);
+    if (island) return _buildIslandProfile(s);
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -347,6 +422,48 @@ class _SettingsScreenState extends State<SettingsScreen>
           ],
         ],
       ),
+    );
+  }
+
+  /// The profile under an avatar that hangs from the Dynamic Island, laid out
+  /// the way davrtruck does it: the name starts right under the avatar, then
+  /// the login and the e-mail in small gray lines.
+  Widget _buildIslandProfile(S s) {
+    // From the top of the page content to just under the avatar's foot.
+    final room = math.max(
+      0.0,
+      IslandPullAvatar.restBottom(context) + 6 - (16 + widget.topInset),
+    );
+    return Column(
+      children: [
+        SizedBox(height: room),
+        Text(
+          _displayName.isNotEmpty ? _displayName : 'UZTEXPRO',
+          maxLines: 2,
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Color(0xFF1C1C1E),
+            fontWeight: FontWeight.w700,
+            fontSize: 22,
+            height: 1.27,
+          ),
+        ),
+        if (_login.isNotEmpty && _login != _displayName) ...[
+          const SizedBox(height: 2),
+          Text(
+            '@$_login',
+            style: const TextStyle(color: Color(0xFF8A8A8E), fontSize: 14),
+          ),
+        ],
+        if (_email.isNotEmpty)
+          Text(
+            _email,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Color(0xFF8A8A8E), fontSize: 12),
+          ),
+      ],
     );
   }
 
@@ -424,46 +541,60 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (mounted) setState(() => _chatBytes = bytes);
   }
 
-  /// "Chat storage": how much the chat's files take, and a way to clear them.
+  /// "Notifications and sounds": the in-app sounds, vibration and banners.
+  Widget _buildNotificationsRow(S s) {
+    return SettingsRow(
+      icon: Icons.notifications_rounded,
+      color: const Color(0xFFFF3B30),
+      title: s.notifTitle,
+      onTap: () => Navigator.push(
+        context,
+        FadeRoute(builder: (_) => const ChatNotificationsPage()),
+      ),
+    );
+  }
+
+  /// "Chat appearance": text size and wallpaper.
+  Widget _buildAppearanceRow(S s) {
+    return SettingsRow(
+      icon: Icons.palette_rounded,
+      color: SettingsColors.indigo,
+      title: s.appearanceTitle,
+      onTap: () => Navigator.push(
+        context,
+        FadeRoute(builder: (_) => const ChatAppearancePage()),
+      ),
+    );
+  }
+
+  /// "Devices": the phones that get my push notifications.
+  Widget _buildDevicesRow(S s) {
+    return SettingsRow(
+      icon: Icons.devices_rounded,
+      color: SettingsColors.green,
+      title: s.devicesTitle,
+      onTap: () => Navigator.push(
+        context,
+        FadeRoute(builder: (_) => ChatDevicesPage(api: widget.chatApi!)),
+      ),
+    );
+  }
+
+  /// "Data and storage": automatic downloads, how long files are kept, and how
+  /// much they take now.
   Widget _buildStorageRow(S s) {
     final bytes = _chatBytes;
     return SettingsRow(
       icon: Icons.cleaning_services_rounded,
       color: SettingsColors.orange,
-      title: s.chatStorageTitle,
-      subtitle: s.chatStorageSubtitle(
-        bytes == null ? '…' : formatFileSize(bytes),
-      ),
-      onTap: () {
-        showNativeAlert(
-          context: context,
-          title: s.chatStorageClearTitle,
-          message: s.chatStorageClearMessage,
-          actions: [
-            AlertAction(
-              title: s.chatStorageClear,
-              style: AlertActionStyle.destructive,
-              onPressed: () async {
-                await ChatMediaStore.clear();
-                if (!mounted) return;
-                setState(() => _chatBytes = 0);
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(
-                    SnackBar(
-                      content: Text(s.chatStorageCleared),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-              },
-            ),
-            AlertAction(
-              title: s.chatCancel,
-              style: AlertActionStyle.cancel,
-              onPressed: () {},
-            ),
-          ],
+      title: s.dataTitle,
+      value: bytes == null ? null : formatFileSize(bytes),
+      onTap: () async {
+        await Navigator.push(
+          context,
+          FadeRoute(builder: (_) => const ChatDataPage()),
         );
+        if (mounted) _countChatStorage();
       },
     );
   }

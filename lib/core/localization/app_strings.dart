@@ -1349,6 +1349,219 @@ class S {
     'uz': "Narx shakllantirish ma'lumotlari kiritilmagan",
   });
 
+  // Data and storage
+  String get dataTitle =>
+      _t({'ru': 'Данные и память', 'en': 'Data and Storage', 'uz': 'Ma’lumot va xotira'});
+  String get dataAutoDownload => _t({
+    'ru': 'Автозагрузка медиа',
+    'en': 'Automatic Media Download',
+    'uz': 'Avtomatik yuklash',
+  });
+  String get dataMobile =>
+      _t({'ru': 'Мобильная сеть', 'en': 'Mobile Data', 'uz': 'Mobil tarmoq'});
+  String get dataWifi => _t({'ru': 'Wi-Fi', 'en': 'Wi-Fi', 'uz': 'Wi-Fi'});
+  String get dataPhotos => _t({'ru': 'Фото', 'en': 'Photos', 'uz': 'Rasmlar'});
+  String get dataVideos => _t({'ru': 'Видео', 'en': 'Videos', 'uz': 'Videolar'});
+  String get dataFiles => _t({'ru': 'Файлы', 'en': 'Files', 'uz': 'Fayllar'});
+  String get dataAutoHint => _t({
+    'ru':
+        'Чужие фото, видео и файлы скачиваются сами, пока вы в приложении. Что не включено, скачивается по нажатию.',
+    'en':
+        'Photos, videos and files others send are downloaded by themselves while you are in the app. Anything switched off is downloaded on a tap.',
+    'uz':
+        'Boshqalar yuborgan rasm, video va fayllar ilovada bo‘lganingizda o‘zi yuklanadi. O‘chirilganlari bosganda yuklanadi.',
+  });
+  String get dataStorage =>
+      _t({'ru': 'Хранение', 'en': 'Storage', 'uz': 'Saqlash'});
+  String get dataKeep =>
+      _t({'ru': 'Хранить медиа', 'en': 'Keep Media', 'uz': 'Saqlash muddati'});
+  String get dataKeepForever =>
+      _t({'ru': 'Всегда', 'en': 'Forever', 'uz': 'Doim'});
+  String get dataKeep3Days =>
+      _t({'ru': '3 дня', 'en': '3 days', 'uz': '3 kun'});
+  String get dataKeepWeek =>
+      _t({'ru': 'Неделю', 'en': '1 week', 'uz': '1 hafta'});
+  String get dataKeepMonth =>
+      _t({'ru': 'Месяц', 'en': '1 month', 'uz': '1 oy'});
+  String get dataKeepHint => _t({
+    'ru':
+        'Файлы старше выбранного срока удаляются с телефона. Если сервер уже удалил оригинал, скачать его снова не получится, поэтому по умолчанию файлы хранятся всегда.',
+    'en':
+        'Files older than the chosen time are deleted from this phone. If the server has already removed an original it cannot be downloaded again, so files are kept forever by default.',
+    'uz':
+        'Tanlangan muddatdan eski fayllar telefondan o‘chiriladi. Server asl nusxani allaqachon o‘chirgan bo‘lsa, uni qayta yuklab bo‘lmaydi, shuning uchun odatda fayllar doim saqlanadi.',
+  });
+  String get dataUsed =>
+      _t({'ru': 'Занято на телефоне', 'en': 'Used on This Phone', 'uz': 'Telefonda band'});
+  String get dataClear => _t({
+    'ru': 'Очистить память чата',
+    'en': 'Clear Chat Storage',
+    'uz': 'Chat xotirasini tozalash',
+  });
+
+  // Chat appearance
+  String get appearanceTitle => _t({
+    'ru': 'Оформление чата',
+    'en': 'Chat Appearance',
+    'uz': 'Chat ko‘rinishi',
+  });
+  String get appearanceTextSize =>
+      _t({'ru': 'Размер текста', 'en': 'Text Size', 'uz': 'Matn o‘lchami'});
+  String get appearanceWallpaper =>
+      _t({'ru': 'Фон чата', 'en': 'Chat Background', 'uz': 'Chat foni'});
+  String get appearancePreviewIn => _t({
+    'ru': 'Привет! Как дела?',
+    'en': 'Hi! How are you?',
+    'uz': 'Salom! Ishlar qalay?',
+  });
+  String get appearancePreviewOut => _t({
+    'ru': 'Всё хорошо, спасибо 👍',
+    'en': 'All good, thanks 👍',
+    'uz': 'Hammasi yaxshi, rahmat 👍',
+  });
+  String get appearanceReset => _t({
+    'ru': 'Сбросить оформление',
+    'en': 'Reset Appearance',
+    'uz': 'Ko‘rinishni tiklash',
+  });
+  String get appearanceHint => _t({
+    'ru': 'Размер текста и фон действуют во всех чатах и группах.',
+    'en': 'Text size and background apply to all chats and groups.',
+    'uz': 'Matn o‘lchami va fon barcha chat va guruhlarda amal qiladi.',
+  });
+
+  // Devices
+  String get devicesTitle =>
+      _t({'ru': 'Устройства', 'en': 'Devices', 'uz': 'Qurilmalar'});
+  String get devicesThis => _t({
+    'ru': 'Это устройство',
+    'en': 'This Device',
+    'uz': 'Shu qurilma',
+  });
+  String get devicesOthers => _t({
+    'ru': 'Другие устройства',
+    'en': 'Other Devices',
+    'uz': 'Boshqa qurilmalar',
+  });
+  String get devicesHint => _t({
+    'ru':
+        'Уведомления о сообщениях приходят на эти телефоны. Отключите те, которыми вы больше не пользуетесь.',
+    'en':
+        'Message notifications are sent to these phones. Disconnect the ones you no longer use.',
+    'uz':
+        'Xabar bildirishnomalari shu telefonlarga keladi. Endi foydalanmaydiganlarini o‘chiring.',
+  });
+  String get devicesUnknown =>
+      _t({'ru': 'Устройство', 'en': 'Device', 'uz': 'Qurilma'});
+  String devicesAdded(String date) => _t({
+    'ru': 'Добавлено $date',
+    'en': 'Added $date',
+    'uz': 'Qo‘shilgan: $date',
+  });
+  String devicesActive(String date) => _t({
+    'ru': 'Был(а) активен $date',
+    'en': 'Last active $date',
+    'uz': 'Oxirgi faollik: $date',
+  });
+  String get devicesRemoveTitle => _t({
+    'ru': 'Отключить устройство?',
+    'en': 'Disconnect this device?',
+    'uz': 'Qurilma o‘chirilsinmi?',
+  });
+  String devicesRemoveMessage(String name) => _t({
+    'ru':
+        'На «$name» перестанут приходить уведомления. Они вернутся, когда вы снова войдёте в приложение на этом устройстве.',
+    'en':
+        '"$name" will stop getting notifications. They come back when you sign in to the app on that device again.',
+    'uz':
+        '«$name» qurilmasiga bildirishnomalar kelmay qoladi. Ilovaga o‘sha qurilmada qayta kirsangiz, ular qaytadi.',
+  });
+  String get devicesRemove =>
+      _t({'ru': 'Отключить', 'en': 'Disconnect', 'uz': 'O‘chirish'});
+  String get devicesLoadError => _t({
+    'ru': 'Не удалось загрузить устройства',
+    'en': 'Could not load the devices',
+    'uz': 'Qurilmalarni yuklab bo‘lmadi',
+  });
+  String get devicesRemoveError => _t({
+    'ru': 'Не удалось отключить устройство',
+    'en': 'Could not disconnect the device',
+    'uz': 'Qurilmani o‘chirib bo‘lmadi',
+  });
+  String get devicesRetry =>
+      _t({'ru': 'Повторить', 'en': 'Retry', 'uz': 'Qayta urinish'});
+
+  // Notifications and sounds (chat settings)
+  String get notifTitle => _t({
+    'ru': 'Уведомления и звуки',
+    'en': 'Notifications and Sounds',
+    'uz': 'Bildirishnomalar va ovozlar',
+  });
+  String get notifInApp =>
+      _t({'ru': 'В приложении', 'en': 'In-App', 'uz': 'Ilova ichida'});
+  String get notifInAppSounds => _t({
+    'ru': 'Звуки в приложении',
+    'en': 'In-App Sounds',
+    'uz': 'Ilova ichidagi ovozlar',
+  });
+  String get notifInAppVibrate => _t({
+    'ru': 'Вибрация в приложении',
+    'en': 'In-App Vibrate',
+    'uz': 'Ilova ichidagi tebranish',
+  });
+  String get notifInAppPreview => _t({
+    'ru': 'Предпросмотр в приложении',
+    'en': 'In-App Preview',
+    'uz': 'Ilova ichida ko‘rsatish',
+  });
+  String get notifInAppPreviewHint => _t({
+    'ru':
+        'Сообщение из другого чата появляется баннером сверху на любом экране приложения.',
+    'en':
+        'A message from another chat slides down from the top on any screen of the app.',
+    'uz':
+        'Boshqa chatdan kelgan xabar ilovaning istalgan ekranida tepadan banner bo‘lib chiqadi.',
+  });
+  String get notifSounds =>
+      _t({'ru': 'Звуки', 'en': 'Sounds', 'uz': 'Ovozlar'});
+  String get notifSoundIncoming => _t({
+    'ru': 'Входящее сообщение',
+    'en': 'Incoming Message',
+    'uz': 'Kiruvchi xabar',
+  });
+  String get notifSoundSent => _t({
+    'ru': 'Отправка сообщения',
+    'en': 'Sent Message',
+    'uz': 'Xabar yuborish',
+  });
+  String get notifSoundsHint => _t({
+    'ru': 'Эти звуки работают, пока приложение открыто. Выключить звук отдельного чата можно в его профиле.',
+    'en': 'These sounds play while the app is open. A single chat can be muted in its profile.',
+    'uz': 'Bu ovozlar ilova ochiq paytida eshitiladi. Alohida chatni uning profilida o‘chirish mumkin.',
+  });
+  String get notifSoundStandard =>
+      _t({'ru': 'Стандартный', 'en': 'Default', 'uz': 'Standart'});
+  String get notifSoundTelegram =>
+      _t({'ru': 'Телеграм', 'en': 'Telegram', 'uz': 'Telegram'});
+  String get notifSoundDice =>
+      _t({'ru': 'Кубик', 'en': 'Dice', 'uz': 'Kub'});
+  String get notifSoundSystem =>
+      _t({'ru': 'Системный', 'en': 'System', 'uz': 'Tizim'});
+  String get notifSoundNone =>
+      _t({'ru': 'Без звука', 'en': 'None', 'uz': 'Ovozsiz'});
+  String get notifReset => _t({
+    'ru': 'Сбросить все настройки',
+    'en': 'Reset All Notifications',
+    'uz': 'Barcha sozlamalarni tiklash',
+  });
+  String get notifResetMessage => _t({
+    'ru': 'Все настройки уведомлений и звуков вернутся к значениям по умолчанию.',
+    'en': 'All notification and sound settings will return to their defaults.',
+    'uz': 'Barcha bildirishnoma va ovoz sozlamalari odatiy holatga qaytadi.',
+  });
+  String get notifResetBtn =>
+      _t({'ru': 'Сбросить', 'en': 'Reset', 'uz': 'Tiklash'});
+
   // Chat
   String get chatTitle => _t({'ru': 'Чаты', 'en': 'Chats', 'uz': 'Chatlar'});
 

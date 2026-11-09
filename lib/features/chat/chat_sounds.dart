@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/services.dart';
+
+import 'chat_notify_settings.dart';
 
 /// Sound files of the chat (assets/sound).
 const String kSendSound = 'sound/dice.mp3';
@@ -48,33 +51,60 @@ class AudioChatSoundPlayer implements ChatSoundPlayer {
 class ChatSounds {
   ChatSounds(
     this._player, {
+    this.settings,
     this.sentGap = const Duration(milliseconds: 150),
     this.incomingGap = const Duration(milliseconds: 700),
     DateTime Function()? clock,
   }) : _now = clock ?? DateTime.now;
 
   final ChatSoundPlayer _player;
+
+  /// What the person chose in "Notifications and sounds" (null: the defaults).
+  final ChatNotifySettings? settings;
   final Duration sentGap;
   final Duration incomingGap;
   final DateTime Function() _now;
 
-  /// Off switch (a future setting).
+  /// Off switch.
   bool enabled = true;
 
   final Map<String, DateTime> _last = {};
 
   /// The user sent a message.
-  void sent() => _play(kSendSound, sentGap);
+  void sent() =>
+      _playChoice(settings?.sentSound ?? ChatNotifySettings.defaultSent, sentGap);
 
   /// A message from the other person arrived.
-  void incoming() => _play(kIncomingSound, incomingGap);
+  void incoming() {
+    if (settings?.inAppVibrate ?? false) HapticFeedback.mediumImpact();
+    _playChoice(
+      settings?.incomingSound ?? ChatNotifySettings.defaultIncoming,
+      incomingGap,
+    );
+  }
 
-  void _play(String asset, Duration gap) {
+  /// Plays [choice] once, to hear it in the settings (no gaps, no switches).
+  void preview(ChatSoundChoice choice) => _fire(choice);
+
+  void _playChoice(ChatSoundChoice choice, Duration gap) {
     if (!enabled) return;
+    if (settings != null && !settings!.inAppSounds) return;
+    final key = choice.asset ?? choice.name;
     final now = _now();
-    final last = _last[asset];
+    final last = _last[key];
     if (last != null && now.difference(last) < gap) return;
-    _last[asset] = now;
-    unawaited(_player.play(asset).catchError((_) {}));
+    _last[key] = now;
+    _fire(choice);
+  }
+
+  void _fire(ChatSoundChoice choice) {
+    switch (choice) {
+      case ChatSoundChoice.none:
+        return;
+      case ChatSoundChoice.system:
+        SystemSound.play(SystemSoundType.alert);
+      default:
+        unawaited(_player.play(choice.asset!).catchError((_) {}));
+    }
   }
 }

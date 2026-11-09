@@ -60,6 +60,35 @@ import UniformTypeIdentifiers
       }
     }
 
+    // The settings tab of the chat tells us where it draws its stand-in for
+    // the Dynamic Island (see IslandCover).
+    let island = FlutterMethodChannel(
+      name: "uztexpro/island_cover",
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
+    )
+    island.setMethodCallHandler { call, result in
+      switch call.method {
+      case "set":
+        if let a = call.arguments as? [String: Any],
+          let x = a["x"] as? Double, let y = a["y"] as? Double,
+          let w = a["width"] as? Double, let h = a["height"] as? Double,
+          let argb = a["color"] as? Int
+        {
+          IslandCover.shared.rect = CGRect(x: x, y: y, width: w, height: h)
+          IslandCover.shared.color = UIColor(
+            red: CGFloat((argb >> 16) & 0xff) / 255,
+            green: CGFloat((argb >> 8) & 0xff) / 255,
+            blue: CGFloat(argb & 0xff) / 255,
+            alpha: CGFloat((argb >> 24) & 0xff) / 255)
+        }
+      case "clear":
+        IslandCover.shared.rect = nil
+      default:
+        break
+      }
+      result(nil)
+    }
+
     // System spell check (UITextChecker) for the chat input: the red dotted
     // underline of the misspelled words, in the language the text is written in.
     let spell = FlutterMethodChannel(
@@ -72,6 +101,57 @@ import UniformTypeIdentifiers
         return
       }
       result(SpellChecker.check(text))
+    }
+  }
+}
+
+// MARK: - Dynamic Island cover
+
+/// Covers the strip of the screen where the chat's settings tab draws its
+/// stand-in for the Dynamic Island.
+///
+/// The system's snapshot for the app switcher has no island in it, so the black
+/// pill the page draws there would show as a blob. A native view added the
+/// moment the scene resigns is part of the window for certain, so it covers
+/// the strip with the page's background colour.
+final class IslandCover {
+  static let shared = IslandCover()
+
+  /// Where the pill and its neck are, in points; nil when the page is not
+  /// drawing them.
+  var rect: CGRect?
+  var color: UIColor = .clear
+
+  private var view: UIView?
+
+  func show(in window: UIWindow?) {
+    hide()
+    guard let rect = rect, let window = window else { return }
+    let cover = UIView(frame: rect)
+    cover.backgroundColor = color
+    cover.isUserInteractionEnabled = false
+    window.addSubview(cover)
+    view = cover
+  }
+
+  func hide() {
+    view?.removeFromSuperview()
+    view = nil
+  }
+}
+
+class SceneDelegate: FlutterSceneDelegate {
+  override func sceneWillResignActive(_ scene: UIScene) {
+    IslandCover.shared.show(in: (scene as? UIWindowScene)?.windows.first)
+    super.sceneWillResignActive(scene)
+  }
+
+  override func sceneDidBecomeActive(_ scene: UIScene) {
+    super.sceneDidBecomeActive(scene)
+    // Flutter starts to fade its own pill back in half a second after the app
+    // is active again; the cover goes just before that.
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+      IslandCover.shared.hide()
     }
   }
 }

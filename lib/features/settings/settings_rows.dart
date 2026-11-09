@@ -48,15 +48,20 @@ class SettingsIconTile extends StatelessWidget {
 }
 
 /// A rounded white card holding rows, set apart by hairlines that start at the
-/// text (inset grouped list, as in iOS Settings and Telegram).
+/// text and stop 16 pt short of the right edge, as in the contacts list.
 class SettingsGroup extends StatelessWidget {
-  const SettingsGroup({super.key, required this.children});
+  const SettingsGroup({super.key, required this.children, this.indent});
 
   final List<Widget> children;
 
+  /// Where the hairlines start; by default at the text of a row that has an
+  /// icon tile. Rows without a tile start the text (and the line) at 16.
+  final double? indent;
+
   @override
   Widget build(BuildContext context) {
-    final indent = 16 + SettingsIconTile.sizeOf(context) + 12;
+    final indent =
+        this.indent ?? 16 + SettingsIconTile.sizeOf(context) + 12;
 
     return Container(
       width: double.infinity,
@@ -71,12 +76,14 @@ class SettingsGroup extends StatelessWidget {
         children: [
           for (var i = 0; i < children.length; i++) ...[
             if (i > 0)
+              // The same line as in the contacts list: from the text to 16 pt
+              // short of the right edge.
               Divider(
                 height: 0.5,
                 thickness: 0.5,
                 indent: indent,
-                endIndent: 0,
-                color: const Color(0xFFE3E3E6),
+                endIndent: 16,
+                color: const Color(0x1F000000),
               ),
             children[i],
           ],

@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 
 import 'chat_api.dart';
+import 'chat_data_settings.dart';
 import 'chat_media.dart';
 import 'chat_models.dart';
 import 'chat_socket.dart';
@@ -799,11 +800,13 @@ class ChatThreadController extends ChangeNotifier {
     _changed();
   }
 
-  /// Photos of others are fetched by themselves (small, and the server can
-  /// then drop its copy); videos and documents on a tap.
+  /// What others sent is fetched by itself when "Data and storage" says so for
+  /// its kind and the network the phone is on (by default photos only: they are
+  /// small, and the server can then drop its copy); the rest on a tap.
   void _autoFetch(ChatMessage m) {
-    if (!m.isImage || isMine(m) || m.isLocal || _disposed) return;
+    if (!m.isMedia || isMine(m) || m.isLocal || _disposed) return;
     if (m.media?.available != true || ChatMediaStore.has(m)) return;
+    if (!ChatDataSettings.instance.shouldAutoDownload(m.kind)) return;
     unawaited(ChatMediaManager.instance.download(m, rest));
   }
 

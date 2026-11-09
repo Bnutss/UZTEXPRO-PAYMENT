@@ -155,10 +155,16 @@ class _ChatPageState extends State<ChatPage> {
             _ContactsTab(api: _api, link: _link, hub: widget.hub),
             _ChatsTab(api: _api, link: _link, hub: widget.hub),
             FadingHeaderScaffold(
-              title: s.settingsTitle,
+              // No heading: the profile below is the page.
+              title: '',
               centerTitle: true,
               background: AppColors.groupedBackground,
-              body: (context, topInset) => SettingsScreen(topInset: topInset),
+              body: (context, topInset) => SettingsScreen(
+                topInset: topInset,
+                chatOnly: true,
+                islandActive: _index == 2,
+                chatApi: widget.hub.api,
+              ),
             ),
           ],
         ),

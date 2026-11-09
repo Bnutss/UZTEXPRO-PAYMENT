@@ -361,3 +361,42 @@ class ChatConversation {
     );
   }
 }
+
+
+/// One of my phones that gets push notifications ("Devices" in the settings).
+class ChatDeviceInfo {
+  const ChatDeviceInfo({
+    required this.id,
+    required this.platform,
+    required this.name,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.current,
+  });
+
+  final int id;
+
+  /// `ios`, `android` or empty.
+  final String platform;
+  final String name;
+  final DateTime createdAt;
+
+  /// The last time this phone told the server it is there (every sign-in).
+  final DateTime updatedAt;
+
+  /// The phone this list is shown on.
+  final bool current;
+
+  factory ChatDeviceInfo.fromJson(Map<String, dynamic> j) => ChatDeviceInfo(
+    id: (j['id'] as num).toInt(),
+    platform: (j['platform'] as String?) ?? '',
+    name: (j['name'] as String?) ?? '',
+    createdAt:
+        DateTime.tryParse((j['created_at'] as String?) ?? '')?.toLocal() ??
+        DateTime.now(),
+    updatedAt:
+        DateTime.tryParse((j['updated_at'] as String?) ?? '')?.toLocal() ??
+        DateTime.now(),
+    current: j['current'] == true,
+  );
+}

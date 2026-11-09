@@ -127,10 +127,17 @@ abstract class ChatRest {
   Future<List<ChatUser>> contacts({String search});
 
   /// This phone wants push notifications for the signed-in user.
-  Future<void> registerDevice(String token, String platform);
+  Future<void> registerDevice(String token, String platform, {String name});
 
   /// Stop push notifications to this phone (on logout).
   Future<void> removeDevice(String token);
+
+  /// My phones that get push notifications; [current] is this phone's token
+  /// (it comes back marked).
+  Future<List<ChatDeviceInfo>> devices({String? current});
+
+  /// Stop push notifications to one of my phones.
+  Future<void> deleteDevice(int id);
   Future<List<ChatConversation>> conversations();
   Future<ChatConversation> openConversation(int userId);
   Future<ChatPageResult> messages(
@@ -705,8 +712,32 @@ class ChatApi implements ChatRest {
   }
 
   @override
-  Future<void> registerDevice(String token, String platform) async {
-    await _post('/devices/', {'token': token, 'platform': platform});
+  Future<void> registerDevice(
+    String token,
+    String platform, {
+    String name = '',
+  }) async {
+    await _post('/devices/', {
+      'token': token,
+      'platform': platform,
+      if (name.isNotEmpty) 'name': name,
+    });
+  }
+
+  @override
+  Future<List<ChatDeviceInfo>> devices({String? current}) async {
+    final data = await _get('/devices/', {
+      if (current != null && current.isNotEmpty) 'current': current,
+    });
+    return (data as List)
+        .whereType<Map>()
+        .map((m) => ChatDeviceInfo.fromJson(m.cast<String, dynamic>()))
+        .toList();
+  }
+
+  @override
+  Future<void> deleteDevice(int id) async {
+    await _delete('/devices/$id/');
   }
 
   @override

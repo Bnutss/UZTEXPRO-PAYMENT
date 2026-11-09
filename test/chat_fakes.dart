@@ -257,9 +257,26 @@ class FakeRest implements ChatRest {
   bool failRegister = false;
 
   @override
-  Future<void> registerDevice(String token, String platform) async {
+  Future<void> registerDevice(
+    String token,
+    String platform, {
+    String name = '',
+  }) async {
     if (failRegister) throw const ChatApiException(null);
     registeredTokens.add('$platform:$token');
+  }
+
+  final deviceList = <ChatDeviceInfo>[];
+  final deletedDevices = <int>[];
+
+  @override
+  Future<List<ChatDeviceInfo>> devices({String? current}) async =>
+      List.of(deviceList);
+
+  @override
+  Future<void> deleteDevice(int id) async {
+    deletedDevices.add(id);
+    deviceList.removeWhere((d) => d.id == id);
   }
 
   @override
