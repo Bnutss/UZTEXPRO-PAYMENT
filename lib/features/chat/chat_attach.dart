@@ -103,6 +103,19 @@ class ChatAttach {
     return out;
   }
 
+  /// Photos / videos already on the phone (ticked in the Android sheet).
+  static Future<AttachResult> fromPaths(
+    List<String> paths, {
+    VoidCallback? onPicked,
+  }) async {
+    final out = AttachResult();
+    if (paths.isNotEmpty) onPicked?.call();
+    for (final path in paths) {
+      await _add(out, path);
+    }
+    return out;
+  }
+
   /// Photos and videos from the gallery (several at once).
   static Future<AttachResult> gallery({
     int limit = 10,

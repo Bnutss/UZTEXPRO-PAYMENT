@@ -25,6 +25,7 @@ import 'chat_socket.dart';
 import 'chat_sounds.dart';
 import 'chat_thread_controller.dart';
 import 'chat_attach.dart';
+import 'chat_attach_android.dart';
 import 'chat_media.dart';
 import 'chat_media_grid.dart';
 import 'chat_media_preview.dart';
@@ -444,7 +445,26 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
   }
 
   Future<AttachResult?> _attachViaMenu(S s) async {
-    final choice = await showCupertinoModalPopup<int>(
+    // Android: the Telegram-style sheet (recent photos grid + sources).
+    int? androidChoice;
+    List<String>? androidPaths;
+    if (Platform.isAndroid) {
+      final picked = await showAttachSheetAndroid(context);
+      if (picked == null || !mounted) return null;
+      if (picked.action != null) {
+        androidChoice = switch (picked.action!) {
+          AttachAction.gallery => 0,
+          AttachAction.camera => 1,
+          AttachAction.video => 2,
+          AttachAction.file => 3,
+        };
+      } else {
+        androidPaths = picked.paths;
+      }
+    }
+    final choice = Platform.isAndroid
+        ? (androidChoice ?? -1)
+        : await showCupertinoModalPopup<int>(
       context: context,
       builder: (ctx) => CupertinoActionSheet(
         actions: [
@@ -520,6 +540,11 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
 
     final AttachResult result;
     switch (choice) {
+      case -1:
+        result = await ChatAttach.fromPaths(
+          androidPaths ?? const [],
+          onPicked: showBusy,
+        );
       case 0:
         result = await ChatAttach.gallery(onPicked: showBusy);
       case 1:
@@ -1165,6 +1190,24 @@ class _DayChip extends StatelessWidget {
 
 enum _MsgAction { reply, copy, edit, deleteForMe, deleteForAll, discard }
 
+/// How many emoji a message is made of when it is ONLY 1-3 emoji (shown big,
+/// without a bubble, as in Telegram); null for anything else.
+int? bigEmojiCount(String text) {
+  final t = text.trim();
+  if (t.isEmpty || t.length > 48) return null;
+  final chars = t.characters;
+  if (chars.length > 3) return null;
+  final emoji = RegExp(
+    r'^(?:\p{Extended_Pictographic}|[\u{1F1E6}-\u{1F1FF}]{2}|[\u{1F3FB}-\u{1F3FF}])'
+    r'[\u{FE0F}\u{200D}\u{1F3FB}-\u{1F3FF}\u{E0020}-\u{E007F}\p{Extended_Pictographic}]*$',
+    unicode: true,
+  );
+  for (final g in chars) {
+    if (!emoji.hasMatch(g)) return null;
+  }
+  return chars.length;
+}
+
 class _Bubble extends StatelessWidget {
   const _Bubble({
     required this.message,
@@ -1229,15 +1272,24 @@ class _Bubble extends StatelessWidget {
     String two(int v) => v.toString().padLeft(2, '0');
     final time = '${two(m.createdAt.hour)}:${two(m.createdAt.minute)}';
 
+    // Only 1-3 emoji: big and without a bubble, as in Telegram.
+    final bigCount = (!m.isMedia && !m.isVoice && !isAlbum && m.reply == null)
+        ? bigEmojiCount(m.text)
+        : null;
+
     final bubble = Container(
       constraints: BoxConstraints(
         maxWidth: MediaQuery.of(context).size.width * 0.84,
       ),
-      padding: m.isMedia
+      padding: bigCount != null
+          ? const EdgeInsets.fromLTRB(4, 2, 4, 2)
+          : m.isMedia
           ? const EdgeInsets.all(4)
           : const EdgeInsets.fromLTRB(14, 9, 12, 8),
       decoration: BoxDecoration(
-        color: mine ? const Color(0xFFE1FFC7) : Colors.white,
+        color: bigCount != null
+            ? Colors.transparent
+            : (mine ? const Color(0xFFE1FFC7) : Colors.white),
         borderRadius: radius,
       ),
       child: Column(
@@ -1341,7 +1393,38 @@ class _Bubble extends StatelessWidget {
                   style: const TextStyle(fontSize: 17, height: 1.28, color: fg),
                 ),
               ),
-          ] else
+          ] else if (bigCount != null)
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  m.text.trim(),
+                  style: TextStyle(
+                    fontSize: bigCount == 1
+                        ? 72
+                        : bigCount == 2
+                        ? 58
+                        : 48,
+                    height: 1.15,
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      m.edited ? '$editedLabel $time' : time,
+                      style: const TextStyle(fontSize: 12, color: kChatMuted),
+                    ),
+                    if (mine) ...[
+                      const SizedBox(width: 3),
+                      _Status(message: m, color: kChatMuted),
+                    ],
+                  ],
+                ),
+              ],
+            )
+          else
             Wrap(
               alignment: WrapAlignment.end,
               crossAxisAlignment: WrapCrossAlignment.end,

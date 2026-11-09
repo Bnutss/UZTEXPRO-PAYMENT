@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../theme/app_colors.dart';
 
@@ -11,7 +12,16 @@ class NotchBarItem {
   /// Unread count in a red badge on the item; 0 shows none.
   final int badge;
 
-  const NotchBarItem(this.icon, this.activeIcon, this.label, {this.badge = 0});
+  /// Our own icon (an svg asset) drawn instead of [icon] / [activeIcon].
+  final String? svgAsset;
+
+  const NotchBarItem(
+    this.icon,
+    this.activeIcon,
+    this.label, {
+    this.badge = 0,
+    this.svgAsset,
+  });
 }
 
 /// Нижнее меню: плавающая панель с вырезом, в котором «сидит» круглая кнопка
@@ -117,12 +127,23 @@ class FloatingNotchBar extends StatelessWidget {
                             scale: a,
                             child: FadeTransition(opacity: a, child: child),
                           ),
-                          child: Icon(
-                            items[selected].activeIcon,
-                            key: ValueKey(selected),
-                            color: Colors.white,
-                            size: 28,
-                          ),
+                          child: items[selected].svgAsset != null
+                              ? SvgPicture.asset(
+                                  items[selected].svgAsset!,
+                                  key: ValueKey(selected),
+                                  width: 28,
+                                  height: 28,
+                                  colorFilter: const ColorFilter.mode(
+                                    Colors.white,
+                                    BlendMode.srcIn,
+                                  ),
+                                )
+                              : Icon(
+                                  items[selected].activeIcon,
+                                  key: ValueKey(selected),
+                                  color: Colors.white,
+                                  size: 28,
+                                ),
                         ),
                       ),
                     ),
@@ -149,11 +170,21 @@ class FloatingNotchBar extends StatelessWidget {
                               AnimatedOpacity(
                                 duration: const Duration(milliseconds: 200),
                                 opacity: i == selected ? 0 : 1,
-                                child: Icon(
-                                  item.icon,
-                                  size: 26,
-                                  color: idleIcon,
-                                ),
+                                child: item.svgAsset != null
+                                    ? SvgPicture.asset(
+                                        item.svgAsset!,
+                                        width: 26,
+                                        height: 26,
+                                        colorFilter: ColorFilter.mode(
+                                          idleIcon,
+                                          BlendMode.srcIn,
+                                        ),
+                                      )
+                                    : Icon(
+                                        item.icon,
+                                        size: 26,
+                                        color: idleIcon,
+                                      ),
                               ),
                               const SizedBox(height: 4),
                               AnimatedDefaultTextStyle(

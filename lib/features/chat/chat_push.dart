@@ -142,6 +142,9 @@ class PushyClient implements PushClient {
     // Android: deliver through Google FCM too, so the phone wakes for a push
     // even while the system has put the app to sleep (as Telegram does).
     Pushy.toggleFCM(true);
+    // Android: the small status-bar icon (white silhouette); without it the
+    // system shows the generic round "i".
+    Pushy.setNotificationIcon('ic_stat_notification');
     Pushy.listen();
     Pushy.setNotificationListener(chatBackgroundNotificationListener);
     return Pushy.register();

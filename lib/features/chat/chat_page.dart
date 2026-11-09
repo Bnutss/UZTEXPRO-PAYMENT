@@ -209,6 +209,8 @@ class _ChatPageState extends State<ChatPage> {
                       Icons.forum_rounded,
                       s.chatTitle,
                       badge: widget.hub.unread.value,
+                      // The same chat bubbles as "Write" in a profile.
+                      svgAsset: 'assets/icons/tg_chats.svg',
                     ),
                     NotchBarItem(
                       Icons.settings_outlined,

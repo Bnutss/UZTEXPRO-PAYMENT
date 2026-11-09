@@ -2173,7 +2173,11 @@ class _HeaderGlassCapsule extends StatelessWidget {
     );
   }
 
-  Widget _button(_CapsuleAction a) {
+  Widget _button(_CapsuleAction a) =>
+      Platform.isAndroid ? _androidButton(a) : _iosButton(a);
+
+  /// iOS (before 26): unchanged.
+  Widget _iosButton(_CapsuleAction a) {
     return Semantics(
       button: true,
       label: a.label,
@@ -2225,6 +2229,77 @@ class _HeaderGlassCapsule extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Android: the badge sits outside the circular clip so a digit is not cut.
+  Widget _androidButton(_CapsuleAction a) {
+    return Semantics(
+      button: true,
+      label: a.label,
+      child: SizedBox(
+        width: _buttonWidth,
+        height: _height,
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            // The ripple is clipped to the circle; the badge below is not,
+            // so a digit is never cut by that circle.
+            Positioned.fill(
+              child: Material(
+                color: Colors.transparent,
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: a.onTap,
+                  child: Center(
+                    child: a.svgAsset != null
+                        ? SvgPicture.asset(
+                            a.svgAsset!,
+                            width: 26,
+                            height: 26,
+                            colorFilter: ColorFilter.mode(
+                              a.color,
+                              BlendMode.srcIn,
+                            ),
+                          )
+                        : Icon(a.icon, size: 22, color: a.color),
+                  ),
+                ),
+              ),
+            ),
+            if (a.badge > 0)
+              Positioned(
+                top: 2,
+                right: 1,
+                child: IgnorePointer(
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: 20),
+                    height: 20,
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF3B30),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                    child: Text(
+                      a.badge > 99 ? '99+' : '${a.badge}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        height: 1.1,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
