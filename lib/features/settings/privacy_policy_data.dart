@@ -124,15 +124,6 @@ const Map<String, PolicyDoc> kPrivacyPolicy = {
         ],
       ),
       PolicyClause(
-        icon: "sparkles",
-        title: "ИИ-ассистент",
-        paragraphs: [
-          "Функция доступна только пользователям с расширенным доступом. Когда вы задаёте вопрос ассистенту, текст вопроса и данные склада, необходимые для ответа, передаются внешнему поставщику ИИ (OpenAI) для формирования ответа.",
-          "Не вводите в чат личную и конфиденциальную информацию. Мы не используем эти данные для рекламы.",
-        ],
-        note: true,
-      ),
-      PolicyClause(
         icon: "lock",
         title: "Хранение и безопасность",
         items: [
@@ -165,7 +156,7 @@ const Map<String, PolicyDoc> kPrivacyPolicy = {
         icon: "share",
         title: "Передача третьим лицам",
         paragraphs: [
-          "Мы не продаём и не передаём ваши данные третьим лицам в рекламных или аналитических целях. Данные остаются в инфраструктуре UztexPro, за исключением запросов к ИИ-ассистенту (см. раздел «ИИ-ассистент»).",
+          "Мы не продаём и не передаём ваши данные третьим лицам в рекламных или аналитических целях. Данные остаются в инфраструктуре UztexPro.",
         ],
       ),
       PolicyClause(
@@ -282,15 +273,6 @@ const Map<String, PolicyDoc> kPrivacyPolicy = {
         ],
       ),
       PolicyClause(
-        icon: "sparkles",
-        title: "AI assistant",
-        paragraphs: [
-          "This feature is available only to users with extended access. When you ask the assistant a question, the text of your question and the warehouse data needed to answer it are sent to an external AI provider (OpenAI) to generate the reply.",
-          "Do not enter personal or confidential information in the chat. We do not use this data for advertising.",
-        ],
-        note: true,
-      ),
-      PolicyClause(
         icon: "lock",
         title: "Data storage & security",
         items: [
@@ -323,7 +305,7 @@ const Map<String, PolicyDoc> kPrivacyPolicy = {
         icon: "share",
         title: "Third-party sharing",
         paragraphs: [
-          "We do not sell or share your data with third parties for advertising or analytics. Data remains within UztexPro infrastructure, except for requests to the AI assistant (see \"AI assistant\").",
+          "We do not sell or share your data with third parties for advertising or analytics. Data remains within UztexPro infrastructure.",
         ],
       ),
       PolicyClause(
@@ -445,15 +427,6 @@ const Map<String, PolicyDoc> kPrivacyPolicy = {
         ],
       ),
       PolicyClause(
-        icon: "sparkles",
-        title: "AI yordamchi",
-        paragraphs: [
-          "Funksiya faqat kengaytirilgan ruxsati bor foydalanuvchilarga mavjud. Yordamchiga savol berganingizda, savol matni va javob uchun zarur ombor ma'lumotlari javob tayyorlash uchun tashqi AI provayderiga (OpenAI) yuboriladi.",
-          "Chatga shaxsiy va maxfiy ma'lumotlarni kiritmang. Biz bu ma'lumotlardan reklama uchun foydalanmaymiz.",
-        ],
-        note: true,
-      ),
-      PolicyClause(
         icon: "lock",
         title: "Saqlash va xavfsizlik",
         items: [
@@ -486,7 +459,7 @@ const Map<String, PolicyDoc> kPrivacyPolicy = {
         icon: "share",
         title: "Uchinchi shaxslarga berish",
         paragraphs: [
-          "Biz ma'lumotlaringizni sotmaymiz va reklama yoki tahlil maqsadida uchinchi shaxslarga bermaymiz. Ma'lumotlar UztexPro infratuzilmasida qoladi, AI yordamchiga so'rovlar bundan mustasno («AI yordamchi» bo'limiga qarang).",
+          "Biz ma'lumotlaringizni sotmaymiz va reklama yoki tahlil maqsadida uchinchi shaxslarga bermaymiz. Ma'lumotlar UztexPro infratuzilmasida qoladi.",
         ],
       ),
       PolicyClause(

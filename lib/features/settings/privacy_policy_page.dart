@@ -333,7 +333,7 @@ class _Bullet extends StatelessWidget {
   }
 }
 
-/// Выделенный блок для важных примечаний (например, про ИИ-ассистента).
+/// Выделенный блок для важных примечаний .
 class _NoteBox extends StatelessWidget {
   final List<Widget> children;
 

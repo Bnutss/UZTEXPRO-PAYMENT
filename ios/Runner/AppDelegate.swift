@@ -46,6 +46,8 @@ import UniformTypeIdentifiers
         AttachSheet.present(args, result: result)
       case "editGroup":
         GroupEditor.present(args, result: result)
+      case "editTimes":
+        TimeEditor.present(args, result: result)
       case "pickPhoto":
         PhotoPickerPresenter.present(result: result)
       case "photoViewer":
@@ -720,6 +722,174 @@ struct GroupEditView: View {
         photo = image
         removed = false
       }
+    }
+  }
+}
+
+/// "Edit attendance": entry and exit times of one day in a native sheet with
+/// system time pickers. Returns {"in": "HH:mm"?, "out": "HH:mm"?} or nil.
+enum TimeEditor {
+  private static var delegate: PickerDismissDelegate?
+
+  static func present(_ args: [String: Any], result: @escaping FlutterResult) {
+    var finished = false
+    let finish: ([String: Any]?) -> Void = { payload in
+      if finished { return }
+      finished = true
+      delegate = nil
+      result(payload)
+    }
+    let box = WeakBox()
+    let view = TimeEditView(
+      title: args["title"] as? String ?? "",
+      subtitle: args["subtitle"] as? String ?? "",
+      saveTitle: args["save"] as? String ?? "",
+      entryTitle: args["entry"] as? String ?? "",
+      exitTitle: args["exit"] as? String ?? "",
+      errorText: args["error"] as? String ?? "",
+      initialIn: args["in"] as? String ?? "",
+      initialOut: args["out"] as? String ?? "",
+      onClose: {
+        if let vc = box.vc { vc.dismiss(animated: true) { finish(nil) } } else { finish(nil) }
+      },
+      onSave: { tin, tout in
+        var payload: [String: Any] = [:]
+        if let tin = tin { payload["in"] = tin }
+        if let tout = tout { payload["out"] = tout }
+        if let vc = box.vc { vc.dismiss(animated: true) { finish(payload) } } else { finish(payload) }
+      }
+    )
+    let host = UIHostingController(rootView: view)
+    box.vc = host
+    host.modalPresentationStyle = .pageSheet
+    if let sheet = host.sheetPresentationController {
+      if #available(iOS 16.0, *) {
+        sheet.detents = [.custom { _ in 340 }]
+      } else {
+        sheet.detents = [.medium()]
+      }
+      sheet.prefersGrabberVisible = true
+    }
+    let d = PickerDismissDelegate { finish(nil) }
+    delegate = d
+    host.presentationController?.delegate = d
+    NativeSheet.topViewControllerForPresenting()?.present(host, animated: true)
+  }
+}
+
+struct TimeEditView: View {
+  let title: String
+  let subtitle: String
+  let saveTitle: String
+  let entryTitle: String
+  let exitTitle: String
+  let errorText: String
+  let initialIn: String
+  let initialOut: String
+  let onClose: () -> Void
+  let onSave: (String?, String?) -> Void
+
+  @State private var tin: Date?
+  @State private var tout: Date?
+
+  private static func parse(_ v: String, fallbackHour: Int) -> Date? {
+    let parts = v.split(separator: ":")
+    guard parts.count == 2, let h = Int(parts[0]), let m = Int(parts[1]) else { return nil }
+    return Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: Date())
+  }
+
+  private static func hm(_ d: Date) -> String {
+    let c = Calendar.current.dateComponents([.hour, .minute], from: d)
+    return String(format: "%02d:%02d", c.hour ?? 0, c.minute ?? 0)
+  }
+
+  private static func minutes(_ d: Date) -> Int {
+    let c = Calendar.current.dateComponents([.hour, .minute], from: d)
+    return (c.hour ?? 0) * 60 + (c.minute ?? 0)
+  }
+
+  private var invalid: Bool {
+    guard let a = tin, let b = tout else { return false }
+    return Self.minutes(b) <= Self.minutes(a)
+  }
+
+  private var changed: Bool {
+    (tin.map(Self.hm) ?? "") != initialIn || (tout.map(Self.hm) ?? "") != initialOut
+  }
+
+  private var canSave: Bool { changed && !invalid && (tin != nil || tout != nil) }
+
+  private func row(_ label: String, _ value: Binding<Date?>, defaultHour: Int) -> some View {
+    HStack {
+      Text(label).font(.body)
+      Spacer()
+      if let current = value.wrappedValue {
+        DatePicker(
+          "",
+          selection: Binding(get: { current }, set: { value.wrappedValue = $0 }),
+          displayedComponents: .hourAndMinute
+        )
+        .labelsHidden()
+        Button { value.wrappedValue = nil } label: {
+          Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
+        }
+        .buttonStyle(.plain)
+      } else {
+        Button {
+          value.wrappedValue = Calendar.current.date(
+            bySettingHour: defaultHour, minute: 0, second: 0, of: Date())
+        } label: {
+          Text("--:--").font(.body.monospacedDigit())
+        }
+      }
+    }
+    .padding(.horizontal, 16).padding(.vertical, 10)
+  }
+
+  var body: some View {
+    if #available(iOS 16.0, *) {
+      NavigationStack { content }
+    } else {
+      NavigationView { content }
+    }
+  }
+
+  private var content: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 10) {
+        if !subtitle.isEmpty {
+          Text(subtitle).font(.footnote).foregroundColor(.secondary).padding(.leading, 16)
+        }
+        VStack(spacing: 0) {
+          row(entryTitle, $tin, defaultHour: 9)
+          Divider().padding(.leading, 16)
+          row(exitTitle, $tout, defaultHour: 18)
+        }
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        if invalid {
+          Text(errorText).font(.footnote).foregroundColor(.red).padding(.leading, 16)
+        }
+      }
+      .padding(16)
+    }
+    .background(Color(.systemGroupedBackground))
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .navigationBarLeading) {
+        Button { onClose() } label: { Image(systemName: "xmark") }
+      }
+      ToolbarItem(placement: .principal) { Text(title).font(.headline) }
+      ToolbarItem(placement: .navigationBarTrailing) {
+        Button {
+          onSave(tin.map(Self.hm), tout.map(Self.hm))
+        } label: { Text(saveTitle).font(.body.weight(.semibold)) }
+          .disabled(!canSave)
+      }
+    }
+    .onAppear {
+      tin = Self.parse(initialIn, fallbackHour: 9)
+      tout = Self.parse(initialOut, fallbackHour: 18)
     }
   }
 }

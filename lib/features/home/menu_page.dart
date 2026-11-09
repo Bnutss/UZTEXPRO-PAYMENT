@@ -28,7 +28,6 @@ import '../passes/passes_page.dart';
 import '../sign_requests/sign_requests_page.dart';
 import '../bonuses/bonuses_page.dart';
 import '../product_models/product_models_page.dart';
-import '../ai_assistant/ai_assistant_page.dart';
 import '../shop/shop_analytics_page.dart';
 import '../shop/shop_issued_report_page.dart';
 import '../shop/shop_pickup_page.dart';
@@ -702,14 +701,6 @@ class _MenuPageState extends State<MenuPage>
     );
   }
 
-  void _openAiAssistant() {
-    HapticFeedback.lightImpact();
-    Navigator.push(
-      context,
-      FadeRoute(builder: (_) => AiAssistantPage(jwtToken: widget.jwtToken)),
-    );
-  }
-
   void _openTimesheet() {
     HapticFeedback.selectionClick();
     Navigator.push(
@@ -718,10 +709,10 @@ class _MenuPageState extends State<MenuPage>
     );
   }
 
-  /// Buttons in the header capsule: timesheet and logout always, AI and chat
+  /// Buttons in the header capsule: timesheet and logout always, chat
   /// by access.
   int get _headerButtonCount =>
-      2 + (_hasFullAccess ? 1 : 0) + (_canUseChat ? 1 : 0);
+      2 + (_canUseChat ? 1 : 0);
 
   /// Opens the messenger window (Contacts / Chats tabs).
   void _openChat({ChatPushTarget? openThread}) {
@@ -738,7 +729,7 @@ class _MenuPageState extends State<MenuPage>
 
   /// iOS 26+: native Liquid Glass toolbar from adaptive_platform_ui. The three
   /// actions share one group, so the system draws them in a single glass
-  /// capsule (like the iOS Photos bar). AI is shown only with full access.
+  /// capsule (like the iOS Photos bar).
   AdaptiveAppBar _buildNativeAppBar(S s) {
     return AdaptiveAppBar(
       useNativeToolbar: true,
@@ -770,13 +761,6 @@ class _MenuPageState extends State<MenuPage>
           label: s.timesheetTitle,
           onPressed: _openTimesheet,
         ),
-        if (_hasFullAccess)
-          AdaptiveAppBarAction(
-            iosSymbol: 'sparkles',
-            icon: CupertinoIcons.sparkles,
-            label: s.aiAssistantTitle,
-            onPressed: _openAiAssistant,
-          ),
         if (_canUseChat)
           AdaptiveAppBarAction(
             iosSymbol: 'TgChats',
@@ -807,12 +791,6 @@ class _MenuPageState extends State<MenuPage>
         label: s.timesheetTitle,
         onTap: _openTimesheet,
       ),
-      if (_hasFullAccess)
-        _CapsuleAction(
-          icon: Icons.auto_awesome_rounded,
-          label: s.aiAssistantTitle,
-          onTap: _openAiAssistant,
-        ),
       if (_canUseChat)
         _CapsuleAction(
           icon: Icons.forum_rounded,

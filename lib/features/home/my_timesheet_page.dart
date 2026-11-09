@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -293,6 +294,45 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
     var saving = false;
     String? error;
 
+    // iOS: native sheet with system time pickers.
+    if (Platform.isIOS) {
+      try {
+        final res = await const MethodChannel(
+          'uztexpro/native_sheet',
+        ).invokeMapMethod<String, dynamic>('editTimes', {
+          'title': s.timesheetEditTitle,
+          'subtitle':
+              '${d.day} ${s.monthName(_month)} $_year, ${s.weekdayShort(d.weekday)}',
+          'save': s.timesheetSave,
+          'entry': s.timesheetEntry,
+          'exit': s.timesheetExit,
+          'error': s.timesheetExitBeforeEntry,
+          'in': origIn == null ? '' : _fmt(origIn),
+          'out': origOut == null ? '' : _fmt(origOut),
+        });
+        if (res == null || !mounted) return;
+        final err = await _saveDay(
+          d,
+          _parseHm(res['in'] as String?),
+          _parseHm(res['out'] as String?),
+          origIn,
+          origOut,
+        );
+        if (!mounted) return;
+        if (err == null) {
+          HapticFeedback.mediumImpact();
+          await _load();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+        }
+        return;
+      } on MissingPluginException {
+        // fall through to the Flutter sheet
+      } on PlatformException {
+        // fall through to the Flutter sheet
+      }
+    }
+
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -568,7 +608,7 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
           )
         else ...[
           _buildHero(s),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           _buildCalendar(s),
         ],
       ],
@@ -592,7 +632,8 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
     );
   }
 
-  /// Compact card: avatar, name, small position line and the month totals.
+  /// Header card: avatar, name, position and the three month totals in
+  /// equal columns.
   Widget _buildHero(S s) {
     Widget stat(String label, String value, Color color) => Expanded(
       child: Column(
@@ -600,35 +641,37 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
           Text(
             value,
             style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              height: 1.1,
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              height: 1.15,
               color: color,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11.5, color: _kMuted),
+            style: const TextStyle(fontSize: 12, color: _kMuted),
           ),
         ],
       ),
     );
 
     Widget divider() =>
-        Container(width: 1, height: 28, color: _kInk.withOpacity(0.08));
+        Container(width: 1, height: 32, color: _kInk.withOpacity(0.08));
 
     return BlockCard(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               PersonAvatar(
                 name: _name,
-                size: 48,
+                size: 52,
                 sources: [
                   if (_photoUrl != null)
                     PhotoSource(
@@ -647,8 +690,8 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                         height: 1.25,
                         color: _kInk,
                       ),
@@ -661,8 +704,8 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 11,
-                            height: 1.25,
+                            fontSize: 13,
+                            height: 1.3,
                             color: _kMuted,
                           ),
                         ),
@@ -672,19 +715,23 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              stat(s.timesheetHours, '$_totalHours', _kInk),
-              divider(),
-              stat(s.timesheetDays, '$_totalDays', _kWorked),
-              divider(),
-              stat(
-                s.timesheetAbsent,
-                '$_absentDays',
-                _absentDays > 0 ? _kAbsent : _kInk,
-              ),
-            ],
+          const SizedBox(height: 16),
+          const BlockDivider(gap: 0),
+          const SizedBox(height: 16),
+          IntrinsicHeight(
+            child: Row(
+              children: [
+                stat(s.timesheetHours, '$_totalHours', _kInk),
+                divider(),
+                stat(s.timesheetDays, '$_totalDays', _kWorked),
+                divider(),
+                stat(
+                  s.timesheetAbsent,
+                  '$_absentDays',
+                  _absentDays > 0 ? _kAbsent : _kInk,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -696,7 +743,7 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
     final selected = _days.where((d) => d.day == _selectedDay).firstOrNull;
 
     return BlockCard(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
       child: Column(
         children: [
           Row(
@@ -706,10 +753,10 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
                   child: Center(
                     child: Text(
                       s.weekdayShort(i),
-                      style: TextStyle(
-                        fontSize: 11.5,
+                      style: const TextStyle(
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: i >= 5 ? _kAbsent.withOpacity(0.8) : _kMuted,
+                        color: _kMuted,
                       ),
                     ),
                   ),
@@ -721,8 +768,10 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
             crossAxisCount: 7,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 6,
-            crossAxisSpacing: 6,
+            mainAxisSpacing: 4,
+            crossAxisSpacing: 4,
+            childAspectRatio: 0.92,
+            padding: EdgeInsets.zero,
             children: [
               for (var i = 0; i < lead; i++) const SizedBox(),
               for (final d in _days) _buildCell(d),
@@ -760,6 +809,7 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
         : const Color(0xFFD62E24);
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: future
           ? null
           : () {
@@ -772,7 +822,7 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
           color: fill,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? AppColors.brandRed : Colors.transparent,
+            color: isSelected ? _kInk : Colors.transparent,
             width: 1.5,
           ),
         ),
@@ -783,8 +833,9 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
             Text(
               '${d.day}',
               style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                height: 1.15,
                 color: textColor,
               ),
             ),
@@ -792,8 +843,9 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
               Text(
                 d.total!,
                 style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500,
+                  height: 1.2,
                   color: textColor.withOpacity(0.85),
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
@@ -809,15 +861,15 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: _kMuted)),
+          Text(label, style: const TextStyle(fontSize: 12, color: _kMuted)),
           const SizedBox(height: 2),
           Text(
             value ?? '—',
             style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
               color: _kInk,
-              fontFeatures: const [FontFeature.tabularFigures()],
+              fontFeatures: [FontFeature.tabularFigures()],
             ),
           ),
         ],
@@ -825,98 +877,107 @@ class _MyTimesheetPageState extends State<MyTimesheetPage> {
     );
 
     return Padding(
-      padding: const EdgeInsets.only(top: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const BlockDivider(gap: 0),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${d.day} ${s.monthName(_month)}, ${s.weekdayShort(d.weekday)}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: _kInk,
-                  ),
-                ),
-              ),
-              if (_canEdit)
-                TextButton.icon(
-                  onPressed: () => _openEditSheet(d),
-                  icon: const Icon(Icons.edit_rounded, size: 16),
-                  label: Text(s.timesheetEdit),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.brandRed,
-                    visualDensity: VisualDensity.compact,
-                    textStyle: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
+      padding: const EdgeInsets.only(top: 16),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 16),
+        decoration: BoxDecoration(
+          color: AppColors.groupedBackground,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 44,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${d.day} ${s.monthName(_month)}, ${s.weekdayShort(d.weekday)}',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: _kInk,
+                      ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              item(s.timesheetEntry, d.firstIn),
-              item(s.timesheetExit, d.lastOut),
-              item(s.timesheetHours, d.total),
-            ],
-          ),
-          if (d.total != null) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                item(s.timesheetDayShift, d.dayHours),
-                item(s.timesheetNight, d.nightHours),
-                const Expanded(child: SizedBox()),
-              ],
+                  if (_canEdit)
+                    SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: Center(
+                        child: SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: AdaptiveButton.icon(
+                            onPressed: () => _openEditSheet(d),
+                            icon: Icons.edit_rounded,
+                            iconColor: _kInk,
+                            color: _kInk,
+                            style: AdaptiveButtonStyle.glass,
+                            size: AdaptiveButtonSize.small,
+                            useSmoothRectangleBorder: false,
+                            padding: EdgeInsets.zero,
+                            minSize: const Size(36, 36),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Row(
+                children: [
+                  item(s.timesheetEntry, d.firstIn),
+                  item(s.timesheetExit, d.lastOut),
+                  item(s.timesheetHours, d.total),
+                ],
+              ),
+            ),
+            if (d.total != null) ...[
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: Row(
+                  children: [
+                    item(s.timesheetDayShift, d.dayHours),
+                    item(s.timesheetNight, d.nightHours),
+                    const Expanded(child: SizedBox()),
+                  ],
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildLegend(S s) {
-    Widget dot(Color c, String text) => Flexible(
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: c,
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              text,
-              maxLines: 1,
-              style: const TextStyle(fontSize: 10.5, color: _kMuted),
-            ),
-          ],
+    Widget dot(Color c, String text) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: c, shape: BoxShape.circle),
         ),
-      ),
+        const SizedBox(width: 6),
+        Text(text, style: const TextStyle(fontSize: 12, color: _kMuted)),
+      ],
     );
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 16,
+      runSpacing: 8,
       children: [
         dot(_kWorked, s.timesheetLegendWorked),
-        const SizedBox(width: 8),
         dot(_kPresent, s.timesheetLegendPresent),
-        const SizedBox(width: 8),
         dot(_kAbsent, s.timesheetLegendAbsent),
-        const SizedBox(width: 8),
         dot(_kOff, s.timesheetLegendOff),
       ],
     );
