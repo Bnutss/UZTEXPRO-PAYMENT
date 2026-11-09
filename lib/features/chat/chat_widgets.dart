@@ -286,7 +286,9 @@ class ChatRow extends StatelessWidget {
                   height: 24,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: selected! ? AppColors.brandOrange : Colors.transparent,
+                    color: selected!
+                        ? AppColors.brandOrange
+                        : Colors.transparent,
                     border: Border.all(
                       color: selected!
                           ? AppColors.brandOrange
@@ -295,7 +297,11 @@ class ChatRow extends StatelessWidget {
                     ),
                   ),
                   child: selected!
-                      ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+                      ? const Icon(
+                          Icons.check_rounded,
+                          size: 16,
+                          color: Colors.white,
+                        )
                       : null,
                 ),
               ],
@@ -369,25 +375,47 @@ const Color kChatWallpaperBase = Color(0xFFFFF1E6);
 class ChatWallpaper extends StatelessWidget {
   const ChatWallpaper({super.key});
 
-  /// How soft the picture is (logical pixels of blur radius).
-  static const double blur = 3;
-
   @override
   Widget build(BuildContext context) {
     final settings = ChatAppearanceSettings.instance;
     return ListenableBuilder(
       listenable: settings,
       builder: (context, _) {
-        final plain = settings.wallpaper.color;
+        final plain = settings.effectiveWallpaper.color;
         if (plain != null) return ColoredBox(color: plain);
-        return _picture(context);
+        return _picture(context, settings);
       },
     );
   }
 
-  Widget _picture(BuildContext context) {
+  Widget _picture(BuildContext context, ChatAppearanceSettings settings) {
     final size = MediaQuery.sizeOf(context);
     final dpr = MediaQuery.devicePixelRatioOf(context);
+    final file = settings.effectiveWallpaper == ChatWallpaperChoice.custom
+        ? settings.customFile
+        : null;
+    // The file is large: decode it at the size of the screen.
+    final decodeWidth = math.min(1080, (size.width * dpr).round());
+    final Widget image = file != null
+        ? Image.file(
+            file,
+            key: ValueKey(file.path),
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            width: size.width,
+            height: size.height,
+            cacheWidth: decodeWidth,
+            gaplessPlayback: true,
+          )
+        : Image.asset(
+            'assets/images/background.jpg',
+            fit: BoxFit.cover,
+            alignment: Alignment.topCenter,
+            width: size.width,
+            height: size.height,
+            cacheWidth: decodeWidth,
+            gaplessPlayback: true,
+          );
     return RepaintBoundary(
       child: ClipRect(
         child: OverflowBox(
@@ -397,24 +425,27 @@ class ChatWallpaper extends StatelessWidget {
           minHeight: size.height,
           maxHeight: size.height,
           child: ColoredBox(
-            color: kChatWallpaperBase,
-            child: ImageFiltered(
-              // The edges repeat the border pixels instead of fading out.
-              imageFilter: ImageFilter.blur(
-                sigmaX: blur,
-                sigmaY: blur,
-                tileMode: TileMode.clamp,
-              ),
-              child: Image.asset(
-                'assets/images/background.jpg',
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-                width: size.width,
-                height: size.height,
-                // The file is large: decode it at the size of the screen.
-                cacheWidth: math.min(1080, (size.width * dpr).round()),
-                gaplessPlayback: true,
-              ),
+            color: settings.wallpaperBase,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                settings.blur < 0.5
+                    ? image
+                    : ImageFiltered(
+                        // The edges repeat the border pixels instead of fading
+                        // out.
+                        imageFilter: ImageFilter.blur(
+                          sigmaX: settings.blur,
+                          sigmaY: settings.blur,
+                          tileMode: TileMode.clamp,
+                        ),
+                        child: image,
+                      ),
+                if (settings.dim > 0.01)
+                  ColoredBox(
+                    color: Colors.black.withValues(alpha: settings.dim),
+                  ),
+              ],
             ),
           ),
         ),

@@ -1,5 +1,7 @@
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart'
     show AdaptiveSlider;
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -8,6 +10,7 @@ import '../../core/localization/locale_notifier.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/fading_header_scaffold.dart';
 import '../chat/chat_appearance_settings.dart';
+import '../chat/chat_group_picker.dart' show pickGalleryPhoto;
 import '../chat/chat_widgets.dart' show ChatWallpaper, kChatInk;
 import 'settings_rows.dart';
 
@@ -69,7 +72,11 @@ class _ChatAppearancePageState extends State<ChatAppearancePage> {
           _sizeCard(),
           const SizedBox(height: 24),
           _caption(s.appearanceWallpaper),
-          _wallpaperCard(),
+          _wallpaperCard(s),
+          if (_settings.isPicture) ...[
+            const SizedBox(height: 12),
+            _pictureCard(s),
+          ],
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Text(
@@ -162,7 +169,15 @@ class _ChatAppearancePageState extends State<ChatAppearancePage> {
     );
   }
 
-  Widget _wallpaperCard() {
+  Future<void> _addPhoto() async {
+    HapticFeedback.selectionClick();
+    final bytes = await pickGalleryPhoto(context, maxSide: 1600);
+    if (bytes == null || !mounted) return;
+    await _settings.setCustom(bytes);
+  }
+
+  Widget _wallpaperCard(S s) {
+    final custom = _settings.customFile;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -174,16 +189,138 @@ class _ChatAppearancePageState extends State<ChatAppearancePage> {
         spacing: 12,
         runSpacing: 12,
         children: [
-          for (final c in ChatWallpaperChoice.values)
+          _AddTile(label: s.appearanceChoosePhoto, onTap: _addPhoto),
+          if (custom != null)
             _WallpaperTile(
-              choice: c,
-              selected: _settings.wallpaper == c,
+              choice: ChatWallpaperChoice.custom,
+              file: custom,
+              selected: _settings.wallpaper == ChatWallpaperChoice.custom,
               onTap: () {
                 HapticFeedback.selectionClick();
-                _settings.update(wallpaper: c);
+                _settings.update(wallpaper: ChatWallpaperChoice.custom);
               },
             ),
+          for (final c in ChatWallpaperChoice.values)
+            if (c != ChatWallpaperChoice.custom)
+              _WallpaperTile(
+                choice: c,
+                selected: _settings.wallpaper == c,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  _settings.update(wallpaper: c);
+                },
+              ),
         ],
+      ),
+    );
+  }
+
+  /// Blur and darkening of a picture wallpaper.
+  Widget _pictureCard(S s) {
+    Widget slider(
+      String label,
+      double value,
+      double max,
+      String text,
+      ValueChanged<double> onChanged,
+    ) {
+      return Row(
+        children: [
+          SizedBox(
+            width: 104,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 16, color: kChatInk),
+            ),
+          ),
+          Expanded(
+            child: AdaptiveSlider(
+              min: 0,
+              max: max,
+              value: value.clamp(0, max),
+              activeColor: AppColors.brandOrange,
+              onChanged: onChanged,
+            ),
+          ),
+          SizedBox(
+            width: 40,
+            child: Text(
+              text,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontSize: 15,
+                color: Color(0xFF8A8A8E),
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        children: [
+          slider(
+            s.appearanceBlur,
+            _settings.blur,
+            ChatAppearanceSettings.maxBlur,
+            '${_settings.blur.round()}',
+            (v) => _settings.update(blur: v),
+          ),
+          slider(
+            s.appearanceDim,
+            _settings.dim,
+            ChatAppearanceSettings.maxDim,
+            '${(_settings.dim * 100).round()}%',
+            (v) => _settings.update(dim: v),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Choose from the gallery": the first tile of the wallpapers.
+class _AddTile extends StatelessWidget {
+  const _AddTile({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: _WallpaperTile.size,
+        height: _WallpaperTile.size,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF2F2F7),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.add_photo_alternate_rounded,
+              color: AppColors.brandOrange,
+              size: 24,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10, color: Color(0xFF8A8A8E)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -194,8 +331,11 @@ class _WallpaperTile extends StatelessWidget {
     required this.choice,
     required this.selected,
     required this.onTap,
+    this.file,
   });
 
+  /// The person's own picture (for [ChatWallpaperChoice.custom]).
+  final File? file;
   final ChatWallpaperChoice choice;
   final bool selected;
   final VoidCallback onTap;
@@ -223,7 +363,14 @@ class _WallpaperTile extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (color == null)
+              if (file != null)
+                Image.file(
+                  file!,
+                  key: ValueKey(file!.path),
+                  fit: BoxFit.cover,
+                  cacheWidth: 200,
+                )
+              else if (color == null)
                 Image.asset(
                   'assets/images/background.jpg',
                   fit: BoxFit.cover,

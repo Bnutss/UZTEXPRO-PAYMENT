@@ -68,34 +68,60 @@ void main() {
     expect(player.played, ['sound/telegram_soundin.mp3']);
   });
 
-  test('settings are saved and read back; reset restores the defaults', () async {
-    settings.update(
-      sounds: false,
-      vibrate: false,
-      preview: false,
-      incoming: ChatSoundChoice.dice,
-      sent: ChatSoundChoice.none,
-    );
-    await Future<void>.delayed(Duration.zero);
+  test(
+    'settings are saved and read back; reset restores the defaults',
+    () async {
+      settings.update(
+        sounds: false,
+        vibrate: false,
+        preview: false,
+        incoming: ChatSoundChoice.dice,
+        sent: ChatSoundChoice.none,
+      );
+      await Future<void>.delayed(Duration.zero);
 
-    final again = ChatNotifySettings.forTest();
-    await again.load();
-    expect(again.inAppSounds, isFalse);
-    expect(again.inAppVibrate, isFalse);
-    expect(again.inAppPreview, isFalse);
-    expect(again.incomingSound, ChatSoundChoice.dice);
-    expect(again.sentSound, ChatSoundChoice.none);
+      final again = ChatNotifySettings.forTest();
+      await again.load();
+      expect(again.inAppSounds, isFalse);
+      expect(again.inAppVibrate, isFalse);
+      expect(again.inAppPreview, isFalse);
+      expect(again.incomingSound, ChatSoundChoice.dice);
+      expect(again.sentSound, ChatSoundChoice.none);
 
-    again.reset();
-    expect(again.inAppSounds, isTrue);
-    expect(again.incomingSound, ChatNotifySettings.defaultIncoming);
-    expect(again.sentSound, ChatNotifySettings.defaultSent);
-  });
+      again.reset();
+      expect(again.inAppSounds, isTrue);
+      expect(again.incomingSound, ChatNotifySettings.defaultIncoming);
+      expect(again.sentSound, ChatNotifySettings.defaultSent);
+    },
+  );
 
   test('an unknown saved sound falls back to the default', () async {
     SharedPreferences.setMockInitialValues({'chat_notify_incoming': 'gone'});
     final s = ChatNotifySettings.forTest();
     await s.load();
     expect(s.incomingSound, ChatNotifySettings.defaultIncoming);
+  });
+
+  test('both sound lists keep the old sounds and add their own files', () {
+    for (final list in [
+      ChatSoundChoice.incomingChoices,
+      ChatSoundChoice.sentChoices,
+    ]) {
+      expect(
+        list,
+        containsAll([
+          ChatSoundChoice.standard,
+          ChatSoundChoice.telegram,
+          ChatSoundChoice.dice,
+          ChatSoundChoice.system,
+          ChatSoundChoice.none,
+        ]),
+      );
+    }
+    expect(
+      ChatSoundChoice.incomingChoices.where((c) => c.asset != null).length,
+      8,
+    );
+    expect(ChatSoundChoice.sentChoices.where((c) => c.asset != null).length, 8);
   });
 }

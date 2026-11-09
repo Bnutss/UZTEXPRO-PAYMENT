@@ -73,4 +73,6 @@ flutter:
     - assets/icons/tg_chats.svg
     - assets/images/background.jpg
     - assets/sound/
+    - assets/sound/incoming/
+    - assets/sound/sent/
   uses-material-design: true

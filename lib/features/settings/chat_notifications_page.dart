@@ -21,6 +21,16 @@ String chatSoundLabel(S s, ChatSoundChoice c) => switch (c) {
   ChatSoundChoice.standard => s.notifSoundStandard,
   ChatSoundChoice.telegram => s.notifSoundTelegram,
   ChatSoundChoice.dice => s.notifSoundDice,
+  ChatSoundChoice.incoming1 => s.notifSoundTune(1),
+  ChatSoundChoice.incoming2 => s.notifSoundTune(2),
+  ChatSoundChoice.incoming3 => s.notifSoundTune(3),
+  ChatSoundChoice.incoming4 => s.notifSoundTune(4),
+  ChatSoundChoice.incoming5 => s.notifSoundTune(5),
+  ChatSoundChoice.sent1 => s.notifSoundTone(1),
+  ChatSoundChoice.sent2 => s.notifSoundTone(2),
+  ChatSoundChoice.sent3 => s.notifSoundTone(3),
+  ChatSoundChoice.sent4 => s.notifSoundTone(4),
+  ChatSoundChoice.sent5 => s.notifSoundTone(5),
   ChatSoundChoice.system => s.notifSoundSystem,
   ChatSoundChoice.none => s.notifSoundNone,
 };
@@ -251,6 +261,7 @@ class _ChatNotificationsPageState extends State<ChatNotificationsPage> {
   void _pick({
     required String title,
     required ChatSoundChoice current,
+    required List<ChatSoundChoice> choices,
     required ValueChanged<ChatSoundChoice> onPicked,
   }) {
     HapticFeedback.selectionClick();
@@ -260,6 +271,7 @@ class _ChatNotificationsPageState extends State<ChatNotificationsPage> {
         builder: (_) => _SoundPickerPage(
           title: title,
           current: current,
+          choices: choices,
           sounds: _sounds,
           onPicked: onPicked,
         ),
@@ -336,6 +348,7 @@ class _ChatNotificationsPageState extends State<ChatNotificationsPage> {
                 onTap: () => _pick(
                   title: s.notifSoundIncoming,
                   current: _settings.incomingSound,
+                  choices: ChatSoundChoice.incomingChoices,
                   onPicked: (c) => _settings.update(incoming: c),
                 ),
               ),
@@ -347,6 +360,7 @@ class _ChatNotificationsPageState extends State<ChatNotificationsPage> {
                 onTap: () => _pick(
                   title: s.notifSoundSent,
                   current: _settings.sentSound,
+                  choices: ChatSoundChoice.sentChoices,
                   onPicked: (c) => _settings.update(sent: c),
                 ),
               ),
@@ -389,12 +403,14 @@ class _SoundPickerPage extends StatefulWidget {
   const _SoundPickerPage({
     required this.title,
     required this.current,
+    required this.choices,
     required this.sounds,
     required this.onPicked,
   });
 
   final String title;
   final ChatSoundChoice current;
+  final List<ChatSoundChoice> choices;
   final ChatSounds sounds;
   final ValueChanged<ChatSoundChoice> onPicked;
 
@@ -418,7 +434,7 @@ class _SoundPickerPageState extends State<_SoundPickerPage> {
             indent: 16,
             children: [
               // Android has no system alert sound to play from the app.
-              for (final c in ChatSoundChoice.values.where(
+              for (final c in widget.choices.where(
                 (c) => !(Platform.isAndroid && c == ChatSoundChoice.system),
               ))
                 SettingsRow(

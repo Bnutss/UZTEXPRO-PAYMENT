@@ -13,6 +13,20 @@ enum ChatSoundChoice {
   telegram('sound/telegram_soundin.mp3'),
   dice('sound/dice.mp3'),
 
+  /// Sounds added for the incoming message (assets/sound/incoming).
+  incoming1('sound/incoming/1.mp3'),
+  incoming2('sound/incoming/2.mp3'),
+  incoming3('sound/incoming/3.mp3'),
+  incoming4('sound/incoming/4.mp3'),
+  incoming5('sound/incoming/5.mp3'),
+
+  /// Sounds added for the sent message (assets/sound/sent).
+  sent1('sound/sent/1.mp3'),
+  sent2('sound/sent/2.mp3'),
+  sent3('sound/sent/3.mp3'),
+  sent4('sound/sent/4.mp3'),
+  sent5('sound/sent/5.mp3'),
+
   /// The system's alert sound (no file).
   system(null),
   none(null);
@@ -21,6 +35,36 @@ enum ChatSoundChoice {
 
   /// The file in assets, null when there is none (system / silent).
   final String? asset;
+
+  /// What the "Incoming message" list offers: the three old sounds, then the
+  /// new ones for it.
+  static const incomingChoices = [
+    standard,
+    telegram,
+    dice,
+    incoming1,
+    incoming2,
+    incoming3,
+    incoming4,
+    incoming5,
+    system,
+    none,
+  ];
+
+  /// What the "Sent message" list offers: the three old sounds, then the new
+  /// ones for it.
+  static const sentChoices = [
+    dice,
+    standard,
+    telegram,
+    sent1,
+    sent2,
+    sent3,
+    sent4,
+    sent5,
+    system,
+    none,
+  ];
 
   static ChatSoundChoice parse(String? name, ChatSoundChoice fallback) {
     for (final c in values) {
@@ -114,7 +158,6 @@ class ChatNotifySettings extends ChangeNotifier {
     sent: defaultSent,
   );
 }
-
 
 /// The push settings that live on the server, kept on the phone as well: the
 /// "Notifications and sounds" screen shows them the moment it opens (no empty

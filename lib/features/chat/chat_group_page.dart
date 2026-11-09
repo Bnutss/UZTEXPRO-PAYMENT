@@ -10,7 +10,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/adaptive_back_button.dart';
 import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/native_segments.dart';
+import '../../core/widgets/pull_photo_list.dart';
 import '../../core/widgets/ui_blocks.dart';
+import '../settings/island_pull_avatar.dart';
 import 'chat_api.dart';
 import 'chat_group_picker.dart';
 import 'chat_models.dart';
@@ -149,39 +151,6 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
     await _run(() => _c.renameGroup(title));
   }
 
-  Future<void> _photo() async {
-    final s = S.of(context);
-    HapticFeedback.selectionClick();
-    final hasPhoto = (_c.group?.peer.photo ?? '').isNotEmpty;
-    await showNativeAlert(
-      context: context,
-      title: s.chatChangePhoto,
-      actions: [
-        if (hasPhoto)
-          AlertAction(
-            title: s.chatRemovePhoto,
-            style: AlertActionStyle.destructive,
-            onPressed: () => _run(_c.removeGroupPhoto),
-          ),
-        AlertAction(
-          title: s.chatChangePhoto,
-          style: AlertActionStyle.primary,
-          onPressed: () async {
-            final bytes = await pickGalleryPhoto(context);
-            if (bytes != null && mounted) {
-              await _run(() => _c.changeGroupPhoto(bytes));
-            }
-          },
-        ),
-        AlertAction(
-          title: s.chatCancel,
-          style: AlertActionStyle.cancel,
-          onPressed: () {},
-        ),
-      ],
-    );
-  }
-
   Future<void> _add() async {
     HapticFeedback.selectionClick();
     final List<ChatUser> all;
@@ -204,7 +173,7 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
   }
 
   /// "More": a native menu (tap) with leave and, for the owner, delete group.
-  Widget _moreMenu(S s) {
+  Widget _moreMenu(S s, double open) {
     final ios26 = PlatformInfo.isIOS26OrHigher();
     return AdaptivePopupMenuButton.widget<String>(
       items: [
@@ -228,7 +197,11 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
         if (entry.value == 'leave') _leave();
         if (entry.value == 'delete') _deleteGroup();
       },
-      child: _Tile(icon: Icons.more_horiz_rounded, label: s.chatMoreShort),
+      child: _Tile(
+        icon: Icons.more_horiz_rounded,
+        label: s.chatMoreShort,
+        open: open,
+      ),
     );
   }
 
@@ -349,80 +322,91 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
           backgroundColor: _bg,
           body: Stack(
             children: [
-              ListView(
-                padding: EdgeInsets.fromLTRB(16, top + 20, 16, 32),
-                children: [
-                  Center(
-                    child: GestureDetector(
-                      onTap: admin ? _photo : null,
-                      child: ClipOval(
-                        child: PersonAvatar(
-                          name: title,
-                          size: 100,
-                          sources: photo == null || photo.isEmpty
-                              ? const []
-                              : [PhotoSource(photo)],
+              PullPhotoList(
+                top: IslandPullAvatar.profileAvatarTop(context),
+                name: title,
+                sources: photo == null || photo.isEmpty
+                    ? const []
+                    : [PhotoSource(photo)],
+                blockHeight: 140,
+                blockBuilder: (context, t) => Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Align(
+                      alignment: Alignment(-t, 0),
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: Color.lerp(kChatInk, Colors.white, t),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: kChatInk,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    widget.statusOf(),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      color: AppColors.brandOrange,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: MuteMenu(
-                          muted: _c.muted,
-                          onMute: (h) => _setMute(hours: h == 0 ? null : h),
-                          onUnmute: _setMute,
-                          child: _Tile(
-                            icon: _c.muted
-                                ? Icons.notifications_off_rounded
-                                : Icons.notifications_rounded,
-                            label: _c.muted ? s.chatSoundOff : s.chatSound,
+                    const SizedBox(height: 2),
+                    Align(
+                      alignment: Alignment(-t, 0),
+                      child: Text(
+                        widget.statusOf(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Color.lerp(
+                            AppColors.brandOrange,
+                            const Color(0xCCFFFFFF),
+                            t,
                           ),
                         ),
                       ),
-                      if (admin) ...[
-                        const SizedBox(width: 8),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
                         Expanded(
-                          child: _Tile(
-                            icon: Icons.person_add_alt_1_rounded,
-                            label: s.chatAddShort,
-                            onTap: _add,
+                          child: MuteMenu(
+                            muted: _c.muted,
+                            onMute: (h) => _setMute(hours: h == 0 ? null : h),
+                            onUnmute: _setMute,
+                            child: _Tile(
+                              icon: _c.muted
+                                  ? Icons.notifications_off_rounded
+                                  : Icons.notifications_rounded,
+                              label: _c.muted ? s.chatSoundOff : s.chatSound,
+                              open: t,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _Tile(
-                            icon: Icons.edit_rounded,
-                            label: s.chatEditGroup,
-                            onTap: _rename,
+                        if (admin) ...[
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _Tile(
+                              icon: Icons.person_add_alt_1_rounded,
+                              label: s.chatAddShort,
+                              onTap: _add,
+                              open: t,
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _Tile(
+                              icon: Icons.edit_rounded,
+                              label: s.chatEditGroup,
+                              onTap: _rename,
+                              open: t,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(width: 8),
+                        Expanded(child: _moreMenu(s, t)),
                       ],
-                      const SizedBox(width: 8),
-                      Expanded(child: _moreMenu(s)),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
+                children: [
                   if (members.isNotEmpty) ...[
                     const SizedBox(height: 18),
                     Padding(
@@ -518,35 +502,42 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
 }
 
 class _Tile extends StatelessWidget {
-  const _Tile({required this.icon, required this.label, this.onTap});
+  const _Tile({
+    required this.icon,
+    required this.label,
+    this.onTap,
+    this.open = 0,
+  });
 
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
 
+  /// How open the photo is (0 to 1): white tile and blue, to dark glass and
+  /// white.
+  final double open;
+
   @override
   Widget build(BuildContext context) {
+    final tint = Color.lerp(_ChatGroupPageState._blue, Colors.white, open)!;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         height: 60,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Color.lerp(Colors.white, const Color(0x59000000), open),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: _ChatGroupPageState._blue, size: 22),
+            Icon(icon, color: tint, size: 22),
             const SizedBox(height: 3),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 11,
-                color: _ChatGroupPageState._blue,
-              ),
+              style: TextStyle(fontSize: 11, color: tint),
             ),
           ],
         ),

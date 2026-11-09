@@ -32,6 +32,8 @@ class IslandPullAvatar extends StatefulWidget {
     required this.active,
     required this.background,
     required this.child,
+    this.hidden = false,
+    this.onLetGo,
   });
 
   final String name;
@@ -47,6 +49,13 @@ class IslandPullAvatar extends StatefulWidget {
 
   /// The scrolling page. Its scroll offset drives the effect.
   final Widget child;
+
+  /// Draws nothing (the page shows its own, bigger photo meanwhile).
+  final bool hidden;
+
+  /// The avatar let go of the island (the page was pulled past the snapping
+  /// point): a profile opens its photo here, at once.
+  final VoidCallback? onLetGo;
 
   /// Devices with an island have a status bar of 59 pixels or more; notched
   /// iPhones stop at 50.
@@ -331,7 +340,11 @@ class _IslandPullAvatarState extends State<IslandPullAvatar>
 
     // One tap of feedback when the avatar lets go of the island.
     final pull = offset < 0 ? -offset : 0.0;
-    if (pull >= _Drop.letGoAt && !_letGo) HapticFeedback.mediumImpact();
+    if (pull >= _Drop.letGoAt && !_letGo) {
+      HapticFeedback.mediumImpact();
+      // The photo opens the moment the neck snaps, not when the finger lifts.
+      widget.onLetGo?.call();
+    }
     if (pull < _Drop.letGoAt * 0.4) _letGo = false;
     if (pull >= _Drop.letGoAt) _letGo = true;
 
@@ -350,6 +363,7 @@ class _IslandPullAvatarState extends State<IslandPullAvatar>
     // pushed over this one, must not have the avatar hanging over it.
     final active =
         widget.active &&
+        !widget.hidden &&
         TickerMode.valuesOf(context).enabled &&
         (ModalRoute.isCurrentOf(context) ?? true);
     _onScreen = active;
@@ -472,20 +486,20 @@ class _Drop extends StatelessWidget {
 
   /// The avatar's nominal radius; the drawn one follows from its distance to
   /// the island.
-  static const nominalRadius = 80.0;
+  static const nominalRadius = 58.0;
 
   /// Must match `REACH` in the shader.
   static const reach = 2.5;
 
   /// The avatar's centre below the island's, expanded and fully merged.
-  static const restDistance = 92.5;
+  static const restDistance = 100.0;
   static const mergedDistance = -27.5;
 
   /// Radius of the avatar at rest.
-  static const restRadius = 38.0;
+  static const restRadius = 42.0;
 
   /// Pull distance at which the neck snaps and the avatar lets go.
-  static const letGoAt = 50.0;
+  static const letGoAt = 30.0;
 
   /// The avatar's radius at [centerY], the same way the shader works it out.
   static double radiusAt(double centerY, double islandCenterY) {

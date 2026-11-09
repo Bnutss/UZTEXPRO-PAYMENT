@@ -584,33 +584,33 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     final choice = Platform.isAndroid
         ? (androidChoice ?? -1)
         : await showCupertinoModalPopup<int>(
-      context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(ctx, 0),
-            child: Text(s.chatAttachGallery),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(ctx, 1),
-            child: Text(s.chatAttachCamera),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(ctx, 2),
-            child: Text(s.chatAttachVideoCamera),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(ctx, 3),
-            child: Text(s.chatAttachFile),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.pop(ctx),
-          child: Text(s.chatCancel),
-        ),
-      ),
-    );
+            context: context,
+            builder: (ctx) => CupertinoActionSheet(
+              actions: [
+                CupertinoActionSheetAction(
+                  onPressed: () => Navigator.pop(ctx, 0),
+                  child: Text(s.chatAttachGallery),
+                ),
+                CupertinoActionSheetAction(
+                  onPressed: () => Navigator.pop(ctx, 1),
+                  child: Text(s.chatAttachCamera),
+                ),
+                CupertinoActionSheetAction(
+                  onPressed: () => Navigator.pop(ctx, 2),
+                  child: Text(s.chatAttachVideoCamera),
+                ),
+                CupertinoActionSheetAction(
+                  onPressed: () => Navigator.pop(ctx, 3),
+                  child: Text(s.chatAttachFile),
+                ),
+              ],
+              cancelButton: CupertinoActionSheetAction(
+                isDefaultAction: true,
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(s.chatCancel),
+              ),
+            ),
+          );
     if (choice == null || !mounted) return null;
 
     var busy = false;
@@ -740,56 +740,82 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
       // and (as in the message menu) for everybody when that is allowed.
       final canDelete = !m.isLocal;
       final allowForAll = !widget.isGroup || _c.isMine(m) || _c.isAdmin;
-      Future<void> apply(String? choice) async {
+      Future<void> apply(String? choice, [ChatMessage? target]) async {
+        final msg = target ?? m;
         if (choice == null || !mounted) return;
         if (choice == 'forward') {
-          await _forward([m]);
+          await _forward([msg]);
           return;
         }
         if (choice == 'show') {
-          await _goToMessage(m); // the photo closed: take the chat to it
+          await _goToMessage(msg); // the photo closed: take the chat to it
           return;
         }
         if (choice == 'reply') {
-          _startReply(m);
+          _startReply(msg);
           return;
         }
-        _c.deleteMessage(m, forAll: choice == 'all');
+        _c.deleteMessage(msg, forAll: choice == 'all');
       }
 
       if (Platform.isIOS) {
         try {
           const channel = MethodChannel('uztexpro/native_sheet');
           const events = MethodChannel('uztexpro/viewer_events');
+          // Every photo of this chat that is on the phone, oldest first: the
+          // viewer swipes through them, starting at the one that was tapped.
+          bool same(ChatMessage a, ChatMessage b) => a.id > 0
+              ? a.id == b.id
+              : identical(a, b) || a.clientId == b.clientId;
+          final photos = <ChatMessage>[];
+          for (final x in _c.messages) {
+            if (!x.isImage) continue;
+            final f = ChatMediaStore.fileOf(x);
+            if (f != null && f.existsSync()) photos.add(x);
+          }
+          var start = photos.indexWhere((x) => same(x, m));
+          if (start < 0) {
+            photos.add(m);
+            start = photos.length - 1;
+          }
           // The list for the forward sheet loads while the photo is looked at.
           List<ForwardTarget> candidates = const [];
-          if (canDelete) {
+          if (canDelete || photos.any((x) => !x.isLocal)) {
             unawaited(
-              _forwardCandidates(s).then((r) {
-                candidates = r.targets;
-                return channel.invokeMethod('photoViewerTargets', {
-                  'items': r.items,
-                });
-              }).catchError((_) {}),
+              _forwardCandidates(s)
+                  .then((r) {
+                    candidates = r.targets;
+                    return channel.invokeMethod('photoViewerTargets', {
+                      'items': r.items,
+                    });
+                  })
+                  .catchError((_) {}),
             );
           }
           // What the forward sheet over the photo picked: forward it here, in
           // the background (the photo stays open) and tell the sheet how it went.
           events.setMethodCallHandler((call) async {
             if (call.method != 'forward') return null;
-            final ids = ((call.arguments as Map)['ids'] as List).cast<num>();
+            final args = call.arguments as Map;
+            final ids = (args['ids'] as List).cast<num>();
+            final at = (args['index'] as num?)?.toInt() ?? start;
+            final shown = at >= 0 && at < photos.length ? photos[at] : m;
             final picked = [
               for (final i in ids)
                 if (i.toInt() >= 0 && i.toInt() < candidates.length)
                   candidates[i.toInt()],
             ];
             if (picked.isEmpty || !mounted) return {'ok': false};
-            final result = await ChatForwarder(widget.api).forward([m], picked);
+            final result = await ChatForwarder(
+              widget.api,
+            ).forward([shown], picked);
             widget.onRead?.call();
             if (result.failed > 0) {
               return {
                 'ok': false,
-                'title': result.sent == 0 ? s.forwardFailed : s.forwardPartFailed,
+                'title': result.sent == 0
+                    ? s.forwardFailed
+                    : s.forwardPartFailed,
               };
             }
             return {
@@ -800,35 +826,50 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
                   : s.forwardDoneChats(picked.length),
             };
           });
-          final String? choice;
+          final Object? answer;
           try {
-            choice = await channel.invokeMethod<String>('photoViewer', {
-              'url': Uri.file(file.path).toString(),
-              'title': _senderLabel(m, s),
-              'subtitle': _sentAtLabel(m),
-              if (canDelete) 'canForward': true,
-              if (canDelete) ...{
-                'menuTexts': {
-                  'show': s.chatShowInChat,
-                  'reply': s.chatMenuReply,
-                  'delete': s.chatMenuDelete,
-                },
-                'forwardTexts': {
-                  'title': s.forwardTitle,
-                  'search': s.forwardSearch,
-                  'send': s.forwardSendTo(1),
-                  'chats': s.forwardChats,
-                  'contacts': s.forwardContacts,
-                },
-                'deleteForMe': s.chatMenuDeleteForMe,
-                if (allowForAll) 'deleteForAll': s.chatMenuDeleteForAll,
-                'cancel': s.chatCancel,
+            answer = await channel.invokeMethod<Object>('photoViewer', {
+              'index': start,
+              'items': [
+                for (final x in photos)
+                  {
+                    'url': Uri.file(
+                      (x == m ? file : ChatMediaStore.fileOf(x) ?? file).path,
+                    ).toString(),
+                    'title': _senderLabel(x, s),
+                    'subtitle': _sentAtLabel(x),
+                    'canManage': !x.isLocal,
+                    'allowForAll':
+                        !widget.isGroup || _c.isMine(x) || _c.isAdmin,
+                  },
+              ],
+              'canForward': true,
+              'menuTexts': {
+                'show': s.chatShowInChat,
+                'reply': s.chatMenuReply,
+                'delete': s.chatMenuDelete,
               },
+              'forwardTexts': {
+                'title': s.forwardTitle,
+                'search': s.forwardSearch,
+                'send': s.forwardSendTo(1),
+                'chats': s.forwardChats,
+                'contacts': s.forwardContacts,
+              },
+              'deleteForMe': s.chatMenuDeleteForMe,
+              'deleteForAll': s.chatMenuDeleteForAll,
+              'cancel': s.chatCancel,
             });
           } finally {
             events.setMethodCallHandler(null);
           }
-          await apply(choice);
+          if (answer is Map) {
+            final at = (answer['index'] as num?)?.toInt() ?? start;
+            await apply(
+              answer['choice'] as String?,
+              at >= 0 && at < photos.length ? photos[at] : m,
+            );
+          }
           return;
         } catch (_) {}
       }
@@ -853,7 +894,8 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
                       allowForAll: allowForAll,
                     );
                     if (choice == null) return;
-                    if (viewerContext.mounted) Navigator.of(viewerContext).pop();
+                    if (viewerContext.mounted)
+                      Navigator.of(viewerContext).pop();
                     await apply(choice);
                   },
           ),

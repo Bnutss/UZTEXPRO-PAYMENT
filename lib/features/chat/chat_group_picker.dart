@@ -130,13 +130,16 @@ Future<GroupDraft?> pickGroupMembers(
 }
 
 /// The system photo picker (the gallery); JPEG bytes, or null when cancelled.
-Future<Uint8List?> pickGalleryPhoto(BuildContext context) async {
+Future<Uint8List?> pickGalleryPhoto(
+  BuildContext context, {
+  int maxSide = 1024,
+}) async {
   if (!Platform.isIOS) {
     try {
       final f = await ImagePicker().pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1024,
-        maxHeight: 1024,
+        maxWidth: maxSide.toDouble(),
+        maxHeight: maxSide.toDouble(),
         imageQuality: 85,
       );
       return f == null ? null : await f.readAsBytes();

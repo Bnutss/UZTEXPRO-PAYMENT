@@ -1410,7 +1410,8 @@ enum PhotoPickerPresenter {
           DispatchQueue.main.async {
             model.busy = false
             guard let data = data, let image = UIImage(data: data) else { return }
-            let scaled = ContactPickerView.downscaledImage(image, maxSide: 1024)
+            let maxSide = CGFloat((args["maxSide"] as? NSNumber)?.doubleValue ?? 1024)
+            let scaled = ContactPickerView.downscaledImage(image, maxSide: maxSide)
             if let jpeg = scaled.jpegData(compressionQuality: 0.85) {
               close(["photo": FlutterStandardTypedData(bytes: jpeg)])
             }
@@ -2102,13 +2103,39 @@ enum PhotoViewerPresenter {
     current?.forwardModel.people = people
   }
 
+  /// Opens the viewer. Either one photo (`url`, `title`, `subtitle`), or a
+  /// list to swipe through (`items`: url, title, subtitle, canManage,
+  /// allowForAll; `index`: which one opens first). With a list the answer is
+  /// {"choice", "index"} (which photo it was about); with one photo, the choice.
   static func present(_ args: [String: Any], result: @escaping FlutterResult) {
-    guard let urlString = args["url"] as? String, let url = URL(string: urlString) else {
+    var items: [ViewerItem] = []
+    let isList = args["items"] is [[String: Any]]
+    if let list = args["items"] as? [[String: Any]] {
+      for d in list {
+        guard let s = d["url"] as? String, let u = URL(string: s) else { continue }
+        items.append(ViewerItem(
+          url: u,
+          title: d["title"] as? String,
+          subtitle: d["subtitle"] as? String,
+          canManage: d["canManage"] as? Bool ?? false,
+          allowForAll: d["allowForAll"] as? Bool ?? false))
+      }
+    } else if let s = args["url"] as? String, let u = URL(string: s) {
+      let manage = args["deleteForMe"] != nil || (args["canForward"] as? Bool ?? false)
+      items = [ViewerItem(
+        url: u,
+        title: args["title"] as? String,
+        subtitle: args["subtitle"] as? String,
+        canManage: manage,
+        allowForAll: args["deleteForAll"] != nil)]
+    }
+    guard !items.isEmpty else {
       result(nil)
       return
     }
-    let vc = PhotoViewerController(url: url, title: args["title"] as? String, subtitle: args["subtitle"] as? String)
-    // A trash button, when the photo can be deleted (the texts come from Flutter).
+    let start = min(max((args["index"] as? NSNumber)?.intValue ?? 0, 0), items.count - 1)
+    let vc = PhotoViewerController(items: items, index: start)
+    // A trash button, when photos can be deleted (the texts come from Flutter).
     if let forMe = args["deleteForMe"] as? String {
       vc.deleteOptions = (
         forMe: forMe,
@@ -2120,24 +2147,31 @@ enum PhotoViewerPresenter {
     if let t = args["menuTexts"] as? [String: String] { vc.menuTexts = t }
     if let t = args["forwardTexts"] as? [String: String] { vc.forwardTexts = t }
     current = vc
-    vc.forwardHandler = { ids, done in
+    vc.forwardHandler = { ids, index, done in
       guard let events = PhotoViewerPresenter.events else {
         done(nil)
         return
       }
-      events.invokeMethod("forward", arguments: ["ids": ids]) { answer in
+      events.invokeMethod("forward", arguments: ["ids": ids, "index": index]) { answer in
         done(answer as? [String: Any])
       }
     }
     var answered = false
-    vc.onFinish = { choice in
+    vc.onFinish = { choice, index in
       if answered { return }
       answered = true
-      result(choice)
+      if isList {
+        result(choice.map { ["choice": $0, "index": index] as [String: Any] })
+      } else {
+        result(choice)
+      }
     }
-    let nav = UINavigationController(rootViewController: vc)
+    let nav = ViewerNav(rootViewController: vc)
     nav.modalPresentationStyle = .overFullScreen
     nav.modalTransitionStyle = .crossDissolve
+    // The viewer, not the page under it, decides how the status bar looks:
+    // light clock and battery on the black photo.
+    nav.modalPresentationCapturesStatusBarAppearance = true
     nav.overrideUserInterfaceStyle = .dark
     let appearance = UINavigationBarAppearance()
     appearance.configureWithTransparentBackground()
@@ -2153,6 +2187,71 @@ enum PhotoViewerPresenter {
     nav.toolbar.scrollEdgeAppearance = toolbarAppearance
     nav.toolbar.tintColor = .white
     NativeSheet.topViewControllerForPresenting()?.present(nav, animated: true)
+  }
+}
+
+/// One photo of the viewer.
+struct ViewerItem {
+  let url: URL
+  let title: String?     // the sender's name
+  let subtitle: String?  // the date and time
+  let canManage: Bool    // forward / the menu / delete are offered
+  let allowForAll: Bool  // "delete for everybody" is offered
+}
+
+/// The viewer's navigation controller: light status bar, and the top page
+/// decides when it is hidden.
+final class ViewerNav: UINavigationController {
+  override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
+  override var childForStatusBarStyle: UIViewController? { nil }
+  override var childForStatusBarHidden: UIViewController? { topViewController }
+}
+
+/// A layer of the viewer's controls that lets every touch that misses a control
+/// through to the photo under it (a tap there shows / hides the controls).
+final class ViewerChromeView: UIView {
+  override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+    let v = super.hitTest(point, with: event)
+    return v === self ? nil : v
+  }
+}
+
+/// A round glass button of the viewer: 46 pt like the chat header's. Liquid
+/// Glass on iOS 26, a dark blur before it.
+final class ViewerGlassButton: UIView {
+  let button = UIButton(type: .system)
+  private let glass: UIVisualEffectView
+
+  init(symbol: String) {
+    if #available(iOS 26.0, *) {
+      let effect = UIGlassEffect()
+      effect.isInteractive = true
+      glass = UIVisualEffectView(effect: effect)
+      glass.cornerConfiguration = .capsule()
+    } else {
+      glass = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
+      glass.clipsToBounds = true
+    }
+    super.init(frame: .zero)
+    addSubview(glass)
+    glass.contentView.addSubview(button)
+    button.setImage(
+      UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)),
+      for: .normal)
+    button.tintColor = .white
+    NSLayoutConstraint.activate([
+      widthAnchor.constraint(equalToConstant: 46),
+      heightAnchor.constraint(equalToConstant: 46),
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError() }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    glass.frame = bounds
+    button.frame = bounds
+    if #unavailable(iOS 26.0) { glass.layer.cornerRadius = bounds.height / 2 }
   }
 }
 
@@ -2224,92 +2323,25 @@ final class ViewerTitleCapsule: UIView {
   }
 }
 
-final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
-  /// A forward button in the bottom bar. It opens the native list of chats right
-  /// over the photo; the answer is "forward:<ids>" (the ids Flutter gave).
-  var canForward = false
-  var forwardTexts: [String: String] = [:]
-  /// The "..." menu: Show in chat / Reply / Delete (absent: no menu).
-  var menuTexts: [String: String] = [:]
-  let forwardModel = ForwardPickerModel()
-  /// Asks Flutter to forward to the picked ids; answers {ok, title, subtitle}.
-  var forwardHandler: (([Int], @escaping ([String: Any]?) -> Void) -> Void)?
-  private var toast: ViewerToast?
-  /// Set when the photo can be deleted: the texts of the two choices and of Cancel.
-  var deleteOptions: (forMe: String, forAll: String?, cancel: String)?
-  /// Called once when the viewer is gone: "me" / "all" if the photo was deleted.
-  var onFinish: ((String?) -> Void)?
-  private var deleteChoice: String?
+/// One photo with pinch / double-tap zoom. A single tap goes to [onTap].
+final class ViewerPageController: UIViewController, UIScrollViewDelegate {
+  let pageIndex: Int
   private let url: URL
+  var onTap: (() -> Void)?
   private let scrollView = UIScrollView()
   private let imageView = UIImageView()
   private let spinner = UIActivityIndicatorView(style: .large)
 
-  /// [title] is the sender's name, [subtitle] the date and time (under it).
-  init(url: URL, title: String?, subtitle: String?) {
+  init(pageIndex: Int, url: URL) {
+    self.pageIndex = pageIndex
     self.url = url
     super.init(nibName: nil, bundle: nil)
-    self.title = title
-    if let title = title, !title.isEmpty {
-      navigationItem.titleView = ViewerTitleCapsule(title: title, subtitle: subtitle)
-    }
   }
   required init?(coder: NSCoder) { fatalError() }
 
   override func viewDidLoad() {
     super.viewDidLoad()
     view.backgroundColor = .black
-    // Back at the left; at the right a "..." button with Show in chat, Reply and
-    // Delete (the owner of the photo can do all three from here).
-    navigationItem.leftBarButtonItem = UIBarButtonItem(
-      image: UIImage(systemName: "chevron.backward"),
-      primaryAction: UIAction { [weak self] _ in self?.dismiss(animated: true) }
-    )
-    if !menuTexts.isEmpty {
-      var actions: [UIMenuElement] = []
-      if let t = menuTexts["show"] {
-        actions.append(UIAction(title: t, image: UIImage(systemName: "text.bubble")) { [weak self] _ in
-          self?.deleteChoice = "show"
-          self?.dismiss(animated: true)
-        })
-      }
-      if let t = menuTexts["reply"] {
-        actions.append(UIAction(title: t, image: UIImage(systemName: "arrowshape.turn.up.left")) { [weak self] _ in
-          self?.deleteChoice = "reply"
-          self?.dismiss(animated: true)
-        })
-      }
-      if let t = menuTexts["delete"], deleteOptions != nil {
-        actions.append(UIAction(title: t, image: UIImage(systemName: "trash"), attributes: .destructive) { [weak self] _ in
-          self?.confirmDelete()
-        })
-      }
-      navigationItem.rightBarButtonItem = UIBarButtonItem(
-        image: UIImage(systemName: "ellipsis"),
-        menu: UIMenu(children: actions)
-      )
-    }
-    // The bar at the bottom: forward on the left, delete on the right (the same
-    // two are in the "..." menu as well).
-    if canForward || deleteOptions != nil {
-      var bar: [UIBarButtonItem] = []
-      if canForward {
-        bar.append(UIBarButtonItem(
-          image: UIImage(systemName: "arrowshape.turn.up.right"),
-          primaryAction: UIAction { [weak self] _ in self?.presentForwardPicker() }
-        ))
-      }
-      bar.append(UIBarButtonItem(systemItem: .flexibleSpace))
-      if deleteOptions != nil {
-        bar.append(UIBarButtonItem(
-          systemItem: .trash,
-          primaryAction: UIAction { [weak self] _ in self?.confirmDelete() }
-        ))
-      }
-      toolbarItems = bar
-      navigationController?.setToolbarHidden(false, animated: false)
-    }
-
     scrollView.frame = view.bounds
     scrollView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     scrollView.delegate = self
@@ -2327,6 +2359,9 @@ final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
     let double = UITapGestureRecognizer(target: self, action: #selector(doubleTapped(_:)))
     double.numberOfTapsRequired = 2
     scrollView.addGestureRecognizer(double)
+    let single = UITapGestureRecognizer(target: self, action: #selector(tapped))
+    single.require(toFail: double)
+    scrollView.addGestureRecognizer(single)
 
     spinner.color = .white
     spinner.center = view.center
@@ -2349,6 +2384,226 @@ final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
     super.viewDidLayoutSubviews()
     if scrollView.zoomScale == 1 {
       imageView.frame = scrollView.bounds
+    }
+  }
+
+  func viewForZooming(in scrollView: UIScrollView) -> UIView? { imageView }
+
+  func scrollViewDidZoom(_ scrollView: UIScrollView) {
+    let bounds = scrollView.bounds.size
+    var frame = imageView.frame
+    frame.origin.x = frame.width < bounds.width ? (bounds.width - frame.width) / 2 : 0
+    frame.origin.y = frame.height < bounds.height ? (bounds.height - frame.height) / 2 : 0
+    imageView.frame = frame
+  }
+
+  @objc private func tapped() { onTap?() }
+
+  @objc private func doubleTapped(_ g: UITapGestureRecognizer) {
+    if scrollView.zoomScale > 1 {
+      scrollView.setZoomScale(1, animated: true)
+    } else {
+      let point = g.location(in: imageView)
+      let size = CGSize(width: scrollView.bounds.width / 2.5, height: scrollView.bounds.height / 2.5)
+      let rect = CGRect(x: point.x - size.width / 2, y: point.y - size.height / 2, width: size.width, height: size.height)
+      scrollView.zoom(to: rect, animated: true)
+    }
+  }
+}
+
+/// The photos of a chat: swipe sideways to go through them; a tap hides and
+/// shows the bars (and the clock), as in Telegram.
+final class PhotoViewerController: UIViewController, UIPageViewControllerDataSource, UIPageViewControllerDelegate {
+  /// A forward button in the bottom bar. It opens the native list of chats right
+  /// over the photo; the answer is "forward:<ids>" (the ids Flutter gave).
+  var canForward = false
+  var forwardTexts: [String: String] = [:]
+  /// The "..." menu: Show in chat / Reply / Delete (absent: no menu).
+  var menuTexts: [String: String] = [:]
+  let forwardModel = ForwardPickerModel()
+  /// Asks Flutter to forward the photo at the index to the picked ids; answers
+  /// {ok, title, subtitle}.
+  var forwardHandler: (([Int], Int, @escaping ([String: Any]?) -> Void) -> Void)?
+  private var toast: ViewerToast?
+  /// Set when photos can be deleted: the texts of the two choices and of Cancel.
+  var deleteOptions: (forMe: String, forAll: String?, cancel: String)?
+  /// Called once when the viewer is gone: "me" / "all" / … and the photo it was
+  /// about.
+  var onFinish: ((String?, Int) -> Void)?
+  private var deleteChoice: String?
+  private let items: [ViewerItem]
+  private(set) var index: Int
+  private let pager = UIPageViewController(
+    transitionStyle: .scroll,
+    navigationOrientation: .horizontal,
+    options: [.interPageSpacing: 24])
+  private var chromeHidden = false
+
+  init(items: [ViewerItem], index: Int) {
+    self.items = items
+    self.index = index
+    super.init(nibName: nil, bundle: nil)
+  }
+  required init?(coder: NSCoder) { fatalError() }
+
+  // The clock and the battery stay on the photo, light on the black; a tap that
+  // hides the bars hides them too.
+  override var prefersStatusBarHidden: Bool { chromeHidden }
+  override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
+  override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation { .fade }
+
+  private func page(at i: Int) -> ViewerPageController {
+    let p = ViewerPageController(pageIndex: i, url: items[i].url)
+    p.onTap = { [weak self] in self?.toggleChrome() }
+    return p
+  }
+
+  override func viewDidLoad() {
+    super.viewDidLoad()
+    view.backgroundColor = .black
+    addChild(pager)
+    pager.view.frame = view.bounds
+    pager.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    view.addSubview(pager.view)
+    pager.didMove(toParent: self)
+    if items.count > 1 {
+      pager.dataSource = self
+      pager.delegate = self
+    }
+    pager.setViewControllers([page(at: index)], direction: .forward, animated: false)
+    buildChrome()
+    refreshChrome()
+  }
+
+  override func viewWillAppear(_ animated: Bool) {
+    super.viewWillAppear(animated)
+    // Our own glass buttons stand where the chat's header ones do: no system bars.
+    navigationController?.setNavigationBarHidden(true, animated: false)
+    navigationController?.setToolbarHidden(true, animated: false)
+  }
+
+  // MARK: paging
+
+  func pageViewController(_ pageViewController: UIPageViewController, viewControllerBefore viewController: UIViewController) -> UIViewController? {
+    guard let p = viewController as? ViewerPageController, p.pageIndex > 0 else { return nil }
+    return page(at: p.pageIndex - 1)
+  }
+
+  func pageViewController(_ pageViewController: UIPageViewController, viewControllerAfter viewController: UIViewController) -> UIViewController? {
+    guard let p = viewController as? ViewerPageController, p.pageIndex < items.count - 1 else { return nil }
+    return page(at: p.pageIndex + 1)
+  }
+
+  func pageViewController(_ pageViewController: UIPageViewController, didFinishAnimating finished: Bool, previousViewControllers: [UIViewController], transitionCompleted completed: Bool) {
+    guard completed, let p = pageViewController.viewControllers?.first as? ViewerPageController else { return }
+    index = p.pageIndex
+    refreshChrome()
+  }
+
+  // MARK: bars
+
+  // The buttons are the chat header's: round, 46 pt, 12 pt from the edge, 6 pt
+  // under the status bar (the header row is 58 pt high), so the photo's bars sit
+  // exactly where the chat's do. The bottom ones mirror them.
+  private let chrome = ViewerChromeView()
+  private let backButton = ViewerGlassButton(symbol: "chevron.backward")
+  private let menuButton = ViewerGlassButton(symbol: "ellipsis")
+  private let forwardButton = ViewerGlassButton(symbol: "arrowshape.turn.up.right")
+  private let trashButton = ViewerGlassButton(symbol: "trash")
+  private var titleCapsule: ViewerTitleCapsule?
+  private var titleHolder = ViewerChromeView()
+
+  private func buildChrome() {
+    chrome.frame = view.bounds
+    chrome.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    chrome.isUserInteractionEnabled = true
+    view.addSubview(chrome)
+    let guide = view.safeAreaLayoutGuide
+    let side: CGFloat = 12
+    for b in [backButton, menuButton, forwardButton, trashButton] {
+      b.translatesAutoresizingMaskIntoConstraints = false
+      chrome.addSubview(b)
+    }
+    titleHolder.translatesAutoresizingMaskIntoConstraints = false
+    chrome.addSubview(titleHolder)
+    NSLayoutConstraint.activate([
+      backButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: side),
+      backButton.topAnchor.constraint(equalTo: guide.topAnchor, constant: 6),
+      menuButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -side),
+      menuButton.topAnchor.constraint(equalTo: guide.topAnchor, constant: 6),
+      forwardButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: side),
+      forwardButton.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -6),
+      trashButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -side),
+      trashButton.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -6),
+      // The name capsule, between the two buttons, on their line.
+      titleHolder.centerYAnchor.constraint(equalTo: backButton.centerYAnchor),
+      titleHolder.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      titleHolder.leadingAnchor.constraint(greaterThanOrEqualTo: backButton.trailingAnchor, constant: 8),
+      titleHolder.trailingAnchor.constraint(lessThanOrEqualTo: menuButton.leadingAnchor, constant: -8),
+      titleHolder.heightAnchor.constraint(equalToConstant: 46),
+    ])
+    backButton.button.addAction(UIAction { [weak self] _ in self?.dismiss(animated: true) }, for: .touchUpInside)
+    forwardButton.button.addAction(UIAction { [weak self] _ in self?.presentForwardPicker() }, for: .touchUpInside)
+    trashButton.button.addAction(UIAction { [weak self] _ in self?.confirmDelete() }, for: .touchUpInside)
+  }
+
+  /// The name and date, the "..." menu and the bottom buttons of the photo that
+  /// is on the screen (they depend on whose photo it is).
+  private func refreshChrome() {
+    let item = items[index]
+    titleCapsule?.removeFromSuperview()
+    titleCapsule = nil
+    if let title = item.title, !title.isEmpty {
+      let capsule = ViewerTitleCapsule(title: title, subtitle: item.subtitle)
+      capsule.translatesAutoresizingMaskIntoConstraints = false
+      titleHolder.addSubview(capsule)
+      NSLayoutConstraint.activate([
+        capsule.centerXAnchor.constraint(equalTo: titleHolder.centerXAnchor),
+        capsule.centerYAnchor.constraint(equalTo: titleHolder.centerYAnchor),
+        capsule.leadingAnchor.constraint(greaterThanOrEqualTo: titleHolder.leadingAnchor),
+        capsule.trailingAnchor.constraint(lessThanOrEqualTo: titleHolder.trailingAnchor),
+        capsule.heightAnchor.constraint(equalToConstant: 46),
+      ])
+      titleCapsule = capsule
+    }
+    let canDelete = item.canManage && deleteOptions != nil
+    if item.canManage && !menuTexts.isEmpty {
+      var actions: [UIMenuElement] = []
+      if let t = menuTexts["show"] {
+        actions.append(UIAction(title: t, image: UIImage(systemName: "text.bubble")) { [weak self] _ in
+          self?.deleteChoice = "show"
+          self?.dismiss(animated: true)
+        })
+      }
+      if let t = menuTexts["reply"] {
+        actions.append(UIAction(title: t, image: UIImage(systemName: "arrowshape.turn.up.left")) { [weak self] _ in
+          self?.deleteChoice = "reply"
+          self?.dismiss(animated: true)
+        })
+      }
+      if let t = menuTexts["delete"], canDelete {
+        actions.append(UIAction(title: t, image: UIImage(systemName: "trash"), attributes: .destructive) { [weak self] _ in
+          self?.confirmDelete()
+        })
+      }
+      menuButton.button.menu = UIMenu(children: actions)
+      menuButton.button.showsMenuAsPrimaryAction = true
+      menuButton.isHidden = false
+    } else {
+      menuButton.isHidden = true
+    }
+    forwardButton.isHidden = !(item.canManage && canForward)
+    trashButton.isHidden = !canDelete
+  }
+
+  /// A tap on the photo: the buttons, the name capsule and the status bar fade
+  /// out together, and back in on the next tap.
+  private func toggleChrome() {
+    chromeHidden.toggle()
+    chrome.isUserInteractionEnabled = !chromeHidden
+    UIView.animate(withDuration: 0.22, delay: 0, options: [.curveEaseInOut]) {
+      self.chrome.alpha = self.chromeHidden ? 0 : 1
+      self.setNeedsStatusBarAppearanceUpdate()
     }
   }
 
@@ -2382,7 +2637,7 @@ final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
   }
 
   private func runForward(_ ids: [Int]) {
-    forwardHandler?(ids) { [weak self] answer in
+    forwardHandler?(ids, index) { [weak self] answer in
       DispatchQueue.main.async {
         guard let self = self else { return }
         let title = answer?["title"] as? String ?? ""
@@ -2435,14 +2690,15 @@ final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
       self?.deleteChoice = "me"
       self?.dismiss(animated: true)
     })
-    if let forAll = options.forAll {
+    if let forAll = options.forAll, items[index].allowForAll {
       sheet.addAction(UIAlertAction(title: forAll, style: .destructive) { [weak self] _ in
         self?.deleteChoice = "all"
         self?.dismiss(animated: true)
       })
     }
     sheet.addAction(UIAlertAction(title: options.cancel, style: .cancel))
-    sheet.popoverPresentationController?.barButtonItem = toolbarItems?.last ?? navigationItem.rightBarButtonItem
+    sheet.popoverPresentationController?.sourceView = trashButton
+    sheet.popoverPresentationController?.sourceRect = trashButton.bounds
     present(sheet, animated: true)
   }
 
@@ -2450,28 +2706,7 @@ final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
     super.viewDidDisappear(animated)
     // Gone for good (dismissed), not just covered by the sheet.
     if isBeingDismissed || navigationController?.isBeingDismissed == true {
-      onFinish?(deleteChoice)
-    }
-  }
-
-  func viewForZooming(in scrollView: UIScrollView) -> UIView? { imageView }
-
-  func scrollViewDidZoom(_ scrollView: UIScrollView) {
-    let bounds = scrollView.bounds.size
-    var frame = imageView.frame
-    frame.origin.x = frame.width < bounds.width ? (bounds.width - frame.width) / 2 : 0
-    frame.origin.y = frame.height < bounds.height ? (bounds.height - frame.height) / 2 : 0
-    imageView.frame = frame
-  }
-
-  @objc private func doubleTapped(_ g: UITapGestureRecognizer) {
-    if scrollView.zoomScale > 1 {
-      scrollView.setZoomScale(1, animated: true)
-    } else {
-      let point = g.location(in: imageView)
-      let size = CGSize(width: scrollView.bounds.width / 2.5, height: scrollView.bounds.height / 2.5)
-      let rect = CGRect(x: point.x - size.width / 2, y: point.y - size.height / 2, width: size.width, height: size.height)
-      scrollView.zoom(to: rect, animated: true)
+      onFinish?(deleteChoice, index)
     }
   }
 }

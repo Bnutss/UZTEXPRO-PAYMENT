@@ -10,6 +10,8 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/adaptive_back_button.dart';
 import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/native_segments.dart';
+import '../../core/widgets/pull_photo_list.dart';
+import '../settings/island_pull_avatar.dart';
 import '../../core/widgets/ui_blocks.dart';
 import 'chat_models.dart';
 import 'chat_mute_sheet.dart';
@@ -150,6 +152,89 @@ class _ChatProfilePageState extends State<ChatProfilePage> {
     nav.pop();
   }
 
+  Widget _status(double t) {
+    return ListenableBuilder(
+      listenable: widget.listenable,
+      builder: (context, _) => Text(
+        widget.statusOf(),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 15,
+          color: Color.lerp(AppColors.brandOrange, const Color(0xCCFFFFFF), t),
+        ),
+      ),
+    );
+  }
+
+  /// Write / call / sound / delete. [t] is how open the photo is: 0 white
+  /// tiles, 1 the look over the open photo (glassy dark tiles, white text).
+  Widget _actions(BuildContext context, S s, bool hasPhone, double t) {
+    return ListenableBuilder(
+      listenable: widget.listenable,
+      builder: (context, _) {
+        final muted = widget.isMuted?.call() ?? false;
+        return Row(
+          children: [
+            if (widget.showWrite) ...[
+              Expanded(
+                child: _Action(
+                  svgIcon: 'assets/icons/tg_chats.svg',
+                  label: s.chatWrite,
+                  open: t,
+                  onTap: _write,
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            if (hasPhone) ...[
+              Expanded(
+                child: _Action(
+                  icon: Icons.call_rounded,
+                  label: s.chatCall,
+                  open: t,
+                  onTap: _call,
+                ),
+              ),
+              if (widget.showManage) const SizedBox(width: 8),
+            ],
+            if (widget.showManage) ...[
+              Expanded(
+                child: MuteMenu(
+                  muted: muted,
+                  enabled: widget.canManage,
+                  onMute: (h) =>
+                      widget.onToggleMute?.call(hours: h == 0 ? null : h),
+                  onUnmute: () => widget.onToggleMute?.call(),
+                  child: _Action(
+                    icon: muted
+                        ? Icons.notifications_off_rounded
+                        : Icons.notifications_rounded,
+                    label: muted ? s.chatSoundOff : s.chatSound,
+                    open: t,
+                    enabled: widget.canManage,
+                    onTap: null,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _Action(
+                  icon: kChatDeleteIcon,
+                  label: s.chatDelete,
+                  color: const Color(0xFFFF3B30),
+                  open: t,
+                  enabled: widget.canManage,
+                  onTap: () => _confirmDelete(context, s),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
@@ -182,103 +267,36 @@ class _ChatProfilePageState extends State<ChatProfilePage> {
       backgroundColor: ChatProfilePage._bg,
       body: Stack(
         children: [
-          ListView(
-            padding: EdgeInsets.fromLTRB(16, top + 20, 16, 32),
+          PullPhotoList(
+            top: IslandPullAvatar.profileAvatarTop(context),
+            name: user.name,
+            sources: user.photo == null ? const [] : [PhotoSource(user.photo!)],
+            blockHeight: 140,
+            blockBuilder: (context, t) => Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Centred at rest, slides to the left as the photo opens.
+                Align(
+                  alignment: Alignment(-t, 0),
+                  child: Text(
+                    user.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: Color.lerp(kChatInk, Colors.white, t),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Align(alignment: Alignment(-t, 0), child: _status(t)),
+                const SizedBox(height: 16),
+                _actions(context, s, hasPhone, t),
+              ],
+            ),
             children: [
-              Center(
-                child: ClipOval(
-                  child: PersonAvatar(
-                    name: user.name,
-                    size: 100,
-                    sources: user.photo == null
-                        ? const []
-                        : [PhotoSource(user.photo!)],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                user.name,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: kChatInk,
-                ),
-              ),
-              const SizedBox(height: 4),
-              ListenableBuilder(
-                listenable: widget.listenable,
-                builder: (context, _) => Text(
-                  widget.statusOf(),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    color: AppColors.brandOrange,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              ListenableBuilder(
-                listenable: widget.listenable,
-                builder: (context, _) {
-                  final muted = widget.isMuted?.call() ?? false;
-                  return Row(
-                    children: [
-                      if (widget.showWrite) ...[
-                        Expanded(
-                          child: _Action(
-                            svgIcon: 'assets/icons/tg_chats.svg',
-                            label: s.chatWrite,
-                            onTap: _write,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                      if (hasPhone) ...[
-                        Expanded(
-                          child: _Action(
-                            icon: Icons.call_rounded,
-                            label: s.chatCall,
-                            onTap: _call,
-                          ),
-                        ),
-                        if (widget.showManage) const SizedBox(width: 8),
-                      ],
-                      if (widget.showManage) ...[
-                        Expanded(
-                          child: MuteMenu(
-                            muted: muted,
-                            enabled: widget.canManage,
-                            onMute: (h) => widget.onToggleMute?.call(
-                              hours: h == 0 ? null : h,
-                            ),
-                            onUnmute: () => widget.onToggleMute?.call(),
-                            child: _Action(
-                              icon: muted
-                                  ? Icons.notifications_off_rounded
-                                  : Icons.notifications_rounded,
-                              label: muted ? s.chatSoundOff : s.chatSound,
-                              enabled: widget.canManage,
-                              onTap: null,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _Action(
-                            icon: kChatDeleteIcon,
-                            label: s.chatDelete,
-                            color: const Color(0xFFFF3B30),
-                            enabled: widget.canManage,
-                            onTap: () => _confirmDelete(context, s),
-                          ),
-                        ),
-                      ],
-                    ],
-                  );
-                },
-              ),
               if (rows.isNotEmpty) ...[
                 const SizedBox(height: 18),
                 Container(
@@ -351,7 +369,12 @@ class _Action extends StatelessWidget {
     required this.onTap,
     this.color = ChatProfilePage._blue,
     this.enabled = true,
+    this.open = 0,
   });
+
+  /// How open the photo is (0 to 1): the tile goes from white to a dark glassy
+  /// one, its icon and text to white.
+  final double open;
 
   final IconData? icon;
 
@@ -364,6 +387,12 @@ class _Action extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Over the photo everything is white, the red delete a lighter red.
+    final tint = Color.lerp(
+      color,
+      color == const Color(0xFFFF3B30) ? const Color(0xFFFF8A80) : Colors.white,
+      open,
+    )!;
     return GestureDetector(
       onTap: enabled ? onTap : null,
       child: Opacity(
@@ -371,7 +400,7 @@ class _Action extends StatelessWidget {
         child: Container(
           height: 60,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Color.lerp(Colors.white, const Color(0x59000000), open),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Column(
@@ -382,16 +411,16 @@ class _Action extends StatelessWidget {
                   svgIcon!,
                   width: 22,
                   height: 22,
-                  colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                  colorFilter: ColorFilter.mode(tint, BlendMode.srcIn),
                 )
               else
-                Icon(icon, color: color, size: 22),
+                Icon(icon, color: tint, size: 22),
               const SizedBox(height: 3),
               Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11, color: color),
+                style: TextStyle(fontSize: 11, color: tint),
               ),
             ],
           ),

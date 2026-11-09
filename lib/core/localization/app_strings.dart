@@ -1527,6 +1527,15 @@ class S {
     'en': 'All good, thanks 👍',
     'uz': 'Hammasi yaxshi, rahmat 👍',
   });
+  String get appearanceChoosePhoto => _t({
+    'ru': 'Свой фон',
+    'en': 'Choose Photo',
+    'uz': 'O‘z fonim',
+  });
+  String get appearanceBlur =>
+      _t({'ru': 'Размытие', 'en': 'Blur', 'uz': 'Xiralashtirish'});
+  String get appearanceDim =>
+      _t({'ru': 'Затемнение', 'en': 'Dimming', 'uz': 'Qoraytirish'});
   String get appearanceReset => _t({
     'ru': 'Сбросить оформление',
     'en': 'Reset Appearance',
@@ -1763,6 +1772,10 @@ class S {
       _t({'ru': 'Телеграм', 'en': 'Telegram', 'uz': 'Telegram'});
   String get notifSoundDice =>
       _t({'ru': 'Кубик', 'en': 'Dice', 'uz': 'Kub'});
+  String notifSoundTune(int n) =>
+      _t({'ru': 'Мелодия $n', 'en': 'Tune $n', 'uz': 'Ohang $n'});
+  String notifSoundTone(int n) =>
+      _t({'ru': 'Сигнал $n', 'en': 'Tone $n', 'uz': 'Signal $n'});
   String get notifSoundSystem =>
       _t({'ru': 'Системный', 'en': 'System', 'uz': 'Tizim'});
   String get notifSoundNone =>

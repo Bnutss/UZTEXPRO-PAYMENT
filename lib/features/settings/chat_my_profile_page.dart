@@ -9,6 +9,7 @@ import '../../core/widgets/adaptive_back_button.dart';
 import '../../core/widgets/fade_route.dart';
 import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/glass_text_button.dart';
+import '../../core/widgets/pull_photo_list.dart';
 import '../../core/widgets/ui_blocks.dart';
 import '../chat/chat_api.dart' show ChatRest;
 import '../chat/chat_models.dart';
@@ -189,50 +190,55 @@ class _ChatMyProfilePageState extends State<ChatMyProfilePage> {
       backgroundColor: ChatMyProfilePage._bg,
       body: Stack(
         children: [
-          ListView(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              IslandPullAvatar.profileAvatarTop(context),
-              16,
-              32,
-            ),
-            children: [
-              Center(
-                child: ClipOval(
-                  child: PersonAvatar(
-                    name: name,
-                    size: IslandPullAvatar.avatarSize,
-                    sources: _photo == null
-                        ? const []
-                        : [
-                            PhotoSource(
-                              _photo!,
-                              headers: {'Authorization': 'Bearer $_token'},
-                            ),
-                          ],
+          PullPhotoList(
+            top: IslandPullAvatar.profileAvatarTop(context),
+            name: name,
+            sources: _photo == null
+                ? const []
+                : [
+                    PhotoSource(
+                      _photo!,
+                      headers: {'Authorization': 'Bearer $_token'},
+                    ),
+                  ],
+            gap: 6,
+            blockHeight: 52,
+            blockBuilder: (context, t) => Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(
+                  alignment: Alignment(-t, 0),
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 22 + 2 * t,
+                      fontWeight: FontWeight.w700,
+                      height: 1.27,
+                      color: Color.lerp(kChatInk, Colors.white, t),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                name,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  height: 1.27,
-                  color: kChatInk,
+                const SizedBox(height: 2),
+                Align(
+                  alignment: Alignment(-t, 0),
+                  child: Text(
+                    s.myProfileOnline,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Color.lerp(
+                        AppColors.brandOrange,
+                        const Color(0xCCFFFFFF),
+                        t,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                s.myProfileOnline,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 15,
-                  color: AppColors.brandOrange,
-                ),
-              ),
+              ],
+            ),
+            children: [
               if (rows.isNotEmpty) ...[
                 const SizedBox(height: 24),
                 _InfoCard(rows: rows),
