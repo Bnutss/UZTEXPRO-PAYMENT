@@ -15,9 +15,13 @@ class PhotoViewerPage extends StatelessWidget {
     this.title,
     this.subtitle,
     this.onDelete,
+    this.onForward,
   });
 
   final File file;
+
+  /// A forward button in the bar when the photo can be forwarded.
+  final VoidCallback? onForward;
 
   /// The sender's name and, under it, when it was sent.
   final String? title;
@@ -39,6 +43,12 @@ class PhotoViewerPage extends StatelessWidget {
           ? null
           : _ViewerTitle(title: title!, subtitle: subtitle),
       actions: [
+        if (onForward != null)
+          IconButton(
+            tooltip: MaterialLocalizations.of(context).shareButtonLabel,
+            icon: const Icon(Icons.shortcut_rounded),
+            onPressed: onForward,
+          ),
         if (onDelete != null)
           IconButton(
             tooltip: MaterialLocalizations.of(context).deleteButtonTooltip,

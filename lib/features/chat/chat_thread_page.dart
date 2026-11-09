@@ -703,6 +703,10 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
       final allowForAll = !widget.isGroup || _c.isMine(m) || _c.isAdmin;
       Future<void> apply(String? choice) async {
         if (choice == null || !mounted) return;
+        if (choice == 'forward') {
+          await _forward([m]);
+          return;
+        }
         _c.deleteMessage(m, forAll: choice == 'all');
       }
 
@@ -713,6 +717,7 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
                 'url': Uri.file(file.path).toString(),
                 'title': _senderLabel(m, s),
                 'subtitle': _sentAtLabel(m),
+                if (canDelete) 'canForward': true,
                 if (canDelete) ...{
                   'deleteForMe': s.chatMenuDeleteForMe,
                   if (allowForAll) 'deleteForAll': s.chatMenuDeleteForAll,
@@ -730,6 +735,12 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
             file: file,
             title: _senderLabel(m, s),
             subtitle: _sentAtLabel(m),
+            onForward: !canDelete
+                ? null
+                : () {
+                    Navigator.of(viewerContext).pop();
+                    apply('forward');
+                  },
             onDelete: !canDelete
                 ? null
                 : () async {

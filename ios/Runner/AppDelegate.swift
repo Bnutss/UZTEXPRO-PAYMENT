@@ -1973,6 +1973,7 @@ enum PhotoViewerPresenter {
         cancel: args["cancel"] as? String ?? "Cancel"
       )
     }
+    vc.canForward = (args["canForward"] as? Bool) ?? false
     var answered = false
     vc.onFinish = { choice in
       if answered { return }
@@ -1989,6 +1990,13 @@ enum PhotoViewerPresenter {
     nav.navigationBar.standardAppearance = appearance
     nav.navigationBar.scrollEdgeAppearance = appearance
     nav.navigationBar.tintColor = .white
+    // The bar at the bottom (forward on the left, trash on the right, as in
+    // Telegram's viewer): the system draws it (Liquid Glass on iOS 26).
+    let toolbarAppearance = UIToolbarAppearance()
+    toolbarAppearance.configureWithTransparentBackground()
+    nav.toolbar.standardAppearance = toolbarAppearance
+    nav.toolbar.scrollEdgeAppearance = toolbarAppearance
+    nav.toolbar.tintColor = .white
     NativeSheet.topViewControllerForPresenting()?.present(nav, animated: true)
   }
 }
@@ -2062,6 +2070,8 @@ final class ViewerTitleCapsule: UIView {
 }
 
 final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
+  /// A forward button in the bottom bar (answers "forward" when closed).
+  var canForward = false
   /// Set when the photo can be deleted: the texts of the two choices and of Cancel.
   var deleteOptions: (forMe: String, forAll: String?, cancel: String)?
   /// Called once when the viewer is gone: "me" / "all" if the photo was deleted.
@@ -2090,12 +2100,27 @@ final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
       systemItem: .close,
       primaryAction: UIAction { [weak self] _ in self?.dismiss(animated: true) }
     )
+    // The bottom bar: forward on the left, delete on the right.
+    var bar: [UIBarButtonItem] = []
+    if canForward {
+      bar.append(UIBarButtonItem(
+        image: UIImage(systemName: "arrowshape.turn.up.right"),
+        primaryAction: UIAction { [weak self] _ in
+          self?.deleteChoice = "forward"
+          self?.dismiss(animated: true)
+        }
+      ))
+    }
+    bar.append(UIBarButtonItem(systemItem: .flexibleSpace))
     if deleteOptions != nil {
-      let trash = UIBarButtonItem(
+      bar.append(UIBarButtonItem(
         systemItem: .trash,
         primaryAction: UIAction { [weak self] _ in self?.confirmDelete() }
-      )
-      navigationItem.leftBarButtonItem = trash
+      ))
+    }
+    if canForward || deleteOptions != nil {
+      toolbarItems = bar
+      navigationController?.setToolbarHidden(false, animated: false)
     }
 
     scrollView.frame = view.bounds
@@ -2156,7 +2181,7 @@ final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
       })
     }
     sheet.addAction(UIAlertAction(title: options.cancel, style: .cancel))
-    sheet.popoverPresentationController?.barButtonItem = navigationItem.leftBarButtonItem
+    sheet.popoverPresentationController?.barButtonItem = toolbarItems?.last
     present(sheet, animated: true)
   }
 
