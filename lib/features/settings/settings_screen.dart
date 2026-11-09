@@ -14,6 +14,7 @@ import '../../core/localization/app_strings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/fade_route.dart';
 import '../chat/chat_media.dart';
+import '../chat/chat_my_photo.dart';
 import '../../core/widgets/ui_blocks.dart';
 import 'face_id_tile.dart';
 import '../chat/chat_api.dart' show ChatRest;
@@ -65,6 +66,8 @@ class _SettingsScreenState extends State<SettingsScreen>
   String _displayName = '';
   String _email = '';
   String _login = '';
+  // The phone from the chat profile, for the line under the name.
+  String _phone = '';
   String _version = '';
   // The photo of the employee linked to this user (same source as "My
   // timesheet"); empty until loaded or when the user has no employee.
@@ -107,6 +110,8 @@ class _SettingsScreenState extends State<SettingsScreen>
       _loadBiometricPreference();
     } else {
       _countChatStorage();
+      // "Edit" on this screen (or "My Profile") changed the card.
+      ChatMyPhoto.version.addListener(_loadPhoto);
     }
     localeNotifier.addListener(_onLocaleChanged);
   }
@@ -209,6 +214,8 @@ class _SettingsScreenState extends State<SettingsScreen>
           setState(() {
             _photoUrl = _resolvePhoto(p.photo);
             _apiToken = chat.apiToken;
+            _phone = p.phone;
+            if (p.username.isNotEmpty) _login = p.username;
           });
         }
         return;
@@ -256,6 +263,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   void dispose() {
     _animationController.dispose();
     localeNotifier.removeListener(_onLocaleChanged);
+    ChatMyPhoto.version.removeListener(_loadPhoto);
     super.dispose();
   }
 
@@ -360,6 +368,12 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  /// Telegram's line under the name: "phone • @username".
+  String get _headerLine => [
+    if (_phone.isNotEmpty) _phone,
+    if (_login.isNotEmpty) '@$_login',
+  ].join(' • ');
+
   Widget _buildProfileSection(S s) {
     final initials = _displayName.isNotEmpty
         ? _displayName
@@ -393,7 +407,16 @@ class _SettingsScreenState extends State<SettingsScreen>
               letterSpacing: 0.3,
             ),
           ),
-          if (_email.isNotEmpty) ...[
+          if (widget.chatOnly && _headerLine.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              _headerLine,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Color(0xFF8A8A8E), fontSize: 14),
+            ),
+          ],
+          if (!widget.chatOnly && _email.isNotEmpty) ...[
             const SizedBox(height: 6),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -418,7 +441,9 @@ class _SettingsScreenState extends State<SettingsScreen>
               ],
             ),
           ],
-          if (_login.isNotEmpty && _login != _displayName) ...[
+          if (!widget.chatOnly &&
+              _login.isNotEmpty &&
+              _login != _displayName) ...[
             const SizedBox(height: 4),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -468,20 +493,15 @@ class _SettingsScreenState extends State<SettingsScreen>
             height: 1.27,
           ),
         ),
-        if (_login.isNotEmpty && _login != _displayName) ...[
+        if (_headerLine.isNotEmpty) ...[
           const SizedBox(height: 2),
           Text(
-            '@$_login',
+            _headerLine,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: Color(0xFF8A8A8E), fontSize: 14),
           ),
         ],
-        if (_email.isNotEmpty)
-          Text(
-            _email,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFF8A8A8E), fontSize: 12),
-          ),
       ],
     );
   }

@@ -12,7 +12,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_refresh.dart';
 import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/floating_notch_bar.dart';
+import '../../core/widgets/glass_text_button.dart';
 import '../auth/widgets/logo_stroke_loader.dart';
+import '../settings/chat_edit_profile_page.dart' show openEditMyProfile;
 import '../settings/settings_screen.dart';
 import 'chat_api.dart';
 import 'chat_group_picker.dart';
@@ -173,6 +175,13 @@ class _ChatPageState extends State<ChatPage> {
               title: '',
               centerTitle: true,
               background: AppColors.groupedBackground,
+              // Telegram's "Edit" at the top right of the settings.
+              trailing: [
+                GlassTextButton(
+                  label: s.myProfileEdit,
+                  onPressed: () => openEditMyProfile(context, _api),
+                ),
+              ],
               body: (context, topInset) => SettingsScreen(
                 topInset: topInset,
                 chatOnly: true,

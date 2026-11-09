@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/localization/app_strings.dart';
 import '../../core/widgets/adaptive_back_button.dart';
+import '../../core/widgets/fade_route.dart';
 import '../../core/widgets/fading_header_scaffold.dart';
 import '../../core/widgets/glass_text_button.dart';
 import '../../core/widgets/routeless_alert.dart';
@@ -15,8 +16,37 @@ import '../chat/chat_api.dart';
 import '../chat/chat_group_picker.dart' show pickGalleryPhoto;
 import '../../core/widgets/ui_blocks.dart';
 import '../chat/chat_models.dart';
+import '../chat/chat_my_photo.dart';
 import '../chat/chat_widgets.dart';
 import 'island_pull_avatar.dart';
+
+/// Opens "Edit profile" for my own card (Telegram's "Edit" on the settings
+/// screen): loads the card, shows the editor, and tells the rest of the app
+/// when something was saved. Null when nothing was saved.
+Future<ChatMyProfile?> openEditMyProfile(
+  BuildContext context,
+  ChatRest api,
+) async {
+  ChatMyProfile? profile;
+  try {
+    profile = await api.myProfile();
+  } catch (_) {
+    return null;
+  }
+  if (!context.mounted) return null;
+  final saved = await Navigator.push<ChatMyProfile>(
+    context,
+    InstantRoute(
+      builder: (_) => ChatEditProfilePage(
+        api: api,
+        profile: profile!,
+        photoUrl: ChatMyPhoto.resolve(profile.photo),
+      ),
+    ),
+  );
+  if (saved != null) ChatMyPhoto.invalidate();
+  return saved;
+}
 
 /// "Edit profile", as in Telegram: the phone, the date of birth and the
 /// username (the login, read-only), saved on the chat server ("Done"). Pops with the saved card.

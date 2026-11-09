@@ -44,7 +44,7 @@ class ChatMyPhoto {
       if (res.statusCode != 200) return null;
       final body =
           jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-      final url = _resolve(body['photo'] as String?);
+      final url = resolve(body['photo'] as String?);
       if (url == null) return null;
 
       final img = await http
@@ -61,7 +61,7 @@ class ChatMyPhoto {
     }
   }
 
-  static String? _resolve(String? url) {
+  static String? resolve(String? url) {
     if (url == null || url.isEmpty) return null;
     final origin = Uri.parse(API).origin;
     if (url.startsWith('//')) return 'https:$url';
