@@ -57,6 +57,16 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- The chat's own notifications (photo, name, text), drawn natively
+             from the same pushes Pushy delivers. -->
+        <receiver
+            android:name=".ChatPushReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="pushy.me" />
+            </intent-filter>
+        </receiver>
+
         <!-- Pushy declarations: internal, leave unchanged -->
         <receiver
             android:name="me.pushy.sdk.flutter.internal.PushyInternalReceiver"

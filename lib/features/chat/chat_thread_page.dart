@@ -952,6 +952,9 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
                             : _replying == null
                             ? null
                             : chatPreviewText(_replying!, s),
+                        editIcon: _editing != null || _replying == null
+                            ? null
+                            : chatPreviewIcon(_replying!),
                         onCancelEdit: _cancelEdit,
                         onVoice: _sendVoice,
                         onAttach: _attach,
@@ -1339,6 +1342,7 @@ class _Bubble extends StatelessWidget {
               child: _Quote(
                 author: quoteAuthor!,
                 text: chatReplyText(m.reply!, S.of(context)),
+                icon: chatReplyIcon(m.reply!),
                 color: mine ? const Color(0xFF5DAA55) : AppColors.brandOrange,
               ),
             ),
@@ -1587,11 +1591,17 @@ class _Status extends StatelessWidget {
 
 /// The quoted message above an answer (a coloured bar, the author, the text).
 class _Quote extends StatelessWidget {
-  const _Quote({required this.author, required this.text, required this.color});
+  const _Quote({
+    required this.author,
+    required this.text,
+    required this.color,
+    this.icon,
+  });
 
   final String author;
   final String text;
   final Color color;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
@@ -1618,10 +1628,9 @@ class _Quote extends StatelessWidget {
               height: 1.2,
             ),
           ),
-          Text(
+          IconText(
             text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            icon: icon,
             style: const TextStyle(fontSize: 14, color: kChatInk, height: 1.2),
           ),
         ],

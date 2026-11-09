@@ -9,35 +9,49 @@ import 'chat_models.dart';
 import 'chat_voice.dart' show formatVoiceTime;
 import 'chat_widgets.dart';
 
-/// One line describing a message, for the chat list and for quotes.
+/// One line describing a message, for the chat list and for quotes. The kind
+/// of attachment is shown as an icon ([chatPreviewIcon]), not as an emoji.
 String chatPreviewText(ChatMessage m, S s) {
-  if (m.isVoice) return '🎤 ${s.chatVoiceMessage}';
-  if (m.isImage) {
-    return '📷 ${m.text.trim().isEmpty ? s.chatPhoto : m.text.trim()}';
-  }
-  if (m.isVideo) {
-    return '🎥 ${m.text.trim().isEmpty ? s.chatVideo : m.text.trim()}';
-  }
+  if (m.isVoice) return s.chatVoiceMessage;
+  if (m.isImage) return m.text.trim().isEmpty ? s.chatPhoto : m.text.trim();
+  if (m.isVideo) return m.text.trim().isEmpty ? s.chatVideo : m.text.trim();
   if (m.isFile) {
-    return '📎 ${m.text.trim().isNotEmpty ? m.text.trim() : (m.media?.name ?? '')}';
+    return m.text.trim().isNotEmpty ? m.text.trim() : (m.media?.name ?? '');
   }
   return m.text;
+}
+
+/// The icon in front of [chatPreviewText]: null for a plain text message.
+IconData? chatPreviewIcon(ChatMessage m) {
+  if (m.isVoice) return Icons.mic_rounded;
+  if (m.isImage) return Icons.photo_camera_rounded;
+  if (m.isVideo) return Icons.videocam_rounded;
+  if (m.isFile) return Icons.attach_file_rounded;
+  return null;
 }
 
 /// The same for the quote of an answer (it carries the kind and the text).
 String chatReplyText(ChatReply r, S s) {
   switch (r.kind) {
     case 'voice':
-      return '🎤 ${s.chatVoiceMessage}';
+      return s.chatVoiceMessage;
     case 'image':
-      return '📷 ${r.text.trim().isEmpty ? s.chatPhoto : r.text.trim()}';
+      return r.text.trim().isEmpty ? s.chatPhoto : r.text.trim();
     case 'video':
-      return '🎥 ${r.text.trim().isEmpty ? s.chatVideo : r.text.trim()}';
+      return r.text.trim().isEmpty ? s.chatVideo : r.text.trim();
     case 'file':
-      return '📎 ${r.text.trim().isEmpty ? s.chatAttachFile : r.text.trim()}';
+      return r.text.trim().isEmpty ? s.chatAttachFile : r.text.trim();
   }
   return r.text;
 }
+
+IconData? chatReplyIcon(ChatReply r) => switch (r.kind) {
+  'voice' => Icons.mic_rounded,
+  'image' => Icons.photo_camera_rounded,
+  'video' => Icons.videocam_rounded,
+  'file' => Icons.attach_file_rounded,
+  _ => null,
+};
 
 /// The photo / video / document inside a bubble. A tap on it is handled by the
 /// bubble (the menu button around it takes the touches): see `_openMedia`.

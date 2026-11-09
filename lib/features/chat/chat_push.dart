@@ -113,11 +113,12 @@ Future<void> chatBackgroundNotificationListener(
   // iOS: the system has already shown it from the `notification` part.
   if (!Platform.isAndroid) return;
   final isChat = data['type'] == 'chat';
+  // Android: a chat message is drawn by the app's own receiver
+  // (ChatPushReceiver.kt) with the photo and the sender, right away.
+  if (isChat) return;
   // Anything else with a text (a test push from the server or the Pushy
   // dashboard) is shown too, so delivery can be checked without a chat.
-  if (!isChat && (data['message'] ?? '').toString().isEmpty) return;
-  // The app is open: it shows the message itself (and the unread badge).
-  if (isChat && await PushForeground.appIsOpen()) return;
+  if ((data['message'] ?? '').toString().isEmpty) return;
   final title = (data['title'] ?? 'UztexPro').toString();
   final text = (data['message'] ?? '').toString();
   Pushy.notify(title, text, data);

@@ -68,6 +68,49 @@ class ChatListCard extends StatelessWidget {
   }
 }
 
+/// A line of text that may start with a small icon (what kind of attachment a
+/// message is), after an optional [prefix] ("You: ").
+class IconText extends StatelessWidget {
+  const IconText(
+    this.text, {
+    super.key,
+    this.icon,
+    this.prefix = '',
+    required this.style,
+    this.maxLines = 1,
+  });
+
+  final String text;
+  final IconData? icon;
+  final String prefix;
+  final TextStyle style;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = (style.fontSize ?? 14) * 1.15;
+    return Text.rich(
+      TextSpan(
+        style: style,
+        children: [
+          if (prefix.isNotEmpty) TextSpan(text: prefix),
+          if (icon != null)
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 3),
+                child: Icon(icon, size: size, color: style.color),
+              ),
+            ),
+          TextSpan(text: text),
+        ],
+      ),
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+
 /// One person / chat: avatar, name, a line under it, and (for chats) the time
 /// with an unread badge on the right.
 class ChatRow extends StatelessWidget {
@@ -80,7 +123,19 @@ class ChatRow extends StatelessWidget {
     this.unread = 0,
     this.muted = false,
     this.subtitleColor,
+    this.subtitleIcon,
+    this.subtitlePrefix = '',
+    this.timeIcon,
   });
+
+  /// Ticks before the time when the last message is mine: one when it is sent,
+  /// two when it has been read (as in Telegram's chat list).
+  final IconData? timeIcon;
+
+  /// An icon between [subtitlePrefix] and [subtitle] (the kind of the last
+  /// message: a photo, a voice message…).
+  final IconData? subtitleIcon;
+  final String subtitlePrefix;
 
   /// Colour of the line under the name (the "online" status is accented).
   final Color? subtitleColor;
@@ -145,6 +200,14 @@ class ChatRow extends StatelessWidget {
                         ],
                         if (time != null) ...[
                           const SizedBox(width: 8),
+                          if (timeIcon != null) ...[
+                            Icon(
+                              timeIcon,
+                              size: 16,
+                              color: const Color(0xFF5DAA55),
+                            ),
+                            const SizedBox(width: 2),
+                          ],
                           Text(
                             time!,
                             style: TextStyle(
@@ -161,10 +224,10 @@ class ChatRow extends StatelessWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: Text(
+                          child: IconText(
                             subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            icon: subtitleIcon,
+                            prefix: subtitlePrefix,
                             style: TextStyle(
                               fontSize: 14,
                               color:

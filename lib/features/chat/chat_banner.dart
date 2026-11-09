@@ -8,7 +8,8 @@ import '../../core/localization/app_strings.dart';
 import '../../core/widgets/ui_blocks.dart';
 import 'chat_hub.dart';
 import 'chat_notify_settings.dart';
-import 'chat_media_widgets.dart' show chatPreviewText;
+import 'chat_media_widgets.dart' show chatPreviewIcon, chatPreviewText;
+import 'chat_widgets.dart' show IconText;
 import 'chat_push.dart' show ChatPushTarget;
 
 /// The in-app notification, as in Telegram: a message from another chat slides
@@ -56,10 +57,12 @@ class ChatBanners {
     final c = incoming.conversation;
     final s = S.of(context);
     final title = c.isGroup ? c.peer.name : c.peer.surnameName;
-    var body = chatPreviewText(m, s);
+    final body = chatPreviewText(m, s);
+    final bodyIcon = chatPreviewIcon(m);
+    var bodyPrefix = '';
     if (c.isGroup && m.senderName.isNotEmpty) {
       final who = m.senderName.trim().split(RegExp(r'\s+')).take(2).join(' ');
-      body = '$who: $body';
+      bodyPrefix = '$who: ';
     }
     final target = ChatPushTarget(c.id, c.peer, isGroup: c.isGroup);
 
@@ -72,6 +75,8 @@ class ChatBanners {
       builder: (_) => _BannerView(
         title: title,
         body: body,
+        bodyIcon: bodyIcon,
+        bodyPrefix: bodyPrefix,
         photo: c.peer.photo,
         name: c.peer.name,
         onTap: () {
@@ -111,6 +116,8 @@ class _BannerView extends StatefulWidget {
   const _BannerView({
     required this.title,
     required this.body,
+    this.bodyIcon,
+    this.bodyPrefix = '',
     required this.photo,
     required this.name,
     required this.onTap,
@@ -121,6 +128,8 @@ class _BannerView extends StatefulWidget {
 
   final String title;
   final String body;
+  final IconData? bodyIcon;
+  final String bodyPrefix;
   final String? photo;
   final String name;
   final VoidCallback onTap;
@@ -239,10 +248,11 @@ class _BannerViewState extends State<_BannerView>
                                   ),
                                 ),
                                 const SizedBox(height: 2),
-                                Text(
+                                IconText(
                                   widget.body,
+                                  icon: widget.bodyIcon,
+                                  prefix: widget.bodyPrefix,
                                   maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 14,
                                     height: 1.25,

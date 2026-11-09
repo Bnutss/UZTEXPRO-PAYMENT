@@ -22,7 +22,7 @@ import 'chat_system.dart';
 import 'chat_models.dart';
 import 'chat_mute_sheet.dart';
 import 'chat_my_photo.dart';
-import 'chat_media_widgets.dart' show chatPreviewText;
+import 'chat_media_widgets.dart' show chatPreviewIcon, chatPreviewText;
 import 'chat_push.dart' show ChatPushTarget;
 import 'chat_socket.dart';
 import 'chat_thread_controller.dart' show ChatOpenThreads;
@@ -953,11 +953,19 @@ class _ChatsTabState extends State<_ChatsTab> {
     await _open(group);
   }
 
-  String _preview(ChatConversation c, S s) {
+  /// The line under a chat's name: who wrote, an icon for the kind of message,
+  /// and the text.
+  ({String prefix, IconData? icon, String text}) _preview(
+    ChatConversation c,
+    S s,
+  ) {
     final m = c.lastMessage;
-    if (m == null) return '';
-    if (m.isSystem) return chatSystemText(m, s, widget.api.myId);
+    if (m == null) return (prefix: '', icon: null, text: '');
+    if (m.isSystem) {
+      return (prefix: '', icon: null, text: chatSystemText(m, s, widget.api.myId));
+    }
     final text = chatPreviewText(m, s);
+    final icon = chatPreviewIcon(m);
     if (c.isGroup) {
       final me = widget.api.myId;
       final mine = m.sender == 0 || (me != null && m.sender == me);
@@ -966,11 +974,20 @@ class _ChatsTabState extends State<_ChatsTab> {
           : (m.senderName.isEmpty
                 ? s.chatMemberFallback
                 : m.senderName.split(' ').first);
-      return '$who: $text';
+      return (prefix: '$who: ', icon: icon, text: text);
     }
-    // A chat of two people: anything not from the peer is mine.
-    final mine = m.sender != c.peer.id;
-    return mine ? '${s.chatYou}: $text' : text;
+    // A chat of two people: no name in front of the text (as in Telegram); that
+    // the last message is mine shows in the ticks by the time.
+    return (prefix: '', icon: icon, text: text);
+  }
+
+  /// Ticks for the time in the list: only when the last message of a chat of
+  /// two people is mine.
+  IconData? _tick(ChatConversation c) {
+    final m = c.lastMessage;
+    if (m == null || c.isGroup || m.isSystem) return null;
+    if (m.sender == c.peer.id) return null;
+    return m.read ? Icons.done_all_rounded : Icons.done_rounded;
   }
 
   @override
@@ -1054,7 +1071,10 @@ class _ChatsTabState extends State<_ChatsTab> {
                   color: AppColors.groupedBackground,
                   child: ChatRow(
                     user: c.peer,
-                    subtitle: _preview(c, s),
+                    subtitle: _preview(c, s).text,
+                    subtitleIcon: _preview(c, s).icon,
+                    subtitlePrefix: _preview(c, s).prefix,
+                    timeIcon: _tick(c),
                     time: chatTimeLabel(
                       c.lastMessage?.createdAt ?? c.updatedAt,
                       s,

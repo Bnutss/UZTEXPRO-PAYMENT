@@ -243,6 +243,7 @@ class ChatInputBar extends StatefulWidget {
     required this.onSend,
     this.editTitle,
     this.editText,
+    this.editIcon,
     this.onCancelEdit,
     this.onVoice,
     this.onAttach,
@@ -259,6 +260,9 @@ class ChatInputBar extends StatefulWidget {
   /// inside the same capsule (as in Telegram).
   final String? editTitle;
   final String? editText;
+
+  /// An icon before [editText] (the kind of message being answered).
+  final IconData? editIcon;
   final VoidCallback? onCancelEdit;
 
   final TextEditingController controller;
@@ -441,13 +445,11 @@ class _ChatInputBarState extends State<ChatInputBar> {
                                                               height: 1.2,
                                                             ),
                                                           ),
-                                                          Text(
+                                                          IconText(
                                                             widget.editText ??
                                                                 '',
-                                                            maxLines: 1,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
+                                                            icon:
+                                                                widget.editIcon,
                                                             style:
                                                                 const TextStyle(
                                                                   fontSize: 14,
