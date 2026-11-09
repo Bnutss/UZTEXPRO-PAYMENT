@@ -212,6 +212,34 @@ class BlockDivider extends StatelessWidget {
   );
 }
 
+/// Decodes a face into the image cache the way [FallbackNetworkImage] will ask
+/// for it at [size], so the next page shows it on its very first frame. Waits
+/// a moment at most: a slow network must not hold the tap back.
+Future<void> precachePersonPhoto(
+  BuildContext context,
+  PhotoSource source,
+  double size,
+) async {
+  final dpr = MediaQuery.devicePixelRatioOf(context);
+  final provider = ResizeImage(
+    CachedNetworkImageProvider(
+      source.url,
+      cacheKey: source.url,
+      cacheManager: appImageCache,
+      headers: source.headers,
+    ),
+    width: (size * dpr).round(),
+  );
+  try {
+    await precacheImage(
+      provider,
+      context,
+    ).timeout(const Duration(milliseconds: 350));
+  } catch (_) {
+    // Not ready in time: the page loads it itself.
+  }
+}
+
 /// One candidate image for [FallbackNetworkImage].
 class PhotoSource {
   final String url;

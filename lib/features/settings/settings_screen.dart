@@ -20,6 +20,7 @@ import '../chat/chat_api.dart' show ChatRest;
 import 'chat_appearance_page.dart';
 import 'chat_data_page.dart';
 import 'chat_devices_page.dart';
+import 'chat_my_profile_page.dart';
 import 'chat_notifications_page.dart';
 import 'island_pull_avatar.dart';
 import 'settings_rows.dart';
@@ -199,6 +200,22 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Future<void> _loadPhoto() async {
+    // In the messenger the picture is the one of "My Profile".
+    final chat = widget.chatApi;
+    if (chat != null) {
+      try {
+        final p = await chat.myProfile();
+        if (mounted) {
+          setState(() {
+            _photoUrl = _resolvePhoto(p.photo);
+            _apiToken = chat.apiToken;
+          });
+        }
+        return;
+      } catch (_) {
+        // Falls back to the employee's photo below.
+      }
+    }
     try {
       final jwtRaw = await _storage.read(key: 'jwt');
       if (jwtRaw == null) return;
@@ -312,6 +329,8 @@ class _SettingsScreenState extends State<SettingsScreen>
         children: [
           _buildProfileSection(s),
           const SizedBox(height: 20),
+          SettingsGroup(children: [_buildMyProfileRow(s)]),
+          const SizedBox(height: 20),
           SettingsGroup(
             children: [
               _buildNotificationsRow(s),
@@ -360,7 +379,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         children: [
           PersonAvatar(
             name: _displayName.isNotEmpty ? _displayName : initials,
-            size: 80,
+            size: IslandPullAvatar.avatarSize,
             sources: _photoSources,
           ),
           const SizedBox(height: 16),
@@ -541,6 +560,42 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (mounted) setState(() => _chatBytes = bytes);
   }
 
+  /// "My Profile": my own card, as in Telegram.
+  Widget _buildMyProfileRow(S s) {
+    return SettingsRow(
+      icon: Icons.account_circle_rounded,
+      color: SettingsColors.red,
+      title: s.myProfileTitle,
+      onTap: () async {
+        // The photo is decoded before the page opens, so it is there on the
+        // first frame instead of blinking in.
+        final photo = _photoSources;
+        if (photo.isNotEmpty) {
+          await precachePersonPhoto(
+            context,
+            photo.first,
+            IslandPullAvatar.avatarSize,
+          );
+          if (!mounted) return;
+        }
+        await Navigator.push(
+          context,
+          InstantRoute(
+            builder: (_) => ChatMyProfilePage(
+              api: widget.chatApi,
+              name: _displayName,
+              email: _email,
+              photoUrl: _photoUrl,
+              token: _apiToken,
+            ),
+          ),
+        );
+        // The picture may have been changed there.
+        if (mounted) _loadPhoto();
+      },
+    );
+  }
+
   /// "Notifications and sounds": the in-app sounds, vibration and banners.
   Widget _buildNotificationsRow(S s) {
     return SettingsRow(
@@ -549,7 +604,9 @@ class _SettingsScreenState extends State<SettingsScreen>
       title: s.notifTitle,
       onTap: () => Navigator.push(
         context,
-        InstantRoute(builder: (_) => ChatNotificationsPage(api: widget.chatApi)),
+        InstantRoute(
+          builder: (_) => ChatNotificationsPage(api: widget.chatApi),
+        ),
       ),
     );
   }

@@ -54,7 +54,7 @@ import UniformTypeIdentifiers
       case "editTimes":
         TimeEditor.present(args, result: result)
       case "pickPhoto":
-        PhotoPickerPresenter.present(result: result)
+        PhotoPickerPresenter.present(args, result: result)
       case "photoViewerTargets":
         // The chats and people the forward sheet lists, loaded by Flutter while
         // the photo is on the screen.
@@ -1374,19 +1374,132 @@ struct PhotoPicker: UIViewControllerRepresentable {
 /// The gallery on its own (for a group's photo outside the "new group" sheet).
 enum PhotoPickerPresenter {
   private static var holder: PhotoPickerHolder?
+  private static var delegate: PickerDismissDelegate?
+  private static var helper: AttachPickers?
 
-  static func present(result: @escaping FlutterResult) {
-    var config = PHPickerConfiguration()
-    config.filter = .images
-    config.selectionLimit = 1
-    let picker = PHPickerViewController(configuration: config)
-    let h = PhotoPickerHolder(result: result)
-    holder = h
-    picker.delegate = h
-    NativeSheet.topViewControllerForPresenting()?.present(picker, animated: true)
+  /// One photo for a profile / group picture: the app's own gallery (the same
+  /// grid and album menu as the attach sheet, with the app's full photo access
+  /// instead of the system picker and its privacy banner). Tapping a photo
+  /// shrinks it to 1024 px and hands it back as {"photo": JPEG bytes}.
+  static func present(_ args: [String: Any], result: @escaping FlutterResult) {
+    var finished = false
+    let finish: ([String: Any]?) -> Void = { payload in
+      if finished { return }
+      finished = true
+      delegate = nil
+      helper = nil
+      result(payload)
+    }
+    let model = AttachModel(limit: 1, recentsTitle: args["recents"] as? String ?? "Recents")
+    model.imagesOnly = true
+    let box = WeakBox()
+    let close: ([String: Any]?) -> Void = { payload in
+      if let vc = box.vc { vc.dismiss(animated: true) { finish(payload) } } else { finish(payload) }
+    }
+    let view = PhotoGridView(
+      model: model,
+      preparing: args["preparing"] as? String ?? "",
+      deniedText: args["denied"] as? String ?? "",
+      settingsTitle: args["settings"] as? String ?? "",
+      onPick: { asset in
+        model.busy = true
+        let opts = PHImageRequestOptions()
+        opts.isNetworkAccessAllowed = true
+        opts.deliveryMode = .highQualityFormat
+        PHImageManager.default().requestImageDataAndOrientation(for: asset, options: opts) { data, _, _, _ in
+          DispatchQueue.main.async {
+            model.busy = false
+            guard let data = data, let image = UIImage(data: data) else { return }
+            let scaled = ContactPickerView.downscaledImage(image, maxSide: 1024)
+            if let jpeg = scaled.jpegData(compressionQuality: 0.85) {
+              close(["photo": FlutterStandardTypedData(bytes: jpeg)])
+            }
+          }
+        }
+      }
+    )
+    let host = UIHostingController(rootView: view)
+    host.view.backgroundColor = .systemBackground
+    let nav = UINavigationController(rootViewController: host)
+    box.vc = nav
+    host.navigationItem.leftBarButtonItem = UIBarButtonItem(
+      systemItem: .close, primaryAction: UIAction { _ in close(nil) }, menu: nil)
+    let titleButton = UIButton(type: .system)
+    host.navigationItem.titleView = titleButton
+    let pickers = AttachPickers()
+    helper = pickers
+    pickers.bind(model: model, titleButton: titleButton)
+    nav.modalPresentationStyle = .pageSheet
+    if let sheet = nav.sheetPresentationController {
+      sheet.detents = [.large()]
+      sheet.prefersGrabberVisible = true
+    }
+    let d = PickerDismissDelegate { finish(nil) }
+    delegate = d
+    nav.presentationController?.delegate = d
+    NativeSheet.topViewControllerForPresenting()?.present(nav, animated: true)
   }
 
   fileprivate static func release() { holder = nil }
+}
+
+/// The grid of the gallery for one photo: tap a photo to pick it.
+struct PhotoGridView: View {
+  @ObservedObject var model: AttachModel
+  let preparing: String
+  let deniedText: String
+  let settingsTitle: String
+  let onPick: (PHAsset) -> Void
+
+  private let gap: CGFloat = 2
+
+  var body: some View {
+    ZStack {
+      if model.denied {
+        VStack(spacing: 14) {
+          Spacer()
+          Image(systemName: "photo.on.rectangle.angled").font(.system(size: 44)).foregroundColor(.secondary)
+          Text(deniedText).multilineTextAlignment(.center).foregroundColor(.secondary).padding(.horizontal, 30)
+          Button(settingsTitle) {
+            if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+          }
+          .font(.body.weight(.semibold))
+          Spacer()
+        }
+        .frame(maxWidth: .infinity)
+      } else {
+        GeometryReader { geo in
+          let cell = (geo.size.width - gap * 2) / 3
+          ScrollView {
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(cell), spacing: gap), count: 3), spacing: gap) {
+              if let fetch = model.album?.fetch {
+                ForEach(0..<fetch.count, id: \.self) { i in
+                  let asset = fetch.object(at: i)
+                  Button { onPick(asset) } label: {
+                    AttachThumb(asset: asset, manager: model.imageManager, size: cell)
+                  }
+                  .buttonStyle(.plain)
+                }
+              }
+            }
+          }
+        }
+      }
+      if model.busy {
+        ZStack {
+          Color.black.opacity(0.25).ignoresSafeArea()
+          VStack(spacing: 12) {
+            ProgressView().progressViewStyle(.circular).scaleEffect(1.3)
+            Text(preparing).font(.subheadline)
+          }
+          .padding(24)
+          .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(.systemBackground)))
+        }
+      }
+    }
+    .background(Color(.systemBackground).ignoresSafeArea())
+    .onAppear { model.load() }
+  }
 }
 
 final class PhotoPickerHolder: NSObject, PHPickerViewControllerDelegate {
@@ -2697,6 +2810,8 @@ final class AttachModel: ObservableObject {
 
   let limit: Int
   let recentsTitle: String
+  /// A profile picture: only photos, no videos.
+  var imagesOnly = false
   @Published var albums: [Album] = []
   @Published var album: Album?
   @Published var selected: [String] = []   // asset ids, in the order picked
@@ -2731,6 +2846,9 @@ final class AttachModel: ObservableObject {
   private func buildAlbums() {
     let opts = PHFetchOptions()
     opts.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+    if imagesOnly {
+      opts.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+    }
     var list: [Album] = []
     let recents = PHAsset.fetchAssets(with: opts)
     list.append(Album(id: "recents", title: recentsTitle, fetch: recents))

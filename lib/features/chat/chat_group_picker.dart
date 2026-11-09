@@ -130,7 +130,7 @@ Future<GroupDraft?> pickGroupMembers(
 }
 
 /// The system photo picker (the gallery); JPEG bytes, or null when cancelled.
-Future<Uint8List?> pickGalleryPhoto() async {
+Future<Uint8List?> pickGalleryPhoto(BuildContext context) async {
   if (!Platform.isIOS) {
     try {
       final f = await ImagePicker().pickImage(
@@ -144,10 +144,15 @@ Future<Uint8List?> pickGalleryPhoto() async {
       return null;
     }
   }
+  final s = S.of(context);
   try {
-    final res = await const MethodChannel(
-      'uztexpro/native_sheet',
-    ).invokeMapMethod<String, dynamic>('pickPhoto', <String, dynamic>{});
+    final res = await const MethodChannel('uztexpro/native_sheet')
+        .invokeMapMethod<String, dynamic>('pickPhoto', <String, dynamic>{
+          'recents': s.chatRecents,
+          'preparing': s.chatPreparing,
+          'denied': s.chatPhotosDenied,
+          'settings': s.chatOpenSettings,
+        });
     return res?['photo'] as Uint8List?;
   } on MissingPluginException {
     return null;

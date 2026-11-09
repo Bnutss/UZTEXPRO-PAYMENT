@@ -167,7 +167,7 @@ class _ChatGroupPageState extends State<ChatGroupPage> {
           title: s.chatChangePhoto,
           style: AlertActionStyle.primary,
           onPressed: () async {
-            final bytes = await pickGalleryPhoto();
+            final bytes = await pickGalleryPhoto(context);
             if (bytes != null && mounted) {
               await _run(() => _c.changeGroupPhoto(bytes));
             }

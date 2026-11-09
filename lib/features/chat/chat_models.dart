@@ -9,6 +9,9 @@ class ChatUser {
     this.department = '',
     this.photo,
     this.phone = '',
+    this.email = '',
+    this.birthday,
+    this.username = '',
     this.online = false,
     this.lastSeen,
     this.role = '',
@@ -20,6 +23,11 @@ class ChatUser {
   final String department;
   final String? photo;
   final String phone;
+  final String email;
+  final DateTime? birthday;
+
+  /// The account's login, shown as @username.
+  final String username;
 
   /// Connected to the chat right now / when last connected (null: never).
   final bool online;
@@ -65,6 +73,11 @@ class ChatUser {
     department: j['department'] as String? ?? '',
     photo: j['photo'] as String?,
     phone: j['phone'] as String? ?? '',
+    email: j['email'] as String? ?? '',
+    birthday: j['birthday'] == null
+        ? null
+        : DateTime.tryParse(j['birthday'] as String),
+    username: j['username'] as String? ?? '',
     online: j['online'] as bool? ?? false,
     lastSeen: j['last_seen'] == null
         ? null
@@ -385,7 +398,6 @@ class ChatConversation {
   }
 }
 
-
 /// One of my phones that gets push notifications ("Devices" in the settings).
 class ChatDeviceInfo {
   const ChatDeviceInfo({
@@ -508,4 +520,57 @@ class ChatServerNotify {
     groupPreview: group ? (preview ?? groupPreview) : groupPreview,
     groupSound: group ? (sound ?? groupSound) : groupSound,
   );
+}
+
+/// My own card ("My Profile"): what the person set in the messenger, falling
+/// back to the employee's data for the phone and the birthday.
+class ChatMyProfile {
+  const ChatMyProfile({
+    required this.name,
+    this.position = '',
+    this.department = '',
+    this.factory = '',
+    this.phone = '',
+    this.birthday,
+    this.username = '',
+    this.login = '',
+    this.email = '',
+    this.reportCard = '',
+    this.photo,
+  });
+
+  final String name;
+  final String position;
+  final String department;
+  final String factory;
+  final String phone;
+  final DateTime? birthday;
+
+  /// The @username the person picked (empty: none).
+  final String username;
+
+  /// The account's sign-in name.
+  final String login;
+  final String email;
+  final String reportCard;
+  final String? photo;
+
+  factory ChatMyProfile.fromJson(Map<String, dynamic> j) {
+    String text(String k) => (j[k] as String?)?.trim() ?? '';
+    return ChatMyProfile(
+      name: text('name'),
+      position: text('position'),
+      department: text('department'),
+      factory: text('factory'),
+      phone: text('phone'),
+      birthday: j['birthday'] == null
+          ? null
+          : DateTime.tryParse(j['birthday'] as String),
+      username: text('username'),
+      login: text('login'),
+      email: text('email'),
+      reportCard: text('report_card'),
+      photo: j['photo'] as String?,
+    );
+  }
 }

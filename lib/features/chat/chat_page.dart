@@ -67,15 +67,20 @@ class _ChatPageState extends State<ChatPage> {
     ChatServerNotifyCache.restore().then(
       (_) => ChatServerNotifyCache.prefetch(widget.hub.api),
     );
-    ChatMyPhoto.load().then((f) {
-      if (mounted && f != null) setState(() => _myPhoto = f);
-    });
+    _loadMyPhoto();
+    ChatMyPhoto.version.addListener(_loadMyPhoto);
     widget.hub.unread.addListener(_onUnread);
     widget.hub.openRequest.addListener(_onOpenRequest);
     final target = widget.openThread;
     if (target != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _openThread(target));
     }
+  }
+
+  void _loadMyPhoto() {
+    ChatMyPhoto.load().then((f) {
+      if (mounted) setState(() => _myPhoto = f);
+    });
   }
 
   /// A tap on an in-app banner while the chat window is open.
@@ -132,6 +137,7 @@ class _ChatPageState extends State<ChatPage> {
   void dispose() {
     widget.hub.unread.removeListener(_onUnread);
     widget.hub.openRequest.removeListener(_onOpenRequest);
+    ChatMyPhoto.version.removeListener(_loadMyPhoto);
     widget.hub.chatOpen = false;
     super.dispose();
   }
@@ -140,6 +146,8 @@ class _ChatPageState extends State<ChatPage> {
     if (i == _index) return;
     HapticFeedback.selectionClick();
     setState(() => _index = i);
+    // The people and chats are fetched again, so a new photo shows at once.
+    widget.hub.listsStale.value++;
   }
 
   @override
@@ -375,6 +383,10 @@ class _ContactsTabState extends State<_ContactsTab> {
   String? _error;
   int _seq = 0;
 
+  /// Background refreshes in flight (the header says "Updating…").
+  int _syncing = 0;
+  bool _wasConnected = false;
+
   @override
   void initState() {
     super.initState();
@@ -382,11 +394,28 @@ class _ContactsTabState extends State<_ContactsTab> {
       _debounce?.cancel();
       _debounce = Timer(const Duration(milliseconds: 350), _load);
     });
+    widget.hub.listsStale.addListener(_onStale);
+    _wasConnected = widget.link.connected.value;
+    widget.link.connected.addListener(_onConnection);
     _load();
+  }
+
+  /// The connection is back: what changed meanwhile is only on the server.
+  void _onConnection() {
+    final now = widget.link.connected.value;
+    final returned = now && !_wasConnected;
+    _wasConnected = now;
+    if (returned && !_loading) _load(silent: true);
+  }
+
+  void _onStale() {
+    if (mounted && !_loading) _load(silent: true);
   }
 
   @override
   void dispose() {
+    widget.hub.listsStale.removeListener(_onStale);
+    widget.link.connected.removeListener(_onConnection);
     _debounce?.cancel();
     _search.dispose();
     super.dispose();
@@ -399,12 +428,16 @@ class _ContactsTabState extends State<_ContactsTab> {
     });
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool silent = false}) async {
     final seq = ++_seq;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    } else {
+      setState(() => _syncing++);
+    }
     try {
       final users = await widget.api.contacts(search: _search.text);
       if (!mounted || seq != _seq) return;
@@ -414,10 +447,14 @@ class _ContactsTabState extends State<_ContactsTab> {
       });
     } catch (e) {
       if (!mounted || seq != _seq) return;
+      // A silent refresh that fails keeps what is on the screen.
+      if (silent && _users.isNotEmpty) return;
       setState(() {
         _error = _errorText(e, S.of(context));
         _loading = false;
       });
+    } finally {
+      if (silent && mounted) setState(() => _syncing--);
     }
   }
 
@@ -454,7 +491,7 @@ class _ContactsTabState extends State<_ContactsTab> {
         s,
         title: s.contactsTitle,
         connected: connected,
-        updating: _loading,
+        updating: _loading || _syncing > 0,
       ),
       centerTitle: true,
       background: AppColors.groupedBackground,
@@ -520,7 +557,12 @@ class _ChatsTabState extends State<_ChatsTab> {
     _wasConnected = widget.link.connected.value;
     widget.link.connected.addListener(_onConnection);
     ChatOpenThreads.closed.addListener(_onThreadClosed);
+    widget.hub.listsStale.addListener(_onStale);
     _load();
+  }
+
+  void _onStale() {
+    if (mounted && !_loading) _load(silent: true);
   }
 
   /// A conversation window was closed: take the unread counts again. (After
@@ -535,6 +577,7 @@ class _ChatsTabState extends State<_ChatsTab> {
   void dispose() {
     _events?.cancel();
     ChatOpenThreads.closed.removeListener(_onThreadClosed);
+    widget.hub.listsStale.removeListener(_onStale);
     widget.link.connected.removeListener(_onConnection);
     _search.dispose();
     _openRow.dispose();
@@ -967,7 +1010,11 @@ class _ChatsTabState extends State<_ChatsTab> {
     final m = c.lastMessage;
     if (m == null) return (prefix: '', icon: null, text: '');
     if (m.isSystem) {
-      return (prefix: '', icon: null, text: chatSystemText(m, s, widget.api.myId));
+      return (
+        prefix: '',
+        icon: null,
+        text: chatSystemText(m, s, widget.api.myId),
+      );
     }
     final text = chatPreviewText(m, s);
     final icon = chatPreviewIcon(m);

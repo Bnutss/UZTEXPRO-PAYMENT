@@ -10,6 +10,7 @@ class SettingsColors {
   static const green = Color(0xFF34C759);
   static const indigo = Color(0xFF5856D6);
   static const gray = Color(0xFF8E8E93);
+  static const red = Color(0xFFEB5545);
 }
 
 /// A Telegram / iOS Settings icon: a white glyph on a colored rounded square.
@@ -60,16 +61,17 @@ class SettingsGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final indent =
-        this.indent ?? 16 + SettingsIconTile.sizeOf(context) + 12;
+    final indent = this.indent ?? 16 + SettingsIconTile.sizeOf(context) + 12;
 
     return Container(
       width: double.infinity,
       clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
+      // Telegram's card: continuous (superellipse) corners, no outline.
+      decoration: ShapeDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFEDEDED), width: 1),
+        shape: RoundedSuperellipseBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

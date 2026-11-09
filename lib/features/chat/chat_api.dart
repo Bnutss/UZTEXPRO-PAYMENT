@@ -10,11 +10,14 @@ import 'chat_session.dart';
 
 /// The chat endpoints are not reachable (network, server, bad answer).
 class ChatApiException implements Exception {
-  const ChatApiException(this.statusCode);
+  const ChatApiException(this.statusCode, [this.code]);
   final int? statusCode;
 
+  /// What the server said was wrong (`error` of a 400), e.g. `username_taken`.
+  final String? code;
+
   @override
-  String toString() => 'ChatApiException($statusCode)';
+  String toString() => 'ChatApiException($statusCode, $code)';
 }
 
 /// Lets the person stop an upload or a download that is going on.
@@ -229,6 +232,19 @@ abstract class ChatRest {
 
   /// Saves the settings and returns what the server has now.
   Future<ChatServerNotify> saveNotifySettings(ChatServerNotify settings);
+
+  /// My own card.
+  Future<ChatMyProfile> myProfile();
+
+  /// Saves the given fields (`phone`, `email`, `username`, `birthday` as
+  /// YYYY-MM-DD; empty text clears one) and the picture ([photo] JPEG bytes, or
+  /// [removePhoto]); returns the card as the server has it now. A refused field
+  /// throws a [ChatApiException] with its `code`.
+  Future<ChatMyProfile> saveMyProfile(
+    Map<String, String> fields, {
+    Uint8List? photo,
+    bool removePhoto = false,
+  });
 
   // ── groups ──
   Future<ChatConversation> createGroup(
@@ -496,6 +512,25 @@ class ChatApi implements ChatRest {
   }
 
   @override
+  Future<ChatMyProfile> myProfile() async {
+    final data = await _get('/profile/');
+    return ChatMyProfile.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  @override
+  Future<ChatMyProfile> saveMyProfile(
+    Map<String, String> fields, {
+    Uint8List? photo,
+    bool removePhoto = false,
+  }) async {
+    final data = await _multipart('PATCH', '/profile/', {
+      ...fields,
+      if (removePhoto) 'remove_photo': 'true',
+    }, photo);
+    return ChatMyProfile.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  @override
   Future<ChatServerNotify> saveNotifySettings(ChatServerNotify settings) async {
     final http.Response res;
     try {
@@ -535,7 +570,12 @@ class ChatApi implements ChatRest {
       ChatSession.terminated();
     }
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw ChatApiException(res.statusCode);
+      String? code;
+      try {
+        code =
+            (jsonDecode(utf8.decode(res.bodyBytes)) as Map)['error'] as String?;
+      } catch (_) {}
+      throw ChatApiException(res.statusCode, code);
     }
     try {
       return jsonDecode(utf8.decode(res.bodyBytes));

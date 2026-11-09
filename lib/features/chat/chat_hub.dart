@@ -73,6 +73,11 @@ class ChatHub with WidgetsBindingObserver {
   /// Unread messages in all chats.
   final ValueNotifier<int> unread = ValueNotifier(0);
 
+  /// Bumps when the lists of people and chats should be taken from the server
+  /// again (the app came back, a tab was opened): somebody may have changed
+  /// their photo or name meanwhile.
+  final ValueNotifier<int> listsStale = ValueNotifier(0);
+
   /// Messages for the in-app banner (see [ChatIncoming]).
   final _incoming = StreamController<ChatIncoming>.broadcast();
   Stream<ChatIncoming> get incoming => _incoming.stream;
@@ -203,6 +208,7 @@ class ChatHub with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       socket?.ensureAlive();
       refresh();
+      listsStale.value++;
     }
   }
 
@@ -216,6 +222,7 @@ class ChatHub with WidgetsBindingObserver {
     socket?.dispose();
     unread.dispose();
     openRequest.dispose();
+    listsStale.dispose();
     _incoming.close();
   }
 }

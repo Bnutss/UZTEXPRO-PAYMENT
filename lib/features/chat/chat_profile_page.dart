@@ -60,6 +60,7 @@ class ChatProfilePage extends StatefulWidget {
   /// The chat exists on the server, so it can be muted / deleted.
   final bool canManage;
   final bool Function()? isMuted;
+
   /// Turns the chat's notifications off ([hours]: for that long, null: for
   /// good) or, when they are off, back on.
   final Future<bool> Function({int? hours})? onToggleMute;
@@ -84,6 +85,24 @@ class _ChatProfilePageState extends State<ChatProfilePage> {
     if (number.isEmpty) return;
     await launchUrl(Uri(scheme: 'tel', path: number));
   }
+
+  void _copy(String value) {
+    HapticFeedback.selectionClick();
+    Clipboard.setData(ClipboardData(text: value));
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(S.of(context).myProfileCopied),
+        duration: const Duration(milliseconds: 1200),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  static String _date(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}.'
+      '${d.month.toString().padLeft(2, '0')}.${d.year}';
 
   void _write() {
     HapticFeedback.selectionClick();
@@ -144,6 +163,16 @@ class _ChatProfilePageState extends State<ChatProfilePage> {
           color: ChatProfilePage._blue,
           onTap: _call,
         ),
+      if (user.username.isNotEmpty)
+        _Row(
+          s.myProfileUsername,
+          '@${user.username}',
+          onTap: () => _copy(user.username),
+        ),
+      if (user.email.isNotEmpty)
+        _Row(s.myProfileEmail, user.email, onTap: () => _copy(user.email)),
+      if (user.birthday != null)
+        _Row(s.myProfileBirthday, _date(user.birthday!)),
       if (user.department.isNotEmpty)
         _Row(s.attendanceDepartment, user.department),
       if (user.position.isNotEmpty) _Row(s.attendancePosition, user.position),

@@ -338,7 +338,7 @@ void main() {
 
       link.online = false;
       await settle(t);
-      expect(find.text('Подключение…'), findsOneWidget);
+      expect(find.text('Соединение…'), findsOneWidget);
     },
   );
 

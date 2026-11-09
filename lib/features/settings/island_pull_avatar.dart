@@ -66,6 +66,17 @@ class IslandPullAvatar extends StatefulWidget {
         _Drop.restRadius;
   }
 
+  /// The diameter of the avatar at rest. The profile pages use the same size
+  /// (and, on an island iPhone, the same place), so going from the settings to
+  /// "My Profile" and to "Edit" keeps the photo where it is.
+  static const avatarSize = _Drop.restRadius * 2;
+
+  /// Where a profile page puts its avatar, from the top of the screen: where
+  /// the hanging avatar rests, or just under the status bar elsewhere.
+  static double profileAvatarTop(BuildContext context) => supported(context)
+      ? restBottom(context) - avatarSize
+      : MediaQuery.paddingOf(context).top + 20;
+
   /// Scroll distance from expanded to merged.
   static const snapRange = _IslandPullAvatarState._snapRange;
 
@@ -354,34 +365,72 @@ class _IslandPullAvatarState extends State<IslandPullAvatar>
 
     final program = _program;
     final image = _photo ?? _initials;
+    final route = ModalRoute.of(context);
 
     return OverlayPortal(
       overlayLocation: OverlayChildLocation.rootOverlay,
       controller: _portal,
-      overlayChildBuilder: (_) => Material(
-        type: MaterialType.transparency,
-        child: program == null || image == null
-            ? const SizedBox.shrink()
-            : AnimatedBuilder(
-                animation: _island,
-                builder: (context, _) => ValueListenableBuilder<double>(
-                  valueListenable: _offset,
-                  builder: (context, offset, _) => _Drop(
-                    offset: offset,
-                    islandTop: islandTop,
-                    program: program,
-                    image: image,
-                    island: _island.value,
-                    background: widget.background,
-                    onCover: _reportCover,
+      overlayChildBuilder: (_) => _FadeWithRoute(
+        route: route,
+        child: Material(
+          type: MaterialType.transparency,
+          child: program == null || image == null
+              ? const SizedBox.shrink()
+              : AnimatedBuilder(
+                  animation: _island,
+                  builder: (context, _) => ValueListenableBuilder<double>(
+                    valueListenable: _offset,
+                    builder: (context, offset, _) => _Drop(
+                      offset: offset,
+                      islandTop: islandTop,
+                      program: program,
+                      image: image,
+                      island: _island.value,
+                      background: widget.background,
+                      onCover: _reportCover,
+                    ),
                   ),
                 ),
-              ),
+        ),
       ),
       child: NotificationListener<ScrollNotification>(
         onNotification: _onScroll,
         child: widget.child,
       ),
+    );
+  }
+}
+
+/// The avatar lives in the root overlay, above the pages, so a page's own
+/// transition does not touch it: leaving the messenger the page faded out while
+/// the avatar stayed at full strength (and then vanished), which blinked. This
+/// fades it with the page: in as the page comes in, out as it goes, and out
+/// while another page covers it.
+class _FadeWithRoute extends StatelessWidget {
+  const _FadeWithRoute({required this.route, required this.child});
+
+  final ModalRoute<dynamic>? route;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = route;
+    if (r == null) return child;
+    final own = r.animation;
+    final over = r.secondaryAnimation;
+    return AnimatedBuilder(
+      animation: Listenable.merge([?own, ?over]),
+      builder: (context, child) {
+        final inValue = own == null
+            ? 1.0
+            : Curves.easeOut.transform(own.value.clamp(0.0, 1.0));
+        final coverValue = over == null ? 0.0 : over.value.clamp(0.0, 1.0);
+        final opacity = inValue * (1 - coverValue);
+        if (opacity <= 0) return const SizedBox.shrink();
+        if (opacity >= 1) return child!;
+        return Opacity(opacity: opacity, child: child);
+      },
+      child: child,
     );
   }
 }

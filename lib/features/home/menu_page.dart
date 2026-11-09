@@ -745,9 +745,12 @@ class _MenuPageState extends State<MenuPage>
     final hub = _chat;
     if (hub == null) return;
     HapticFeedback.lightImpact();
+    // No fade: the window has a native tab bar (a platform view), which
+    // ignores a fade's opacity and would show at full strength, then blink out,
+    // while the rest of the page fades.
     Navigator.push(
       context,
-      FadeRoute(
+      InstantRoute(
         builder: (_) => ChatPage(hub: hub, openThread: openThread),
       ),
     );

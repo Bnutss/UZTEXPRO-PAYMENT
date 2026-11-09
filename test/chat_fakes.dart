@@ -268,6 +268,16 @@ class FakeRest implements ChatRest {
   Future<ChatServerNotify> notifySettings() async => serverNotify;
 
   @override
+  Future<ChatMyProfile> myProfile() async => const ChatMyProfile(name: 'Me');
+
+  @override
+  Future<ChatMyProfile> saveMyProfile(
+    Map<String, String> fields, {
+    Uint8List? photo,
+    bool removePhoto = false,
+  }) async => const ChatMyProfile(name: 'Me');
+
+  @override
   Future<ChatServerNotify> saveNotifySettings(ChatServerNotify s) async =>
       serverNotify = s;
 

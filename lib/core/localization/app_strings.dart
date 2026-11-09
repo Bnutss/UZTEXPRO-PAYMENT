@@ -1623,6 +1623,92 @@ class S {
   String get devicesRetry =>
       _t({'ru': 'Повторить', 'en': 'Retry', 'uz': 'Qayta urinish'});
 
+  // My profile (chat settings)
+  String get myProfileTitle =>
+      _t({'ru': 'Мой профиль', 'en': 'My Profile', 'uz': 'Mening profilim'});
+  String get myProfileOnline =>
+      _t({'ru': 'в сети', 'en': 'online', 'uz': 'onlayn'});
+  String get myProfileUsername => _t({
+    'ru': 'Имя пользователя',
+    'en': 'Username',
+    'uz': 'Foydalanuvchi nomi',
+  });
+  String get myProfileLogin =>
+      _t({'ru': 'Логин', 'en': 'Login', 'uz': 'Login'});
+  String get myProfileEmail =>
+      _t({'ru': 'Эл. почта', 'en': 'Email', 'uz': 'Elektron pochta'});
+  String get myProfileEdit => _t({'ru': 'Изм.', 'en': 'Edit', 'uz': 'Tah.'});
+  String get myProfileDone =>
+      _t({'ru': 'Готово', 'en': 'Done', 'uz': 'Tayyor'});
+  String get myProfileEditTitle => _t({
+    'ru': 'Изменить профиль',
+    'en': 'Edit Profile',
+    'uz': 'Profilni tahrirlash',
+  });
+  String get myProfileBirthday => _t({
+    'ru': 'День рождения',
+    'en': 'Date of Birth',
+    'uz': "Tug'ilgan kun",
+  });
+  String get myProfileNotSet =>
+      _t({'ru': 'Не указано', 'en': 'Not set', 'uz': "Ko'rsatilmagan"});
+  String get myProfileRemove =>
+      _t({'ru': 'Удалить', 'en': 'Remove', 'uz': "O'chirish"});
+  String get myProfilePhoneHint => _t({
+    'ru': '+998 90 123 45 67',
+    'en': '+998 90 123 45 67',
+    'uz': '+998 90 123 45 67',
+  });
+  String get myProfileUsernameHint => _t({
+    'ru': 'Имя пользователя — это ваш логин для входа в приложение. Изменить его нельзя.',
+    'en': 'Your username is your login for the app. It cannot be changed here.',
+    'uz': "Foydalanuvchi nomi — ilovaga kirish loginingiz. Uni bu yerda o'zgartirib bo'lmaydi.",
+  });
+  String get myProfileInvalidPhone => _t({
+    'ru': 'Неверный номер телефона',
+    'en': 'Invalid phone number',
+    'uz': "Telefon raqami noto'g'ri",
+  });
+  String get myProfileInvalidEmail => _t({
+    'ru': 'Неверный адрес почты',
+    'en': 'Invalid email address',
+    'uz': "Elektron pochta manzili noto'g'ri",
+  });
+  String get myProfileInvalidPhoto => _t({
+    'ru': 'Не удалось загрузить фото',
+    'en': 'Could not upload the photo',
+    'uz': 'Rasmni yuklab bo‘lmadi',
+  });
+  String get myProfileSetPhoto => _t({
+    'ru': 'Выбрать новое фото',
+    'en': 'Set New Photo',
+    'uz': 'Yangi rasm tanlash',
+  });
+  String get myProfileRemovePhoto => _t({
+    'ru': 'Удалить фото',
+    'en': 'Remove Photo',
+    'uz': "Rasmni o'chirish",
+  });
+  String get myProfileInvalidBirthday => _t({
+    'ru': 'Неверная дата рождения',
+    'en': 'Invalid date of birth',
+    'uz': "Tug'ilgan kun noto'g'ri",
+  });
+  String get myProfileSaveError => _t({
+    'ru': 'Не удалось сохранить',
+    'en': 'Could not save',
+    'uz': 'Saqlab bo‘lmadi',
+  });
+  String get myProfileFactory =>
+      _t({'ru': 'Предприятие', 'en': 'Company', 'uz': 'Korxona'});
+  String get myProfileTapToCopy => _t({
+    'ru': 'Нажмите, чтобы скопировать',
+    'en': 'Tap to copy',
+    'uz': 'Nusxalash uchun bosing',
+  });
+  String get myProfileCopied =>
+      _t({'ru': 'Скопировано', 'en': 'Copied', 'uz': 'Nusxalandi'});
+
   // Notifications and sounds (chat settings)
   String get notifTitle => _t({
     'ru': 'Уведомления и звуки',
