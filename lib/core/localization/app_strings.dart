@@ -1370,6 +1370,18 @@ class S {
     'en': 'Forwarded from $name',
     'uz': '$name dan yuborilgan',
   });
+  String get chatShowInChat => _t({
+    'ru': 'Показать в чате',
+    'en': 'Show in Chat',
+    'uz': 'Chatda ko‘rsatish',
+  });
+  String get forwardDone =>
+      _t({'ru': 'Переслано', 'en': 'Forwarded', 'uz': 'Yuborildi'});
+  String forwardDoneChats(int n) => _t({
+    'ru': 'Чатов: $n',
+    'en': '$n chats',
+    'uz': '$n ta chat',
+  });
   String get forwardFailed => _t({
     'ru': 'Не удалось переслать',
     'en': 'Could not forward',

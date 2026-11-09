@@ -1,8 +1,25 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:uztexpro_payment/features/chat/chat_forward.dart';
+import 'package:uztexpro_payment/features/chat/chat_media.dart';
 import 'package:uztexpro_payment/features/chat/chat_models.dart';
 
 import 'chat_fakes.dart';
+
+class _Paths extends Fake
+    with MockPlatformInterfaceMixin
+    implements PathProviderPlatform {
+  _Paths(this.dir);
+  final String dir;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => dir;
+  @override
+  Future<String?> getTemporaryPath() async => dir;
+}
 
 ChatMessage _msg(
   int id, {
@@ -124,5 +141,28 @@ void main() {
     expect(fwd.forward?.userId, 7);
     // a copy of the message (a new id when the server confirms it) keeps it
     expect(fwd.copyWith(id: 99).forward?.name, 'Anna Karimova');
+  });
+
+  test('a forwarded photo shows at once: this phone\'s file is kept for the copy',
+      () async {
+    final root = await Directory.systemTemp.createTemp('fwd_test');
+    PathProviderPlatform.instance = _Paths(root.path);
+    await ChatMediaStore.init();
+    final original = _msg(5, kind: 'image');
+    final src = ChatMediaStore.fileOf(original)!..writeAsStringSync('photo');
+
+    final rest = FakeRest()..forwardKind = 'image';
+    final result = await ChatForwarder(rest).forward(
+      [original],
+      [ForwardTarget.chat(_chat(1))],
+    );
+    expect(result.sent, 1);
+    // the new message is found on this phone without any download
+    final sent = await rest.forwardMessage(1, 5, rest.forwardCalls.first.split(':')[2]);
+    final copy = ChatMediaStore.fileOf(sent)!;
+    expect(copy.existsSync(), isTrue);
+    expect(copy.readAsStringSync(), 'photo');
+    expect(src.existsSync(), isTrue); // the original stays where it was
+    await root.delete(recursive: true);
   });
 }

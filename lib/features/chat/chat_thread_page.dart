@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 import 'dart:math' as math;
 
@@ -32,6 +33,7 @@ import 'chat_delete_sheet.dart';
 import 'chat_forward.dart';
 import 'chat_forward_page.dart';
 import 'chat_media.dart';
+import 'chat_toast.dart';
 import 'chat_media_grid.dart';
 import 'chat_media_preview.dart';
 import 'chat_media_viewers.dart';
@@ -382,10 +384,8 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     }
   }
 
-  /// "Forward": pick the chats, send the copies (the server copies what it can,
-  /// the rest goes from this phone), and, when it was one chat, land in it.
+  /// "Forward": pick the chats (the Flutter list), then send.
   Future<void> _forward(List<ChatMessage> all) async {
-    final s = S.of(context);
     final targets = await Navigator.of(context).push<List<ForwardTarget>>(
       MaterialPageRoute(
         fullscreenDialog: true,
@@ -393,7 +393,51 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
       ),
     );
     if (targets == null || targets.isEmpty || !mounted) return;
+    await _forwardTo(all, targets);
+  }
 
+  /// The chats and people the native forward sheet lists (over the photo), with
+  /// the numbers the sheet answers with: the chats that exist first, then the
+  /// people one has no personal chat with yet.
+  Future<({List<ForwardTarget> targets, List<Map<String, Object?>> items})>
+  _forwardCandidates(S s) async {
+    final results = await Future.wait([
+      widget.api.conversations(),
+      widget.api.contacts(),
+    ]);
+    final chats = results[0] as List<ChatConversation>;
+    final people = results[1] as List<ChatUser>;
+    final haveChat = {
+      for (final c in chats)
+        if (!c.isGroup) c.peer.id,
+    };
+    final targets = <ForwardTarget>[
+      for (final c in chats) ForwardTarget.chat(c),
+      for (final u in people)
+        if (!haveChat.contains(u.id)) ForwardTarget.person(u),
+    ];
+    final items = <Map<String, Object?>>[
+      for (var i = 0; i < targets.length; i++)
+        {
+          'id': i,
+          'name': targets[i].peer.name,
+          'status': targets[i].isGroup
+              ? s.chatMembersCount(targets[i].chat!.membersCount)
+              : targets[i].peer.position,
+          'photo': targets[i].peer.photo ?? '',
+          'section': targets[i].chat != null ? 0 : 1,
+        },
+    ];
+    return (targets: targets, items: items);
+  }
+
+  /// Sends the copies to [targets] (the server copies what it can, the rest
+  /// goes from this phone) and, when it was one chat, lands in it.
+  Future<void> _forwardTo(
+    List<ChatMessage> all,
+    List<ForwardTarget> targets,
+  ) async {
+    final s = S.of(context);
     // A spinner while it goes (a copy from this phone can take a moment).
     showDialog<void>(
       context: context,
@@ -425,26 +469,15 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
       );
       return;
     }
-    // One chat picked: show it, as Telegram does (back goes to the list).
-    if (targets.length == 1 && result.chatIds.length == 1) {
-      final t = targets.first;
-      final id = result.chatIds.first;
-      if (id == _c.conversationId) return; // forwarded into this very chat
-      Navigator.of(context).pushReplacement(
-        chatInstantRoute(
-          (_) => ChatThreadPage(
-            api: widget.api,
-            link: widget.link,
-            peer: t.peer,
-            conversationId: id,
-            sounds: widget.sounds,
-            mutedChats: widget.mutedChats,
-            onRead: widget.onRead,
-            isGroup: t.isGroup,
-          ),
-        ),
-      );
-    }
+    // Telegram's small notice at the bottom; the person stays where they are.
+    ChatToast.show(
+      context,
+      icon: Icons.check_circle_outline_rounded,
+      title: s.forwardDone,
+      subtitle: targets.length == 1
+          ? targets.first.peer.name
+          : s.forwardDoneChats(targets.length),
+    );
   }
 
   void _snack(String text) {
@@ -645,9 +678,15 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     return result;
   }
 
-  /// Who sent a photo / video, for the viewer's header: "You" for mine, else
-  /// the person's "Surname Name" (in a group: the member's).
+  /// Who sent a photo / video, for the viewer's header: the author of the
+  /// original for a forward, "You" for mine, else the person's "Surname Name"
+  /// (in a group: the member's).
   String _senderLabel(ChatMessage m, S s) {
+    // A forward shows who wrote the original, not who passed it on.
+    final fwd = m.forward;
+    if (fwd != null && fwd.name.trim().isNotEmpty) {
+      return fwd.name.trim().split(RegExp(r'\s+')).take(2).join(' ');
+    }
     if (_c.isMine(m)) return s.chatYou;
     if (widget.isGroup) {
       final full =
@@ -707,23 +746,88 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
           await _forward([m]);
           return;
         }
+        if (choice == 'show') {
+          await _goToMessage(m); // the photo closed: take the chat to it
+          return;
+        }
+        if (choice == 'reply') {
+          _startReply(m);
+          return;
+        }
         _c.deleteMessage(m, forAll: choice == 'all');
       }
 
       if (Platform.isIOS) {
         try {
-          final choice = await const MethodChannel('uztexpro/native_sheet')
-              .invokeMethod<String>('photoViewer', {
-                'url': Uri.file(file.path).toString(),
-                'title': _senderLabel(m, s),
-                'subtitle': _sentAtLabel(m),
-                if (canDelete) 'canForward': true,
-                if (canDelete) ...{
-                  'deleteForMe': s.chatMenuDeleteForMe,
-                  if (allowForAll) 'deleteForAll': s.chatMenuDeleteForAll,
-                  'cancel': s.chatCancel,
+          const channel = MethodChannel('uztexpro/native_sheet');
+          const events = MethodChannel('uztexpro/viewer_events');
+          // The list for the forward sheet loads while the photo is looked at.
+          List<ForwardTarget> candidates = const [];
+          if (canDelete) {
+            unawaited(
+              _forwardCandidates(s).then((r) {
+                candidates = r.targets;
+                return channel.invokeMethod('photoViewerTargets', {
+                  'items': r.items,
+                });
+              }).catchError((_) {}),
+            );
+          }
+          // What the forward sheet over the photo picked: forward it here, in
+          // the background (the photo stays open) and tell the sheet how it went.
+          events.setMethodCallHandler((call) async {
+            if (call.method != 'forward') return null;
+            final ids = ((call.arguments as Map)['ids'] as List).cast<num>();
+            final picked = [
+              for (final i in ids)
+                if (i.toInt() >= 0 && i.toInt() < candidates.length)
+                  candidates[i.toInt()],
+            ];
+            if (picked.isEmpty || !mounted) return {'ok': false};
+            final result = await ChatForwarder(widget.api).forward([m], picked);
+            widget.onRead?.call();
+            if (result.failed > 0) {
+              return {
+                'ok': false,
+                'title': result.sent == 0 ? s.forwardFailed : s.forwardPartFailed,
+              };
+            }
+            return {
+              'ok': true,
+              'title': s.forwardDone,
+              'subtitle': picked.length == 1
+                  ? picked.first.peer.name
+                  : s.forwardDoneChats(picked.length),
+            };
+          });
+          final String? choice;
+          try {
+            choice = await channel.invokeMethod<String>('photoViewer', {
+              'url': Uri.file(file.path).toString(),
+              'title': _senderLabel(m, s),
+              'subtitle': _sentAtLabel(m),
+              if (canDelete) 'canForward': true,
+              if (canDelete) ...{
+                'menuTexts': {
+                  'show': s.chatShowInChat,
+                  'reply': s.chatMenuReply,
+                  'delete': s.chatMenuDelete,
                 },
-              });
+                'forwardTexts': {
+                  'title': s.forwardTitle,
+                  'search': s.forwardSearch,
+                  'send': s.forwardSendTo(1),
+                  'chats': s.forwardChats,
+                  'contacts': s.forwardContacts,
+                },
+                'deleteForMe': s.chatMenuDeleteForMe,
+                if (allowForAll) 'deleteForAll': s.chatMenuDeleteForAll,
+                'cancel': s.chatCancel,
+              },
+            });
+          } finally {
+            events.setMethodCallHandler(null);
+          }
           await apply(choice);
           return;
         } catch (_) {}

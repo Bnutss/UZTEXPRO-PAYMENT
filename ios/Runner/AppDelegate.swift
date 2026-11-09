@@ -23,6 +23,11 @@ import UniformTypeIdentifiers
       binaryMessenger: engineBridge.applicationRegistrar.messenger()
     )
     VoiceBar.channel = channel
+    // The photo viewer tells Flutter what was picked in its forward sheet.
+    PhotoViewerPresenter.events = FlutterMethodChannel(
+      name: "uztexpro/viewer_events",
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
+    )
     channel.setMethodCallHandler { call, result in
       if call.method == "voiceBarHide" {
         VoiceBar.hide()
@@ -50,6 +55,11 @@ import UniformTypeIdentifiers
         TimeEditor.present(args, result: result)
       case "pickPhoto":
         PhotoPickerPresenter.present(result: result)
+      case "photoViewerTargets":
+        // The chats and people the forward sheet lists, loaded by Flutter while
+        // the photo is on the screen.
+        PhotoViewerPresenter.setTargets(args["items"] as? [[String: Any]] ?? [])
+        result(nil)
       case "photoViewer":
         // Answers when the viewer is closed: nil, or "me" / "all" when the
         // person deleted the photo from it.
@@ -1959,6 +1969,26 @@ struct MenuGlass: ViewModifier {
 // MARK: - Photo viewer
 
 enum PhotoViewerPresenter {
+  /// The viewer on the screen (it needs the list of targets when it arrives).
+  static weak var current: PhotoViewerController?
+
+  /// To Flutter: "forward these" (the forward itself is done there).
+  static var events: FlutterMethodChannel?
+
+  static func setTargets(_ items: [[String: Any]]) {
+    let people = items.compactMap { c -> ForwardPerson? in
+      guard let id = (c["id"] as? NSNumber)?.intValue else { return nil }
+      return ForwardPerson(
+        id: id,
+        name: c["name"] as? String ?? "",
+        status: c["status"] as? String ?? "",
+        photo: c["photo"] as? String ?? "",
+        isChat: (c["section"] as? NSNumber)?.intValue == 0
+      )
+    }
+    current?.forwardModel.people = people
+  }
+
   static func present(_ args: [String: Any], result: @escaping FlutterResult) {
     guard let urlString = args["url"] as? String, let url = URL(string: urlString) else {
       result(nil)
@@ -1974,6 +2004,18 @@ enum PhotoViewerPresenter {
       )
     }
     vc.canForward = (args["canForward"] as? Bool) ?? false
+    if let t = args["menuTexts"] as? [String: String] { vc.menuTexts = t }
+    if let t = args["forwardTexts"] as? [String: String] { vc.forwardTexts = t }
+    current = vc
+    vc.forwardHandler = { ids, done in
+      guard let events = PhotoViewerPresenter.events else {
+        done(nil)
+        return
+      }
+      events.invokeMethod("forward", arguments: ["ids": ids]) { answer in
+        done(answer as? [String: Any])
+      }
+    }
     var answered = false
     vc.onFinish = { choice in
       if answered { return }
@@ -2070,8 +2112,16 @@ final class ViewerTitleCapsule: UIView {
 }
 
 final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
-  /// A forward button in the bottom bar (answers "forward" when closed).
+  /// A forward button in the bottom bar. It opens the native list of chats right
+  /// over the photo; the answer is "forward:<ids>" (the ids Flutter gave).
   var canForward = false
+  var forwardTexts: [String: String] = [:]
+  /// The "..." menu: Show in chat / Reply / Delete (absent: no menu).
+  var menuTexts: [String: String] = [:]
+  let forwardModel = ForwardPickerModel()
+  /// Asks Flutter to forward to the picked ids; answers {ok, title, subtitle}.
+  var forwardHandler: (([Int], @escaping ([String: Any]?) -> Void) -> Void)?
+  private var toast: ViewerToast?
   /// Set when the photo can be deleted: the texts of the two choices and of Cancel.
   var deleteOptions: (forMe: String, forAll: String?, cancel: String)?
   /// Called once when the viewer is gone: "me" / "all" if the photo was deleted.
@@ -2096,29 +2146,53 @@ final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
   override func viewDidLoad() {
     super.viewDidLoad()
     view.backgroundColor = .black
-    navigationItem.rightBarButtonItem = UIBarButtonItem(
-      systemItem: .close,
+    // Back at the left; at the right a "..." button with Show in chat, Reply and
+    // Delete (the owner of the photo can do all three from here).
+    navigationItem.leftBarButtonItem = UIBarButtonItem(
+      image: UIImage(systemName: "chevron.backward"),
       primaryAction: UIAction { [weak self] _ in self?.dismiss(animated: true) }
     )
-    // The bottom bar: forward on the left, delete on the right.
-    var bar: [UIBarButtonItem] = []
-    if canForward {
-      bar.append(UIBarButtonItem(
-        image: UIImage(systemName: "arrowshape.turn.up.right"),
-        primaryAction: UIAction { [weak self] _ in
-          self?.deleteChoice = "forward"
+    if !menuTexts.isEmpty {
+      var actions: [UIMenuElement] = []
+      if let t = menuTexts["show"] {
+        actions.append(UIAction(title: t, image: UIImage(systemName: "text.bubble")) { [weak self] _ in
+          self?.deleteChoice = "show"
           self?.dismiss(animated: true)
-        }
-      ))
+        })
+      }
+      if let t = menuTexts["reply"] {
+        actions.append(UIAction(title: t, image: UIImage(systemName: "arrowshape.turn.up.left")) { [weak self] _ in
+          self?.deleteChoice = "reply"
+          self?.dismiss(animated: true)
+        })
+      }
+      if let t = menuTexts["delete"], deleteOptions != nil {
+        actions.append(UIAction(title: t, image: UIImage(systemName: "trash"), attributes: .destructive) { [weak self] _ in
+          self?.confirmDelete()
+        })
+      }
+      navigationItem.rightBarButtonItem = UIBarButtonItem(
+        image: UIImage(systemName: "ellipsis"),
+        menu: UIMenu(children: actions)
+      )
     }
-    bar.append(UIBarButtonItem(systemItem: .flexibleSpace))
-    if deleteOptions != nil {
-      bar.append(UIBarButtonItem(
-        systemItem: .trash,
-        primaryAction: UIAction { [weak self] _ in self?.confirmDelete() }
-      ))
-    }
+    // The bar at the bottom: forward on the left, delete on the right (the same
+    // two are in the "..." menu as well).
     if canForward || deleteOptions != nil {
+      var bar: [UIBarButtonItem] = []
+      if canForward {
+        bar.append(UIBarButtonItem(
+          image: UIImage(systemName: "arrowshape.turn.up.right"),
+          primaryAction: UIAction { [weak self] _ in self?.presentForwardPicker() }
+        ))
+      }
+      bar.append(UIBarButtonItem(systemItem: .flexibleSpace))
+      if deleteOptions != nil {
+        bar.append(UIBarButtonItem(
+          systemItem: .trash,
+          primaryAction: UIAction { [weak self] _ in self?.confirmDelete() }
+        ))
+      }
       toolbarItems = bar
       navigationController?.setToolbarHidden(false, animated: false)
     }
@@ -2165,6 +2239,80 @@ final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
     }
   }
 
+  /// The chats and people to forward to, in a sheet over the photo. Picking and
+  /// "Forward" closes the sheet and the viewer, and the ids go back to Flutter.
+  private func presentForwardPicker() {
+    guard presentedViewController == nil else { return }
+    let box = WeakBox()
+    let texts = forwardTexts
+    let view = ForwardPickerView(
+      model: forwardModel,
+      title: texts["title"] ?? "",
+      searchPrompt: texts["search"] ?? "",
+      sendTitle: texts["send"] ?? "",
+      chatsTitle: texts["chats"] ?? "",
+      contactsTitle: texts["contacts"] ?? "",
+      onClose: { box.vc?.dismiss(animated: true) },
+      onSend: { [weak self] ids in
+        // The sheet goes; the photo stays, and a small notice says it is done.
+        box.vc?.dismiss(animated: true) { self?.runForward(ids) }
+      }
+    )
+    let host = UIHostingController(rootView: view)
+    box.vc = host
+    host.modalPresentationStyle = .pageSheet
+    if let sheet = host.sheetPresentationController {
+      sheet.detents = [.large()]
+      sheet.prefersGrabberVisible = true
+    }
+    present(host, animated: true)
+  }
+
+  private func runForward(_ ids: [Int]) {
+    forwardHandler?(ids) { [weak self] answer in
+      DispatchQueue.main.async {
+        guard let self = self else { return }
+        let title = answer?["title"] as? String ?? ""
+        let subtitle = answer?["subtitle"] as? String
+        if answer?["ok"] as? Bool == true {
+          self.showToast(title: title, subtitle: subtitle)
+        } else {
+          let alert = UIAlertController(title: title.isEmpty ? nil : title, message: nil, preferredStyle: .alert)
+          alert.addAction(UIAlertAction(title: "OK", style: .cancel))
+          self.present(alert, animated: true)
+        }
+      }
+    }
+  }
+
+  /// Telegram's small notice over the photo ("Forwarded").
+  private func showToast(title: String, subtitle: String?) {
+    toast?.removeFromSuperview()
+    let t = ViewerToast(title: title, subtitle: subtitle)
+    toast = t
+    view.addSubview(t)
+    t.translatesAutoresizingMaskIntoConstraints = false
+    NSLayoutConstraint.activate([
+      t.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      t.leadingAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 16),
+      t.trailingAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
+      t.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -64),
+    ])
+    t.alpha = 0
+    t.transform = CGAffineTransform(translationX: 0, y: 14)
+    UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut]) {
+      t.alpha = 1
+      t.transform = .identity
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self, weak t] in
+      guard let t = t else { return }
+      UIView.animate(withDuration: 0.25, animations: { t.alpha = 0 }) { _ in
+        t.removeFromSuperview()
+        if self?.toast === t { self?.toast = nil }
+      }
+    }
+  }
+
   /// The system's sheet: delete for me, delete for everybody (when allowed),
   /// Cancel. The answer goes back to Flutter when the viewer closes.
   private func confirmDelete() {
@@ -2181,7 +2329,7 @@ final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
       })
     }
     sheet.addAction(UIAlertAction(title: options.cancel, style: .cancel))
-    sheet.popoverPresentationController?.barButtonItem = toolbarItems?.last
+    sheet.popoverPresentationController?.barButtonItem = toolbarItems?.last ?? navigationItem.rightBarButtonItem
     present(sheet, animated: true)
   }
 
@@ -2212,6 +2360,168 @@ final class PhotoViewerController: UIViewController, UIScrollViewDelegate {
       let rect = CGRect(x: point.x - size.width / 2, y: point.y - size.height / 2, width: size.width, height: size.height)
       scrollView.zoom(to: rect, animated: true)
     }
+  }
+}
+
+/// The notice over the photo viewer: a small frosted dark plate with a success
+/// check, a bold line and a quieter one, as Telegram shows "Forwarded".
+final class ViewerToast: UIView {
+  init(title: String, subtitle: String?) {
+    super.init(frame: .zero)
+    layer.cornerRadius = 12
+    clipsToBounds = true
+    isUserInteractionEnabled = false
+
+    let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
+    blur.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(blur)
+
+    let icon = UIImageView(image: UIImage(
+      systemName: "checkmark.circle",
+      withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .regular)))
+    icon.tintColor = .white
+    icon.contentMode = .center
+    icon.setContentHuggingPriority(.required, for: .horizontal)
+
+    let name = UILabel()
+    name.text = title
+    name.font = .systemFont(ofSize: 14, weight: .semibold)
+    name.textColor = .white
+    let text = UIStackView(arrangedSubviews: [name])
+    if let subtitle = subtitle, !subtitle.isEmpty {
+      let sub = UILabel()
+      sub.text = subtitle
+      sub.font = .systemFont(ofSize: 12)
+      sub.textColor = UIColor.white.withAlphaComponent(0.75)
+      text.addArrangedSubview(sub)
+    }
+    text.axis = .vertical
+    text.spacing = 0
+
+    let row = UIStackView(arrangedSubviews: [icon, text])
+    row.axis = .horizontal
+    row.alignment = .center
+    row.spacing = 10
+    row.translatesAutoresizingMaskIntoConstraints = false
+    blur.contentView.addSubview(row)
+
+    NSLayoutConstraint.activate([
+      blur.topAnchor.constraint(equalTo: topAnchor),
+      blur.bottomAnchor.constraint(equalTo: bottomAnchor),
+      blur.leadingAnchor.constraint(equalTo: leadingAnchor),
+      blur.trailingAnchor.constraint(equalTo: trailingAnchor),
+      row.topAnchor.constraint(equalTo: blur.contentView.topAnchor, constant: 8),
+      row.bottomAnchor.constraint(equalTo: blur.contentView.bottomAnchor, constant: -8),
+      row.leadingAnchor.constraint(equalTo: blur.contentView.leadingAnchor, constant: 12),
+      row.trailingAnchor.constraint(equalTo: blur.contentView.trailingAnchor, constant: -14),
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError() }
+}
+
+// MARK: - Forward picker (over the photo viewer)
+
+struct ForwardPerson: Identifiable {
+  let id: Int
+  let name: String
+  let status: String   // under the name: "5 members", the position…
+  let photo: String
+  let isChat: Bool     // a chat that exists (else a person with no chat yet)
+}
+
+final class ForwardPickerModel: ObservableObject {
+  /// Null until Flutter has loaded the list (a spinner shows meanwhile).
+  @Published var people: [ForwardPerson]?
+}
+
+/// "Forward" as in Telegram: a native sheet with search, the chats, then the
+/// people with no chat yet, a round check on each, and the button on top.
+struct ForwardPickerView: View {
+  @ObservedObject var model: ForwardPickerModel
+  let title: String
+  let searchPrompt: String
+  let sendTitle: String
+  let chatsTitle: String
+  let contactsTitle: String
+  let onClose: () -> Void
+  let onSend: ([Int]) -> Void
+
+  @State private var query = ""
+  @State private var selected: [Int] = []
+
+  private let accent = Color(red: 1.0, green: 0.416, blue: 0.0)
+
+  private func matches(_ p: ForwardPerson) -> Bool {
+    let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+    return q.isEmpty || p.name.lowercased().contains(q)
+  }
+
+  private func toggle(_ id: Int) {
+    if let i = selected.firstIndex(of: id) { selected.remove(at: i) } else { selected.append(id) }
+  }
+
+  var body: some View {
+    if #available(iOS 16.0, *) {
+      NavigationStack { content }
+    } else {
+      NavigationView { content }
+    }
+  }
+
+  private var content: some View {
+    Group {
+      if let people = model.people {
+        List {
+          let chats = people.filter { $0.isChat && matches($0) }
+          let others = people.filter { !$0.isChat && matches($0) }
+          if !chats.isEmpty {
+            Section(header: Text(chatsTitle)) { ForEach(chats) { row($0) } }
+          }
+          if !others.isEmpty {
+            Section(header: Text(contactsTitle)) { ForEach(others) { row($0) } }
+          }
+        }
+        .listStyle(.plain)
+        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: searchPrompt)
+      } else {
+        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+      }
+    }
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .navigationBarLeading) {
+        Button { onClose() } label: { Image(systemName: "xmark") }
+      }
+      ToolbarItem(placement: .principal) { Text(title).font(.headline) }
+      ToolbarItem(placement: .navigationBarTrailing) {
+        Button { onSend(selected) } label: {
+          Text(selected.count > 1 ? "\(sendTitle) (\(selected.count))" : sendTitle)
+            .font(.body.weight(.semibold))
+        }
+        .disabled(selected.isEmpty)
+      }
+    }
+  }
+
+  private func row(_ p: ForwardPerson) -> some View {
+    Button { toggle(p.id) } label: {
+      HStack(spacing: 12) {
+        Image(systemName: selected.contains(p.id) ? "checkmark.circle.fill" : "circle")
+          .font(.title2)
+          .foregroundColor(selected.contains(p.id) ? accent : Color(.systemGray3))
+        PickerAvatar(person: PickerPerson(id: p.id, name: p.name, subtitle: "", status: p.status, photo: p.photo))
+        VStack(alignment: .leading, spacing: 1) {
+          Text(p.name).font(.body).foregroundColor(.primary).lineLimit(1)
+          if !p.status.isEmpty {
+            Text(p.status).font(.footnote).foregroundColor(.secondary).lineLimit(1)
+          }
+        }
+        Spacer(minLength: 0)
+      }
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
   }
 }
 

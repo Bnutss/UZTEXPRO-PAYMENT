@@ -45,7 +45,8 @@ class _ChatNotificationsPageState extends State<ChatNotificationsPage> {
     settings: _settings,
   );
 
-  ChatServerNotify? _server;
+  // The cached answer is shown at once (no jump when the real one arrives).
+  ChatServerNotify? _server = ChatServerNotifyCache.value;
   bool _serverFailed = false;
 
   @override
@@ -63,9 +64,11 @@ class _ChatNotificationsPageState extends State<ChatNotificationsPage> {
     setState(() => _serverFailed = false);
     try {
       final got = await api.notifySettings();
+      ChatServerNotifyCache.put(got);
       if (mounted) setState(() => _server = got);
     } catch (_) {
-      if (mounted) setState(() => _serverFailed = true);
+      // Something is on the screen already: keep it, say nothing.
+      if (mounted && _server == null) setState(() => _serverFailed = true);
     }
   }
 
@@ -77,6 +80,7 @@ class _ChatNotificationsPageState extends State<ChatNotificationsPage> {
     setState(() => _server = next);
     try {
       final saved = await api.saveNotifySettings(next);
+      ChatServerNotifyCache.put(saved);
       if (mounted) setState(() => _server = saved);
     } catch (_) {
       if (!mounted) return;
@@ -97,8 +101,8 @@ class _ChatNotificationsPageState extends State<ChatNotificationsPage> {
   }
 
   /// One kind of chat (personal / group): notifications, text, sound.
-  Widget _serverGroup(S s, {required bool group}) {
-    final v = _server!;
+  Widget _serverGroup(S s, {required bool group, required bool locked}) {
+    final v = _server ?? const ChatServerNotify();
     final enabled = group ? v.groupEnabled : v.privateEnabled;
     final preview = group ? v.groupPreview : v.privatePreview;
     final sound = group ? v.groupSound : v.privateSound;
@@ -125,7 +129,9 @@ class _ChatNotificationsPageState extends State<ChatNotificationsPage> {
       return dim ? Opacity(opacity: 0.4, child: IgnorePointer(child: r)) : r;
     }
 
-    return SettingsGroup(
+    // Nothing known yet: the same two groups, dimmed, so that the page does not
+    // change its shape when the answer comes.
+    final group_ = SettingsGroup(
       children: [
         row(
           icon: Icons.notifications_rounded,
@@ -155,12 +161,14 @@ class _ChatNotificationsPageState extends State<ChatNotificationsPage> {
           ),
       ],
     );
+    return locked
+        ? Opacity(opacity: 0.4, child: IgnorePointer(child: group_))
+        : group_;
   }
 
   Widget _serverSection(S s) {
     if (widget.api == null) return const SizedBox.shrink();
-    if (_server == null) {
-      if (!_serverFailed) return const SizedBox.shrink();
+    if (_server == null && _serverFailed) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 24),
         child: Column(
@@ -178,10 +186,10 @@ class _ChatNotificationsPageState extends State<ChatNotificationsPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _caption(s.notifPrivateChats),
-        _serverGroup(s, group: false),
+        _serverGroup(s, group: false, locked: _server == null),
         const SizedBox(height: 24),
         _caption(s.notifGroups),
-        _serverGroup(s, group: true),
+        _serverGroup(s, group: true, locked: _server == null),
         _footer(s.notifPushHint),
         const SizedBox(height: 24),
       ],

@@ -88,6 +88,9 @@ class FakeRest implements ChatRest {
   final forwardCalls = <String>[];
   final goneForwards = <int>{};
 
+  /// A forward answers as this kind of message (default: text).
+  String forwardKind = 'text';
+
   @override
   Future<ChatMessage> forwardMessage(
     int conversationId,
@@ -105,6 +108,8 @@ class FakeRest implements ChatRest {
       clientId: clientId,
       createdAt: DateTime(2026),
       read: false,
+      kind: forwardKind,
+      media: forwardKind == 'text' ? null : const ChatMedia(name: 'p9.jpg'),
       forward: const ChatForward(name: 'Anna', userId: 2),
     );
   }

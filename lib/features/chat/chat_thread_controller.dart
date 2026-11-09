@@ -806,7 +806,9 @@ class ChatThreadController extends ChangeNotifier {
   /// its kind and the network the phone is on (by default photos only: they are
   /// small, and the server can then drop its copy); the rest on a tap.
   void _autoFetch(ChatMessage m) {
-    if (!m.isMedia || isMine(m) || m.isLocal || _disposed) return;
+    // My own photo is on this phone already (it was sent from here); one that
+    // I forwarded is not, until it is fetched like anybody's.
+    if (!m.isMedia || m.isLocal || _disposed) return;
     if (m.media?.available != true || ChatMediaStore.has(m)) return;
     if (!ChatDataSettings.instance.shouldAutoDownload(m.kind)) return;
     unawaited(ChatMediaManager.instance.download(m, rest));

@@ -20,6 +20,7 @@ import 'chat_hub.dart';
 import 'chat_list_actions.dart';
 import 'chat_system.dart';
 import 'chat_models.dart';
+import 'chat_notify_settings.dart';
 import 'chat_mute_sheet.dart';
 import 'chat_my_photo.dart';
 import 'chat_media_widgets.dart' show chatPreviewIcon, chatPreviewText;
@@ -62,6 +63,10 @@ class _ChatPageState extends State<ChatPage> {
     // The window shows the real numbers itself; the badge of the chat button
     // waits (and is refreshed on closing).
     widget.hub.chatOpen = true;
+    // The push settings are fetched now, so their screen opens with them.
+    ChatServerNotifyCache.restore().then(
+      (_) => ChatServerNotifyCache.prefetch(widget.hub.api),
+    );
     ChatMyPhoto.load().then((f) {
       if (mounted && f != null) setState(() => _myPhoto = f);
     });

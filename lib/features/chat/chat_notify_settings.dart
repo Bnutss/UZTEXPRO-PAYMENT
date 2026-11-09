@@ -1,5 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'chat_api.dart';
+import 'chat_models.dart' show ChatServerNotify;
 
 /// A sound the person can pick for a message sent or received in the app.
 enum ChatSoundChoice {
@@ -108,4 +113,49 @@ class ChatNotifySettings extends ChangeNotifier {
     incoming: defaultIncoming,
     sent: defaultSent,
   );
+}
+
+
+/// The push settings that live on the server, kept on the phone as well: the
+/// "Notifications and sounds" screen shows them the moment it opens (no empty
+/// space that fills in a moment later, which made the screen jump), and
+/// refreshes them quietly.
+class ChatServerNotifyCache {
+  ChatServerNotifyCache._();
+
+  static const _key = 'chat_server_notify';
+
+  /// What the server had the last time we asked (null: never asked).
+  static ChatServerNotify? value;
+
+  /// Reads what was saved by the last run (once).
+  static Future<void> restore() async {
+    if (value != null) return;
+    try {
+      final p = await SharedPreferences.getInstance();
+      final raw = p.getString(_key);
+      if (raw != null && value == null) {
+        value = ChatServerNotify.fromJson(
+          (jsonDecode(raw) as Map).cast<String, dynamic>(),
+        );
+      }
+    } catch (_) {}
+  }
+
+  /// Asks the server and remembers the answer; a failure keeps the old one.
+  static Future<void> prefetch(ChatRest api) async {
+    try {
+      put(await api.notifySettings());
+    } catch (_) {}
+  }
+
+  static void put(ChatServerNotify v) {
+    value = v;
+    () async {
+      try {
+        final p = await SharedPreferences.getInstance();
+        await p.setString(_key, jsonEncode(v.toJson()));
+      } catch (_) {}
+    }();
+  }
 }

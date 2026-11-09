@@ -90,7 +90,15 @@ class ChatForwarder {
   Future<bool> _one(int convId, ChatMessage m, String albumId) async {
     final clientId = _clientId();
     try {
-      await api.forwardMessage(convId, m.id, clientId, albumId: albumId);
+      final copy = await api.forwardMessage(
+        convId,
+        m.id,
+        clientId,
+        albumId: albumId,
+      );
+      // The file is on this phone already: the new message shows it at once
+      // (and opens at once) instead of being fetched from the server first.
+      if (m.isMedia) await _keepCopy(copy, m);
       return true;
     } on ChatApiException catch (e) {
       // The server no longer has the file: send the copy from this phone.
@@ -101,6 +109,22 @@ class ChatForwarder {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Puts this phone's file and preview of [original] where the new message
+  /// [copy] looks for its own. Nothing to copy (not downloaded here) is fine.
+  Future<void> _keepCopy(ChatMessage copy, ChatMessage original) async {
+    try {
+      await ChatMediaStore.init();
+      final file = ChatMediaStore.fileOf(original);
+      if (file == null || !file.existsSync()) return;
+      final thumb = ChatMediaStore.thumbOf(original);
+      await ChatMediaStore.keepOutgoing(
+        copy,
+        file.path,
+        (thumb != null && thumb.existsSync()) ? thumb.path : null,
+      );
+    } catch (_) {}
   }
 
   Future<bool> _upload(
@@ -130,7 +154,13 @@ class ChatForwarder {
         caption: m.text,
         albumId: albumId,
       );
-      await api.sendMedia(convId, upload, '${clientId}u', forwardOf: m.id);
+      final sent = await api.sendMedia(
+        convId,
+        upload,
+        '${clientId}u',
+        forwardOf: m.id,
+      );
+      await _keepCopy(sent, m);
       return true;
     } on FileSystemException {
       return false;
