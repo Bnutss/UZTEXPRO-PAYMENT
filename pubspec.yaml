@@ -3,7 +3,7 @@ description: "A new Flutter project."
 
 publish_to: 'none'
 
-version: 1.2.10+33
+version: 1.3.0+34
 
 environment:
   sdk: ^3.12.0
@@ -26,9 +26,10 @@ dependencies:
   shared_preferences: ^2.4.0
   url_launcher: ^6.3.2
   shimmer: ^3.0.0
-  # Push notifications about chat messages (iOS via APNs, Android without Google
-  # Play Services). The secret key lives on the backend only.
-  pushy_flutter: 2.0.49
+  # Push notifications about chat messages (Firebase Cloud Messaging; iOS goes
+  # through APNs). The service-account key lives on the backend only.
+  firebase_core: ^4.0.0
+  firebase_messaging: ^16.0.0
   intl: ^0.20.2
   package_info_plus: ^8.1.0
   cached_network_image: ^3.4.1

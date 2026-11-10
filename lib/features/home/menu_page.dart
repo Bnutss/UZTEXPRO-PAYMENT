@@ -164,7 +164,7 @@ class _MenuPageState extends State<MenuPage>
       _chat!.unread.addListener(_onChatUnread);
       _push = ChatPushService(
         api: _chat!.api,
-        client: PushyClient(),
+        client: FcmClient(),
         unread: () => _chatUnread,
       );
       _push!.openRequest.addListener(_onPushOpen);

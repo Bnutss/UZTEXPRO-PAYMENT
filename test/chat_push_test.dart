@@ -19,6 +19,9 @@ class _Push implements PushClient {
   }
 
   @override
+  void onTokenRefresh(void Function(String token) listener) {}
+
+  @override
   void onTap(void Function(Map<String, dynamic> data) listener) =>
       tap = listener;
 

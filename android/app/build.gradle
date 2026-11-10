@@ -43,7 +43,7 @@ android {
 
     buildTypes {
         release {
-            // Keep rules of the push SDK (Pushy); harmless when R8 is off.
+            // Keep rules for the notification code; harmless when R8 is off.
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             // Falls back to debug signing only if key.properties is missing
             // (e.g. a fresh checkout before the release keystore is set up)
@@ -58,7 +58,9 @@ flutter {
 }
 
 dependencies {
-    // Pushy delivers through FCM too (Pushy.toggleFCM), which wakes the phone
-    // while the system has put the app to sleep.
-    implementation "com.google.firebase:firebase-messaging:24.1.0"
+    // ChatFirebaseService extends the Flutter plugin's service, so the Firebase
+    // classes must be visible to the app too. The BoM is the one firebase_core
+    // uses (a newer plugin may raise it; Gradle takes the higher one).
+    implementation platform("com.google.firebase:firebase-bom:34.19.0")
+    implementation "com.google.firebase:firebase-messaging"
 }

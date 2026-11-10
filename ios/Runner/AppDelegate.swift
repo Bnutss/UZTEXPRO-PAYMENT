@@ -5,6 +5,7 @@ import PhotosUI
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
+import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -69,6 +70,26 @@ import UniformTypeIdentifiers
       default:
         result(FlutterMethodNotImplemented)
       }
+    }
+
+    // Opening the chat with nothing unread: the number on the icon and the
+    // notifications left in the shade go.
+    FlutterMethodChannel(
+      name: "uztexpro/notifications",
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
+    ).setMethodCallHandler { call, result in
+      guard call.method == "clearBadge" || call.method == "cancelAll" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      let center = UNUserNotificationCenter.current()
+      center.removeAllDeliveredNotifications()
+      if #available(iOS 16.0, *) {
+        center.setBadgeCount(0) { _ in }
+      } else {
+        UIApplication.shared.applicationIconBadgeNumber = 0
+      }
+      result(true)
     }
 
     // The settings tab of the chat tells us where it draws its stand-in for

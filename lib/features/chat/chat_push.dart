@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' show Platform;
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:pushy_flutter/pushy_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'chat_api.dart';
@@ -12,13 +14,14 @@ import 'chat_device_model.dart';
 import 'chat_models.dart';
 import 'chat_session.dart';
 
-/// Push notifications about chat messages (Pushy): registering this phone with
+/// Push notifications about chat messages (Firebase Cloud Messaging): registering this phone with
 /// the backend, showing a notification on Android, and leading a tap to the
 /// right conversation.
 ///
-/// On iOS the system shows the notification itself (from the `notification`
-/// part the server sends) and only when the app is not in the foreground; on
-/// Android the app shows it from `data`, and must not do so while it is open.
+/// On iOS the system shows the notification itself (from the `aps` part the
+/// server sends) and only when the app is not in the foreground; on Android
+/// the app draws it natively from `data` (ChatFirebaseService.kt), and must not
+/// do so while it is open.
 
 // ── What a tapped notification leads to ──────────────────────────────────
 
@@ -105,32 +108,15 @@ class PushForeground {
   }
 }
 
-/// Runs for every push while the app is not the foreground one (Android: in a
-/// background isolate). Must be a top-level function.
-@pragma('vm:entry-point')
-Future<void> chatBackgroundNotificationListener(
-  Map<String, dynamic> data,
-) async {
-  // iOS: the system has already shown it from the `notification` part.
-  if (!Platform.isAndroid) return;
-  final isChat = data['type'] == 'chat';
-  // Android: a chat message is drawn by the app's own receiver
-  // (ChatPushReceiver.kt) with the photo and the sender, right away.
-  if (isChat) return;
-  // Anything else with a text (a test push from the server or the Pushy
-  // dashboard) is shown too, so delivery can be checked without a chat.
-  if ((data['message'] ?? '').toString().isEmpty) return;
-  final title = (data['title'] ?? 'UztexPro').toString();
-  final text = (data['message'] ?? '').toString();
-  Pushy.notify(title, text, data);
-}
-
 // ── The push SDK behind a small interface (a seam for tests) ─────────────
 
 abstract class PushClient {
   /// Starts receiving, asks for the permission where the system needs it, and
   /// returns this phone's token (null when there is none).
   Future<String?> register();
+
+  /// The system gave this phone a new token: it must be registered again.
+  void onTokenRefresh(void Function(String token) listener);
 
   /// A tap on a notification (also one that launched the app).
   void onTap(void Function(Map<String, dynamic> data) listener);
@@ -139,33 +125,68 @@ abstract class PushClient {
   void clearBadge();
 }
 
-class PushyClient implements PushClient {
-  @override
-  Future<String?> register() async {
-    // Android: deliver through Google FCM too, so the phone wakes for a push
-    // even while the system has put the app to sleep (as Telegram does).
-    Pushy.toggleFCM(true);
-    // Android: the small status-bar icon (white silhouette); without it the
-    // system shows the generic round "i".
-    Pushy.setNotificationIcon('ic_stat_notification');
-    Pushy.listen();
-    Pushy.setNotificationListener(chatBackgroundNotificationListener);
-    return Pushy.register();
-  }
-
-  @override
-  void onTap(void Function(Map<String, dynamic> data) listener) =>
-      Pushy.setNotificationClickListener(listener);
-
+class FcmClient implements PushClient {
   static const _channel = MethodChannel('uztexpro/notifications');
 
   @override
-  void clearBadge() {
-    Pushy.clearBadge(); // iOS: the number on the icon
-    if (Platform.isAndroid) {
-      // Android: the number is the notifications still in the shade.
-      _channel.invokeMethod<bool>('cancelAll').catchError((_) => false);
+  Future<String?> register() async {
+    // Android reads its settings from google-services.json, iOS from
+    // GoogleService-Info.plist; both are added by the build.
+    if (Firebase.apps.isEmpty) await Firebase.initializeApp();
+    final messaging = FirebaseMessaging.instance;
+    // iOS asks the person here; on Android 13+ MainActivity asks at start.
+    await messaging.requestPermission();
+    if (Platform.isIOS) {
+      // The FCM token exists only once Apple has handed over the APNs one,
+      // which can take a moment after the first launch.
+      for (var i = 0; i < 10 && await messaging.getAPNSToken() == null; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      }
     }
+    return messaging.getToken();
+  }
+
+  @override
+  void onTokenRefresh(void Function(String token) listener) {
+    if (Firebase.apps.isEmpty) return;
+    FirebaseMessaging.instance.onTokenRefresh.listen(listener);
+  }
+
+  @override
+  void onTap(void Function(Map<String, dynamic> data) listener) {
+    // iOS: the system showed it; a tap comes through Firebase.
+    FirebaseMessaging.onMessageOpenedApp.listen((m) => listener(m.data));
+    FirebaseMessaging.instance.getInitialMessage().then((m) {
+      if (m != null) listener(m.data);
+    }).catchError((_) {});
+    // Android: the app drew it (ChatFirebaseService), and MainActivity hands
+    // the tap over: the one that launched the app, and later ones.
+    if (Platform.isAndroid) {
+      _channel.setMethodCallHandler((call) async {
+        if (call.method == 'pushTapped') _deliver(call.arguments, listener);
+      });
+      _channel
+          .invokeMethod<String>('initialPush')
+          .then((payload) => _deliver(payload, listener))
+          .catchError((_) {});
+    }
+  }
+
+  static void _deliver(
+    Object? payload,
+    void Function(Map<String, dynamic>) listener,
+  ) {
+    if (payload is! String || payload.isEmpty) return;
+    try {
+      final data = jsonDecode(payload);
+      if (data is Map) listener(Map<String, dynamic>.from(data));
+    } catch (_) {}
+  }
+
+  @override
+  void clearBadge() {
+    // iOS: the number on the icon; Android: the notifications in the shade.
+    _channel.invokeMethod<bool>('clearBadge').catchError((_) => false);
   }
 }
 
@@ -218,21 +239,30 @@ class ChatPushService with WidgetsBindingObserver {
     try {
       final token = await client.register();
       if (token == null || token.isEmpty || _disposed) return;
-      // The chat asks the server about this phone in every request from now on.
-      ChatSession.deviceToken = token;
-      final d = await detectDeviceDetails();
-      final id = await api.registerDevice(
-        token,
-        platform,
-        name: d.model,
-        model: d.model,
-        osVersion: d.os,
-        appVersion: d.appVersion,
-      );
-      ChatSession.deviceId = id;
-      _token = token;
-      lastToken = token;
+      await _registerToken(token);
+      client.onTokenRefresh((fresh) {
+        if (!_disposed && _token != null && fresh != _token) {
+          _registerToken(fresh).catchError((_) {});
+        }
+      });
     } catch (_) {}
+  }
+
+  Future<void> _registerToken(String token) async {
+    // The chat asks the server about this phone in every request from now on.
+    ChatSession.deviceToken = token;
+    final d = await detectDeviceDetails();
+    final id = await api.registerDevice(
+      token,
+      platform,
+      name: d.model,
+      model: d.model,
+      osVersion: d.os,
+      appVersion: d.appVersion,
+    );
+    ChatSession.deviceId = id;
+    _token = token;
+    lastToken = token;
   }
 
   /// Call on sign-out, before the login is dropped: the next person on this

@@ -2,7 +2,7 @@ package com.example.uztexpro_payment
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.content.BroadcastReceiver
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -20,46 +20,63 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import androidx.core.graphics.drawable.IconCompat
-import me.pushy.sdk.flutter.util.PushyNotification
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import kotlin.concurrent.thread
 
 /**
  * The chat's notifications on Android, drawn by the app (like Telegram's): the
  * sender's round photo, the name, the text, the messages of one chat in one
  * notification, and a quiet channel when "Sound" is off.
  *
- * Pushy hands every push to every receiver that listens for the `pushy.me`
- * action. This one answers the chat's own pushes right here, with no wait for
- * the Dart isolate (which made them late); anything else is left to Pushy's.
+ * Firebase hands every push to [ChatFirebaseService], which calls this for the
+ * chat's own pushes right away, with no wait for the Dart isolate (which made
+ * them late).
  */
-class ChatPushReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        val extras = intent.extras ?: return
-        if (extras.get("type")?.toString() != "chat") return
-        // The app is open on the screen: it shows the message itself.
+object ChatNotifier {
+    /** Draws a chat push ([values] is its FCM `data`); does nothing while the
+     *  app is open on the screen (it shows the message itself). Blocking: the
+     *  photo is downloaded here, so call it off the main thread. */
+    fun onPush(context: Context, values: Map<String, String>) {
         if (appIsOpen(context)) return
-
-        val values = HashMap<String, String>()
         val payload = JSONObject()
-        for (key in extras.keySet()) {
-            val v = extras.get(key)
-            payload.put(key, v)
-            values[key] = v?.toString() ?: ""
+        for ((k, v) in values) payload.put(k, v)
+        try {
+            show(context.applicationContext, values, payload.toString())
+        } catch (_: Throwable) {
+            // A notification that cannot be drawn must never crash the app.
         }
+    }
 
-        val pending = goAsync()
-        thread(name = "chat-push") {
-            try {
-                show(context.applicationContext, values, payload.toString())
-            } catch (_: Throwable) {
-                // A notification that cannot be drawn must never crash the app.
-            } finally {
-                pending.finish()
-            }
+    /** A plain notification (the test push from the admin). */
+    fun showPlain(context: Context, title: String, text: String) {
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        ensureChannels(context, manager)
+        val builder = NotificationCompat.Builder(context, CHANNEL_MESSAGES)
+            .setSmallIcon(R.drawable.ic_stat_notification)
+            .setColor(Color.parseColor("#FF8C00"))
+            .setContentTitle(title)
+            .setContentText(text)
+            .setAutoCancel(true)
+            .setContentIntent(openApp(context, "", 1))
+        try {
+            NotificationManagerCompat.from(context).notify(System.currentTimeMillis().toInt(), builder.build())
+        } catch (_: SecurityException) {
         }
+    }
+
+    /** A tap leads to the app; [payload] (the push's data as JSON) tells it
+     *  which chat to open (see MainActivity). */
+    private fun openApp(context: Context, payload: String, requestCode: Int): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+            if (payload.isNotEmpty()) putExtra(MainActivity.EXTRA_PUSH, payload)
+        }
+        return PendingIntent.getActivity(
+            context, requestCode, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     /** The app writes a heartbeat while it is the foreground one (see
@@ -126,7 +143,7 @@ class ChatPushReceiver : BroadcastReceiver() {
             .setAutoCancel(true)
             .setWhen(System.currentTimeMillis())
             .setGroup(GROUP_KEY)
-            .setContentIntent(PushyNotification.getMainActivityPendingIntent(context, payload))
+            .setContentIntent(openApp(context, payload, convId.toInt()))
             // A new message in a chat that already has a notification should
             // not make a sound again unless it is the first one.
             .setOnlyAlertOnce(false)
@@ -215,10 +232,8 @@ class ChatPushReceiver : BroadcastReceiver() {
         return out
     }
 
-    companion object {
-        private const val CHANNEL_MESSAGES = "chat_messages"
-        private const val CHANNEL_QUIET = "chat_messages_quiet"
-        private const val GROUP_KEY = "uztexpro_chat_messages"
-        private const val SUMMARY_ID = 0
-    }
+    private const val CHANNEL_MESSAGES = "chat_messages"
+    private const val CHANNEL_QUIET = "chat_messages_quiet"
+    private const val GROUP_KEY = "uztexpro_chat_messages"
+    private const val SUMMARY_ID = 0
 }
