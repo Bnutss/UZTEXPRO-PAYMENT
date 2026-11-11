@@ -136,7 +136,11 @@ class ChatRow extends StatelessWidget {
     this.subtitlePrefix = '',
     this.timeIcon,
     this.selected,
+    this.shortName = false,
   });
+
+  /// The name as surname and first name only (contacts), not the full one.
+  final bool shortName;
 
   /// Not null: a round check at the right end (a list to pick from, as in
   /// Telegram's "Forward"); true when this row is picked.
@@ -194,7 +198,7 @@ class ChatRow extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            user.name,
+                            shortName ? user.surnameName : user.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(

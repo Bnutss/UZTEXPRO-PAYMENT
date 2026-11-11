@@ -4,7 +4,6 @@ import 'dart:io' show Platform;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -128,11 +127,24 @@ abstract class PushClient {
 class FcmClient implements PushClient {
   static const _channel = MethodChannel('uztexpro/notifications');
 
+  static Future<bool>? _ready;
+
+  /// Starts Firebase once; false when it cannot start (no config file, no
+  /// Play services): push is then off, nothing else breaks. Android reads its
+  /// settings from google-services.json, iOS from GoogleService-Info.plist;
+  /// both are added by the build.
+  static Future<bool> _init() => _ready ??= () async {
+    try {
+      if (Firebase.apps.isEmpty) await Firebase.initializeApp();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }();
+
   @override
   Future<String?> register() async {
-    // Android reads its settings from google-services.json, iOS from
-    // GoogleService-Info.plist; both are added by the build.
-    if (Firebase.apps.isEmpty) await Firebase.initializeApp();
+    if (!await _init()) return null;
     final messaging = FirebaseMessaging.instance;
     // iOS asks the person here; on Android 13+ MainActivity asks at start.
     await messaging.requestPermission();
@@ -148,17 +160,22 @@ class FcmClient implements PushClient {
 
   @override
   void onTokenRefresh(void Function(String token) listener) {
-    if (Firebase.apps.isEmpty) return;
-    FirebaseMessaging.instance.onTokenRefresh.listen(listener);
+    _init().then((ok) {
+      if (ok) FirebaseMessaging.instance.onTokenRefresh.listen(listener);
+    });
   }
 
   @override
   void onTap(void Function(Map<String, dynamic> data) listener) {
     // iOS: the system showed it; a tap comes through Firebase.
-    FirebaseMessaging.onMessageOpenedApp.listen((m) => listener(m.data));
-    FirebaseMessaging.instance.getInitialMessage().then((m) {
-      if (m != null) listener(m.data);
-    }).catchError((_) {});
+    _init()
+        .then((ok) async {
+          if (!ok) return;
+          FirebaseMessaging.onMessageOpenedApp.listen((m) => listener(m.data));
+          final first = await FirebaseMessaging.instance.getInitialMessage();
+          if (first != null) listener(first.data);
+        })
+        .catchError((_) {});
     // Android: the app drew it (ChatFirebaseService), and MainActivity hands
     // the tap over: the one that launched the app, and later ones.
     if (Platform.isAndroid) {

@@ -522,6 +522,7 @@ class _ContactsTabState extends State<_ContactsTab> {
           for (final u in _users)
             ChatRow(
               user: u,
+              shortName: true,
               subtitle: u.online ? s.chatOnline : s.chatLastSeen(u.lastSeen),
               subtitleColor: u.online ? AppColors.brandOrange : null,
               onTap: () => _open(u),

@@ -61,7 +61,10 @@ final class NotificationService: UNNotificationServiceExtension {
     // In a group the system's title is the person of the intent: make it the
     // group (as Telegram does); the author stays in front of the text, which
     // the server already put there ("Surname Name: text").
-    let senderName = isGroup ? content.title : ((info["sender_name"] as? String) ?? content.title)
+    let fullName = (info["sender_name"] as? String) ?? content.title
+    // Surname and first name only, without the patronymic.
+    let shortName = fullName.split(whereSeparator: { $0.isWhitespace }).prefix(2).joined(separator: " ")
+    let senderName = isGroup ? content.title : shortName
     let senderId = "\(info["sender"] ?? "0")"
     let conversationId = "\(info["conversation"] ?? "0")"
 
